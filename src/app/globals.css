@@ -1,0 +1,172 @@
+
+/* stylelint-disable at-rule-no-unknown, declaration-block-no-duplicate-properties */
+/* Allow Tailwind/JIT @rules in editor/linters (these are handled by PostCSS/Tailwind at build time) */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=PT+Sans:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 280 60% 97%; /* Light Lavender */
+    --foreground: 280 10% 20%;
+    
+    --card: 280 50% 95% / 0.8;
+    --card-foreground: 280 10% 15%;
+    
+    --popover: 280 60% 97%;
+    --popover-foreground: 280 10% 15%;
+    
+    --primary: 283 51% 53%; /* Vibrant Violet */
+    --primary-foreground: 280 40% 98%;
+    
+    --secondary: 280 40% 92%;
+    --secondary-foreground: 283 51% 53%;
+    
+    --muted: 280 30% 92%;
+    --muted-foreground: 280 10% 55%;
+    
+    --accent: 260 80% 65%; /* Cool Indigo */
+    --accent-foreground: 280 40% 98%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 280 30% 90% / 0.5;
+    --input: 280 30% 90% / 0.8;
+    --ring: 283 51% 53%;
+    
+    --radius: 0.75rem;
+
+    --chart-1: 283 51% 53%;
+    --chart-2: 150 70% 45%;
+    --chart-3: 30 90% 55%;
+    --chart-4: 210 90% 55%;
+    --chart-5: 340 85% 65%;
+
+    --gradient-from: 330 85% 60%;
+    --gradient-to: 210 90% 55%;
+  }
+
+  .dark {
+    --background: 275 22% 11%; /* Deep Violet-Blue */
+    --foreground: 275 15% 85%;
+    
+    --card: 275 20% 15% / 0.6; 
+    --card-foreground: 275 15% 90%;
+    
+    --popover: 275 22% 11%;
+    --popover-foreground: 275 15% 85%;
+    
+    --primary: 283 51% 53%; /* Vibrant Violet */
+    --primary-foreground: 280 20% 98%;
+    
+    --secondary: 275 15% 20%;
+    --secondary-foreground: 275 15% 95%;
+    
+    --muted: 275 15% 20%;
+    --muted-foreground: 275 10% 55%;
+    
+    --accent: 260 80% 70%; /* Brighter Indigo */
+    --accent-foreground: 280 20% 98%;
+    
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 275 15% 25% / 0.4;
+    --input: 275 15% 25% / 0.6;
+    --ring: 283 51% 53%;
+
+    --chart-1: 283 51% 53%;
+    --chart-2: 150 70% 45%;
+    --chart-3: 30 90% 55%;
+    --chart-4: 210 90% 55%;
+    --chart-5: 340 85% 65%;
+
+    --gradient-from: 330 85% 60%;
+    --gradient-to: 210 90% 55%;
+  }
+
+  .amoled {
+    --background: 0 0% 0%; /* True Black */
+    --foreground: 275 15% 85%;
+    
+    --card: 0 0% 7%;
+    --card-foreground: 275 15% 85%;
+    
+    --popover: 0 0% 5%;
+    --popover-foreground: 275 15% 85%;
+    
+    --primary: 283 51% 53%;
+    --primary-foreground: 280 20% 98%;
+    
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 275 15% 95%;
+    
+    --muted: 0 0% 10%;
+    --muted-foreground: 275 10% 55%;
+    
+    --accent: 260 80% 70%;
+    --accent-foreground: 280 20% 98%;
+    
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 0 0% 15%;
+    --input: 0 0% 12%;
+    --ring: 283 51% 53%;
+
+    --gradient-from: 330 85% 60%;
+    --gradient-to: 210 90% 55%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+    .animated-gradient {
+        background-size: 200%;
+        background-position: 0% 50%;
+        animation: background-pan 3s ease-in-out infinite;
+    }
+
+    @keyframes background-pan {
+        0% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+        100% {
+            background-position: 0% 50%;
+        }
+    }
+    
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+}
+
+/* Force breaking of very long tokens in chat previews to avoid layout overflow */
+.chat-list-force-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

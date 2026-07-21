@@ -1,0 +1,18 @@
+
+:root {
+  --glass-blur: 10px;
+  --glass-bg-light: rgba(255, 255, 255, 0.6);
+  --glass-border-light: rgba(0, 0, 0, 0.06);
+  --text-on-glass-light: rgba(0, 0, 0, 0.8);
+
+  --glass-bg-dark: rgba(30, 30, 30, 0.5);
+  --glass-border-dark: rgba(255, 255, 255, 0.1);
+  --text-on-glass-dark: rgba(255, 255, 255, 0.95);
+  
+  --accent-rgb: 124, 92, 255;
+  --radius-lg: 14px;
+}
+
+body.glass-lite .backdrop-blur-var {
+    backdrop-filter: none;
+}

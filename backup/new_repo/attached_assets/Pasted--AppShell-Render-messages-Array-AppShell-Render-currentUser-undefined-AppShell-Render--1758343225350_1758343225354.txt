@@ -1,0 +1,69 @@
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[Fast Refresh] rebuilding
+Error sending verification code: 
+Error {}
+message: "Failed to send verification code"
+stack: "Error: Failed to send verification code↵ at handleSendVerificationCode (webpack-internal:///(app-pages-browser)/./src/app/(auth)/signup/page.tsx:88:23)↵ at async onSubmit (webpack-internal:///(app-pages-browser)/./src/app/(auth)/signup/page.tsx:251:13)↵ at async eval (webpack-internal:///(app-pages-browser)/./node_modules/react-hook-form/dist/index.esm.mjs:2081:17)"
+get stack: ƒ ()
+set stack: ƒ ()
+Symbol(next.console.error.digest): undefined
+[[Prototype]]: Object
+
+at t.value (https://0faa6f91-9f09-44e6-be72-ced4eb895f37-00-1xh83yplx0tie.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://0faa6f91-9f09-44e6-be72-ced4eb895f37-00-1xh83yplx0tie.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://0faa6f91-9f09-44e6-be72-ced4eb895f37-00-1xh83yplx0tie.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://0faa6f91-9f09-44e6-be72-ced4eb895f37-00-1xh83yplx0tie.worf.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+Error sending verification code: 
+Error {}
+
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[Fast Refresh] done in 4652ms
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined
+[AppShell Render] selectedChat: undefined
+[AppShell Render] messages: 
+Array []
+[AppShell Render] currentUser: undefined

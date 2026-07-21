@@ -1,0 +1,53 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "user-1",
+      "description": "Avatar for Sarah Lee",
+      "imageUrl": "https://picsum.photos/seed/1/100/100",
+      "imageHint": "woman portrait"
+    },
+    {
+      "id": "user-2",
+      "description": "Avatar for Alex Chen",
+      "imageUrl": "https://picsum.photos/seed/2/100/100",
+      "imageHint": "man portrait"
+    },
+    {
+      "id": "user-3",
+      "description": "Avatar for Maria Rodriguez",
+      "imageUrl": "https://picsum.photos/seed/3/100/100",
+      "imageHint": "woman smiling"
+    },
+    {
+      "id": "user-4",
+      "description": "Avatar for David Kim",
+      "imageUrl": "https://picsum.photos/seed/4/100/100",
+      "imageHint": "man glasses"
+    },
+    {
+      "id": "user-5",
+      "description": "Avatar for Emily White",
+      "imageUrl": "https://picsum.photos/seed/5/100/100",
+      "imageHint": "person nature"
+    },
+    {
+      "id": "user-6",
+      "description": "Avatar for Tech Innovations Group",
+      "imageUrl": "https://picsum.photos/seed/6/100/100",
+      "imageHint": "abstract tech"
+    },
+    {
+      "id": "user-7",
+      "description": "Avatar for Weekend Hangouts",
+      "imageUrl": "https://picsum.photos/seed/7/100/100",
+      "imageHint": "friends laughing"
+    },
+    {
+      "id": "user-8",
+      "description": "Avatar for Family Group",
+      "imageUrl": "https://picsum.photos/seed/8/100/100",
+      "imageHint": "family photo"
+    }
+  ]
+}

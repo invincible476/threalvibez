@@ -1,0 +1,23 @@
+
+{
+  "colors": {
+    "light": {
+      "glassBg": "rgba(255, 255, 255, 0.6)",
+      "glassBorder": "rgba(0, 0, 0, 0.06)",
+      "textOnGlass": "rgba(0, 0, 0, 0.8)"
+    },
+    "dark": {
+      "glassBg": "rgba(30, 30, 30, 0.5)",
+      "glassBorder": "rgba(255, 255, 255, 0.1)",
+      "textOnGlass": "rgba(255, 255, 255, 0.95)"
+    },
+    "accentRgb": "124, 92, 255"
+  },
+  "radii": {
+    "lg": "14px"
+  },
+  "blur": {
+    "default": "10px",
+    "mobile": "8px"
+  }
+}

@@ -1,0 +1,108 @@
+/* Static background for reduced motion or fallback */
+.auth-bg {
+    background-color: #0c0a1e; /* Deep indigo base */
+    background-image: radial-gradient(at 20% 80%, hsla(255, 60%, 30%, 0.3) 0px, transparent 50%),
+                      radial-gradient(at 80% 10%, hsla(280, 50%, 40%, 0.25) 0px, transparent 50%);
+    overflow: hidden;
+    position: relative;
+}
+
+.blob-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 0;
+}
+
+/* Base styles for all blobs */
+.blob-container::before,
+.blob-container::after,
+.blob-container > div::before,
+.blob-container > div::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+    opacity: 0;
+    mix-blend-mode: screen; /* Soft additive blending */
+    filter: blur(80px); /* Increased blur for softer edges */
+}
+
+/* Blob 1 (Violet) */
+.blob-container::before {
+    width: 550px; /* Increased size */
+    height: 550px;
+    background: hsla(283, 60%, 55%, 0.25); /* Increased opacity and vibrancy */
+    animation: blob-float 15s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+/* Blob 2 (Cyan Accent) */
+.blob-container::after {
+    width: 450px; /* Increased size */
+    height: 450px;
+    background: hsla(180, 80%, 50%, 0.2); /* Increased opacity */
+    animation: blob-float 20s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55) 3s;
+}
+
+/* Blob 3 (Indigo) */
+.blob-container > div::before {
+    width: 500px; /* Increased size */
+    height: 500px;
+    background: hsla(260, 80%, 65%, 0.28); /* Increased opacity */
+    animation: blob-float 18s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55) 1.5s;
+}
+
+/* Blob 4 (Deeper Violet) */
+.blob-container > div::after {
+    width: 400px; /* Increased size */
+    height: 400px;
+    background: hsla(275, 50%, 45%, 0.22); /* Increased opacity */
+    animation: blob-float 25s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55) 5s;
+}
+
+
+@keyframes blob-float {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.15;
+    }
+    33% {
+        transform: translate(calc(60vw - 40%), calc(70vh - 60%)) scale(1.3);
+        opacity: 0.3;
+    }
+    66% {
+        transform: translate(calc(25vw - 50%), calc(40vh - 50%)) scale(0.9);
+        opacity: 0.25;
+    }
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.15;
+    }
+}
+
+/* Apply different initial positions and delays */
+.blob-container::after {
+    animation-delay: -5s;
+}
+.blob-container > div::before {
+    animation-delay: -10s;
+}
+.blob-container > div::after {
+    animation-delay: -2.5s;
+    animation-direction: alternate-reverse;
+}
+
+
+/* Accessibility: Disable animations if the user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .blob-container::before,
+    .blob-container::after,
+    .blob-container > div::before,
+    .blob-container > div::after {
+        animation: none;
+        opacity: 0; /* Hide the animated blobs completely */
+    }
+}

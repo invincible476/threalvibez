@@ -1,0 +1,31 @@
+## Error Type
+Build Error
+
+## Error Message
+Parsing ecmascript source code failed
+
+## Build Output
+./src/utils/replitmail.ts:38:5
+Parsing ecmascript source code failed
+  36 |     : process.env.REPL_IDENTITY || 'v2.public.Q2lRM1ptTmpNVE0zWXkwellqQmlMVFJsTldRdFlqQTVNaTB4TXprME5qUmxaamhpWW1FU0QzbGhaMkZ0YVd4cFoyaDBhM1Z1TVJvRlZrbENSVm9pSkRkbVkyTXhNemRqTFROaU1HSXROR1UxWkMxaU1Ea3lMVEV6T1RRMk5HVm1PR0ppWVRpUjV1Z1BXaE1LQkhCcGEyVVNDMmx1ZEdWeVlXTjBhWFpsMQqde217ItS5EI3-2v1broDMH-fQ67Y302S3A-gKTcIOaogdNXg0JQ6Pppfn0hkpd9qX15kUa1qmhEkIFlQ9DQ.R0FFaUJtTnZibTFoYmhLYkNIWXlMbkIxWW14cFl5NVJNbVF6VTFjME5GbFVSalJhTVd4U1kwZFNjVTR5Tlc1VVZrNUZVVmRzTVdFd01XMVNNRXB2VVhwTmVsVklWbXhSV0doMlVUQmtRbFpYUmt0YU1qbHlWR3BLWVdGc2JEWlNXSEJQVFdzeE1GUlVTa3BrTVd4d1RVUkNZVlpHV25KVVJtUktaREE1VlZOWVVrNVdSVEF4Vkd0U1drMUdjRmhYVkZKYVlsVndiMUl5YUVaVk1GRjZZa2RvWVUxcldqQlpWbVEwWTBadmVXRkVRbWhOTVZveFZGWktkbEpyT1V0VFJ6QXlVVlJvYUZGdGJFcFNWMDVJWWtoS1lWVnRPVTlUTW1Rd1kwZEtkVlZ0ZUdwaVZWcHhXa1ZrYzAxc2NGUlRWRVpvWld0c01Wa3dhRmRoVjBwSVlrZHdUV0V3Y0hSV2JHUTBXbTFTYzA5SVpGcGliV2hZVlZSR1FrMXRVbGhsU1ZaV1pXdEtjbFZxUVRGVFZrWnlVMnhhVGxKc2NGTldiWEJQV1ZkU1YySXphRk5pVjJoVFZtcEtiMlJXVmxoa1IzUnBZa1UxV0ZsclZrOVdiVXBWWWtWV1ZtRnJTa2hhUjNoelZteEtkVkpzU2xkV1dFSktWakp3UTJNeFpITlNiR2hvVTBad1UxUlZaRk5STVZwSFdrVmtVbUpWV2tsWGExVjRWVEF4ZEZWcmRGZE5WbHBVVlZSS1NtUXhVbkpoUmtwWFlURndkbFpXV210aU1rcHpWRzVLYVZORldsaFpiWFIzVkRGc1YxVnNaRTVOV0VKSVYydFdNR0ZyTVhKWGJHeFhVbTFvV0ZaRVJtRmtSMVpKWTBaa1YySldTa2xXUmxKTFZESk5lVk5xV2xaaGVteFlWRmQ0UzJJeFdYbE5WRkpVVFd0YVIxUldWbXRXUjBwR1YyeGFXbFo2UlRCWFZscHpUbXhHVlZKdGNHbFNXRUkyVmtSR1YxbFhSWGxUYkd4V1ZrVmFWMWxyV21GamJIQklaVVZhYkZKdVFrWldNakYzWVVkRmVHTkhPVmRoYTFwVVZYcEdUbVZHV25OVGJFWlhVa1ZLTTFZeWRHRlhiVTUwWTBVeFVGZEZOSHBhUlZaYVRsWndSVkpZVW1saVZGWlJWREJrWVZWdFNsaGhSRXBVVWxad2VGWnJWbkprUjFKRllVVndhV0pXY0ZGWFJFbDRWbFV4ZEZsNlVtcFhTRUpHVld0a1ZrNUdXa1ZpUmxKb1RWWktObGR0ZUc5aVYxWnlZbnBDV0ZaVk1UWlhiWE4zWld4a1ZrNVlTbFJXUjFKWlYxZHJkMDVXU25KVmJUbFBZVlJHVEZScVNUVlNSWGh6VTFoa1UyRXhjRzlXYkZaM1RVWmFTRTVYUm1oV01IQldWVzB3TlZkdFNsaFZha3BXWVd0d1VGVXhXazlrVm1SMFVteE9VMlZ0WnpBPQ';
+  37 | </new_str>
+> 38 |     : null // Client side - tokens should not be exposed  
+     |     ^
+  39 |     : process.env.WEB_REPL_RENEWAL;
+  40 |
+  41 |   const xReplitToken = replIdentity
+
+Expression expected
+
+Import traces:
+  Client Component Browser:
+    ./src/utils/replitmail.ts [Client Component Browser]
+    ./src/app/(auth)/signup/page.tsx [Client Component Browser]
+    ./src/app/(auth)/signup/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/utils/replitmail.ts [Client Component SSR]
+    ./src/app/(auth)/signup/page.tsx [Client Component SSR]
+    ./src/app/(auth)/signup/page.tsx [Server Component]
+
+Next.js version: 15.5.3 (Turbopack)
