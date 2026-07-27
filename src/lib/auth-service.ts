@@ -12,7 +12,7 @@ import {
   onAuthStateChanged,
   deleteUser
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { auth as firebaseAuth, db } from './firebase';
 import { setupPresence, setOfflineStatus } from './presence-final';
 import { getHighQualityGooglePhotoUrl } from '@/utils/avatar';
@@ -99,37 +99,67 @@ export const authService = {
   /**
    * Ensure user document exists with unified schema
    */
-  async ensureUserDocument(user: any, customData?: { name?: string; photoURL?: string }) {
+  /**
+   * Check if a username is available in Firestore
+   */
+  async isUsernameAvailable(username: string): Promise<boolean> {
+    if (!username || username.trim().length < 3) return false;
+    try {
+      const normalized = username.trim().toLowerCase();
+      const q = query(collection(db, 'users'), where('username', '==', normalized));
+      const snapshot = await getDocs(q);
+      return snapshot.empty;
+    } catch {
+      return true; // Fallback gracefully if query is unindexed
+    }
+  },
+
+  /**
+   * Ensure user document exists with unified schema (Idempotent merge)
+   */
+  async ensureUserDocument(user: any, customData?: { name?: string; username?: string; photoURL?: string }) {
     const userDocRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userDocRef);
 
+    let photoURL = customData?.photoURL || user.photoURL || '';
+    if (photoURL && photoURL.includes('googleusercontent.com')) {
+      photoURL = photoURL.replace(/=s\d+-c/, '=s400-c');
+    }
+
+    const name = customData?.name || user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+    const username = customData?.username || name.toLowerCase().replace(/[^a-z0-9_]/g, '');
+
+    const initialData = {
+      uid: user.uid,
+      email: user.email ?? '',
+      name,
+      username,
+      photoURL,
+      status: 'online',
+      about: '',
+      devices: [],
+      background: 'galaxy',
+      useCustomBackground: true,
+      friends: [],
+      friendRequestsSent: [],
+      friendRequestsReceived: [],
+      blockedUsers: [],
+      mutedConversations: [],
+      emailVerified: user.emailVerified ?? true,
+      updatedAt: serverTimestamp(),
+    };
+
     if (!userDoc.exists()) {
-      let photoURL = customData?.photoURL || user.photoURL || '';
-      if (photoURL && photoURL.includes('googleusercontent.com')) {
-        photoURL = photoURL.replace(/=s\d+-c/, '=s400-c');
-      }
-
-      const name = customData?.name || user.displayName || (user.email ? user.email.split('@')[0] : 'User');
-
       await setDoc(userDocRef, {
-        uid: user.uid,
-        email: user.email ?? '',
+        ...initialData,
+        createdAt: serverTimestamp(),
+      }, { merge: true });
+    } else {
+      await setDoc(userDocRef, {
         name,
         photoURL,
-        status: 'online',
-        about: '',
-        devices: [],
-        background: 'galaxy',
-        useCustomBackground: true,
-        friends: [],
-        friendRequestsSent: [],
-        friendRequestsReceived: [],
-        blockedUsers: [],
-        mutedConversations: [],
-        emailVerified: user.emailVerified ?? true,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     }
     return userDoc;
   },

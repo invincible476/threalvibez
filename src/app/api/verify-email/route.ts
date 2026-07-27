@@ -291,12 +291,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = await sendPasswordResetEmail(parseResult.data.email);
+      await sendPasswordResetEmail(parseResult.data.email);
       
+      // Generic success message preventing user enumeration
       return NextResponse.json({ 
-        success: result.success, 
-        message: result.message,
-        error: result.success ? undefined : result.message 
+        success: true, 
+        message: 'If an account exists with that email address, a password reset code has been sent.'
       });
     }
 
