@@ -9,6 +9,7 @@ import { VibezLogo } from '../vibez-logo';
 import { GalaxyBackground } from '../galaxy-background';
 import { getDoc, doc, updateDoc, serverTimestamp, DocumentData } from 'firebase/firestore';
 import { db, setupPresence } from '@/lib/firebase';
+import { authService } from '@/lib/auth-service';
 
 interface AuthContextType {
   user: User | null;
@@ -173,8 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           sessionStorage.setItem(`lastVerificationCheck_${user.uid}`, now.toString());
           
-          // Get user document
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          // Get user document (or initialize with unified schema if missing)
+          let userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (!userDoc.exists()) {
+            userDoc = await authService.ensureUserDocument(user);
+          }
           const userData = userDoc.data() as DocumentData | undefined;
           
           // Consider email verified if either Firebase auth or Firestore says so

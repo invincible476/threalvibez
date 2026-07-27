@@ -7,32 +7,27 @@ import { signOut as firebaseSignOut } from 'firebase/auth';
 export function ForceSignOutButton() {
   const handleForceSignOut = async () => {
     try {
-      // Sign out from Firebase
-      await firebaseSignOut(auth);
-      
-      // Clear IndexedDB data
-      if (window.indexedDB) {
-        const databases = await window.indexedDB.databases();
-        for (const db of databases) {
-          if (db.name?.includes('firebase')) {
-            await window.indexedDB.deleteDatabase(db.name);
-          }
-        }
+      // 1. Sign out from Firebase Auth cleanly
+      if (auth.currentUser) {
+        await firebaseSignOut(auth);
       }
       
-      // Clear local and session storage
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      // Reload the page to ensure clean state
-      window.location.reload();
-    } catch (error) {
-      console.error('Error during force sign out:', error);
-      // If normal sign out fails, try to clear everything anyway
-      try {
+      // 2. Clear local and session storage safely
+      if (typeof window !== 'undefined') {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.reload();
+      }
+      
+      // 3. Reload the page to ensure clean state reset
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Error during force sign out:', error);
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.href = '/login';
+        }
       } catch (e) {
         console.error('Final cleanup failed:', e);
       }
