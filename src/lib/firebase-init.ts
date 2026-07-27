@@ -163,13 +163,9 @@ async function initializeWithRetry(maxRetries = 3): Promise<{ app: FirebaseApp, 
       console.warn(`Firebase initialization attempt ${i + 1} failed:`, error);
       // Clear any stale initialization data
       if (typeof window !== 'undefined') {
-        localStorage.clear();
+        localStorage.removeItem('lastLogin');
+        localStorage.removeItem('sessionUser');
         sessionStorage.clear();
-        try {
-          indexedDB.deleteDatabase('firebaseLocalStorageDb');
-        } catch (e) {
-          console.warn('Failed to clear IndexedDB:', e);
-        }
       }
     }
   }

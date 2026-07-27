@@ -255,18 +255,21 @@ useEffect(() => {
             if(userData.background) {
               setAppBackground(userData.background);
             }
-              if(userData.hasOwnProperty('useCustomBackground')) {
+            if(userData.hasOwnProperty('useCustomBackground')) {
               setUseCustomBackground(userData.useCustomBackground ?? false);
             }
         }
     });
     
-    const usersQuery = query(collection(db, 'users'));
+    // Limit users query to prevent fetching entire database into memory
+    const usersQuery = query(collection(db, 'users'), limit(100));
     const unsubscribeAllUsers = onSnapshot(usersQuery, (snapshot) => {
       const usersData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
-      const newCache = new Map(usersCache);
-      usersData.forEach(user => newCache.set(user.uid, user));
-      setUsersCache(newCache);
+      setUsersCache(prevCache => {
+        const newCache = new Map(prevCache);
+        usersData.forEach(user => newCache.set(user.uid, user));
+        return newCache;
+      });
       setAllUsers(usersData);
     }, (error) => console.error("Error fetching all users:", error));
 
@@ -276,14 +279,18 @@ useEffect(() => {
     };
   }, [authUser, authLoading, updateUserInCache, setAppBackground, setUseCustomBackground]);
 
-
-  const getParticipantDetails = useCallback((participantIds: string[]): User[] => {
-    return participantIds.map(id => usersCache.get(id)).filter(Boolean) as User[];
+  // Keep a ref of usersCache to avoid re-subscribing conversations query on every cache mutation
+  const usersCacheRef = useRef<Map<string, User>>(usersCache);
+  useEffect(() => {
+    usersCacheRef.current = usersCache;
   }, [usersCache]);
 
+  const getParticipantDetails = useCallback((participantIds: string[]): User[] => {
+    return participantIds.map(id => usersCacheRef.current.get(id)).filter(Boolean) as User[];
+  }, []);
 
   useEffect(() => {
-    if (!authUser || usersCache.size <= 1) return;
+    if (!authUser) return;
 
     const conversationsQuery = query(
       collection(db, 'conversations'),
@@ -313,8 +320,6 @@ useEffect(() => {
           let unreadCount = 0;
           const lastReadTimestamp = data.lastRead?.[authUser.uid];
           if (data.lastMessage && lastReadTimestamp && data.lastMessage.timestamp > lastReadTimestamp) {
-              // This is a simplified unread count. A more accurate one would query messages.
-              // For performance, we can assume 1 unread if last message is newer.
               unreadCount = data.lastMessage.senderId !== authUser.uid ? 1 : 0;
           } else if (data.lastMessage && !lastReadTimestamp && data.lastMessage.senderId !== authUser.uid) {
               unreadCount = 1;
@@ -332,16 +337,12 @@ useEffect(() => {
       });
 
       const convos = await Promise.all(convosPromises);
-      // Keep conversations in their current order if a chat is selected
-      if (!selectedChat) {
-        convos.sort((a, b) => (b.lastMessage?.timestamp?.toMillis() || 0) - (a.lastMessage?.timestamp?.toMillis() || 0));
-      }
+      convos.sort((a, b) => (b.lastMessage?.timestamp?.toMillis() || 0) - (a.lastMessage?.timestamp?.toMillis() || 0));
       setConversations(convos);
-
     });
 
     return () => unsubscribeConversations();
-  }, [authUser, usersCache, getParticipantDetails]);
+  }, [authUser?.uid, getParticipantDetails]);
   
   useEffect(() => {
     if (newlyCreatedChatId) {
@@ -360,23 +361,20 @@ useEffect(() => {
     }
   }, [aiConversation, selectedChat]);
 
-  // Cleanup temporary URLs when component unmounts
+  // Cleanup active message subscriptions and temporary resources ONLY when component unmounts
   useEffect(() => {
     return () => {
-      messages.forEach(message => {
-        if (message.file?.url.startsWith('blob:')) {
-          URL.revokeObjectURL(message.file.url);
-        }
-      });
+      if (messagesUnsubscribe.current) {
+        messagesUnsubscribe.current();
+      }
       
-      // Also cleanup any pending uploads
+      // Cleanup any pending uploads
       uploadTasks.current.forEach(task => task.cancel());
       xhrRequests.current.forEach(request => request.xhrAbort?.());
       uploadTasks.current.clear();
       xhrRequests.current.clear();
-      setUploadProgress(new Map());
     };
-  }, [messages]);
+  }, []);
 
 
   // Message fetching logic

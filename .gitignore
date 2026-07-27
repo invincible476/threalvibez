@@ -18,10 +18,15 @@
 .DS_Store
 *.pem
 
-# debug
+# debug & logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+/logs/
+*.log
+.launch.pid
+.supervisor.pid
+.genkit.pid
 
 # local env files
 .env

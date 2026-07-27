@@ -105,28 +105,11 @@ export default function LoginPage() {
             console.error('Invalid credential error details:', e);
             await auth.signOut();
             
-            // Clear session data
+            // Clear session data safely
             if (typeof window !== 'undefined') {
-              localStorage.clear();
+              localStorage.removeItem('lastLogin');
+              localStorage.removeItem('sessionUser');
               sessionStorage.clear();
-              
-              try {
-                const databases = await window.indexedDB.databases();
-                await Promise.all(
-                  databases
-                    .filter(db => db.name?.includes('firebase'))
-                    .filter((db): db is { name: string } => db.name !== undefined)
-                    .map(db => window.indexedDB.deleteDatabase(db.name))
-                );
-              } catch (dbError) {
-                console.error('Error clearing IndexedDB:', dbError);
-              }
-              
-              document.cookie.split(';').forEach(c => {
-                document.cookie = c
-                  .replace(/^ +/, '')
-                  .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-              });
             }
             
             errorMessage = 'Your session has expired. The page will refresh in a moment - please try logging in again.';
@@ -328,21 +311,11 @@ export default function LoginPage() {
           errorMessage = 'Another popup is already open. Please close it and try again.';
           break;
         case 'auth/argument-error':
-          // Clear all storage and reload
+          // Clear session data safely
           if (typeof window !== 'undefined') {
-            localStorage.clear();
+            localStorage.removeItem('lastLogin');
+            localStorage.removeItem('sessionUser');
             sessionStorage.clear();
-            // Clear IndexedDB
-            try {
-              const databases = await window.indexedDB.databases();
-              await Promise.all(
-                databases
-                  .filter(db => db.name?.includes('firebase'))
-                  .map(db => window.indexedDB.deleteDatabase(db.name || ''))
-              );
-            } catch (dbError) {
-              console.error('Error clearing IndexedDB:', dbError);
-            }
           }
           errorMessage = 'Authentication error. Please try again after the page reloads.';
           setTimeout(() => window.location.reload(), 1500);

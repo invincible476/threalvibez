@@ -15,6 +15,7 @@ import {
 import { 
   doc, 
   updateDoc,
+  setDoc,
   serverTimestamp as firestoreServerTimestamp,
   DocumentReference,
   writeBatch,
@@ -111,11 +112,11 @@ class PresenceManager {
 
       await Promise.all([
         set(this.presenceRef, presenceData),
-        updateDoc(this.userDocRef, {
+        setDoc(this.userDocRef, {
           status: state,
           lastSeen: firestoreServerTimestamp(),
           lastDeviceId: this.deviceId
-        })
+        }, { merge: true })
       ]);
 
       this.lastSuccessfulUpdate = Date.now();
@@ -264,10 +265,10 @@ class PresenceManager {
               lastHeartbeat: rtServerTimestamp(),
               connectedAt: rtServerTimestamp()
             }),
-            updateDoc(this.userDocRef, {
+            setDoc(this.userDocRef, {
               status: 'online',
               lastSeen: firestoreServerTimestamp()
-            })
+            }, { merge: true })
           ]);
 
           this.startHeartbeat();
@@ -321,10 +322,10 @@ class PresenceManager {
         const userDocRef = this.userDocRef;
         if (userDocRef) {
           cleanupTasks.push(
-            updateDoc(userDocRef, {
+            setDoc(userDocRef, {
               status: 'offline',
               lastSeen: firestoreServerTimestamp()
-            })
+            }, { merge: true })
           );
         }
 
@@ -424,10 +425,10 @@ class PresenceManager {
           lastChanged: rtServerTimestamp(),
           lastHeartbeat: null
         }),
-        updateDoc(this.userDocRef, {
+        setDoc(this.userDocRef, {
           status: 'offline',
           lastSeen: firestoreServerTimestamp()
-        })
+        }, { merge: true })
       ]);
     } catch (error) {
       console.error('Error setting offline status:', error);

@@ -86,11 +86,11 @@ export const setupPresence = (uid: string) => {
       // Update realtime database
       await set(userStatusRef, status);
       
-      // Update Firestore
-      await updateDoc(userDocRef, {
+      // Update Firestore safely (merge in case user document is still being created)
+      await setDoc(userDocRef, {
         status: status.state,
         lastSeen: firestoreServerTimestamp()
-      });
+      }, { merge: true });
     } catch (error) {
       console.error('Error updating presence:', error);
     }

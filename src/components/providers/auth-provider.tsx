@@ -87,9 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('lastLogin');
         localStorage.removeItem('sessionUser');
-        // Clear IndexedDB auth data
-        const req = indexedDB.deleteDatabase('firebaseLocalStorageDb');
-        req.onsuccess = () => console.log('Cleared IndexedDB auth data');
       }
     };
 
@@ -206,12 +203,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setTimeout(() => { navigationInProgress.current = false; }, 500); // Increased timeout
           }
         } catch (error) {
-          console.error('Error checking email verification:', error);
-          // On error, use cached status if available
-          const cachedStatus = sessionStorage.getItem(`emailVerified_${user.uid}`);
-          if (cachedStatus === 'true') return;
-          // Otherwise, assume verified to prevent constant redirects
-          sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          console.error('Error checking email verification status from Firestore:', error);
+          // Fall back strictly to Firebase Auth's verified state without overwriting sessionStorage
+          if (user.emailVerified) {
+            sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          }
         }
       }
     };

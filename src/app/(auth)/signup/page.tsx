@@ -144,11 +144,6 @@ export default function SignupPage() {
         description: 'Your account has been created and verified successfully.'
       });
 
-      // Small delay to ensure everything is updated
-      setTimeout(() => {
-        router.push('/');
-      }, 2000);
-
     } catch (error: any) {
       console.error('Error during verification/signup:', error);
       
@@ -224,31 +219,7 @@ export default function SignupPage() {
       console.log('Google signup result:', result);
       
       if (result?.user) {
-        const userDocRef = doc(db, 'users', result.user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-          // Create user document for new Google user (without devices - handled by secure API)
-          await setDoc(userDocRef, {
-            uid: result.user.uid,
-            name: result.user.displayName || 'Google User',
-            email: result.user.email,
-            photoURL: result.user.photoURL,
-            status: 'online',
-            about: '',
-            devices: [], // Will be populated by secure device registration
-            background: 'galaxy',
-            useCustomBackground: true,
-            friends: [],
-            friendRequestsSent: [],
-            friendRequestsReceived: [],
-            blockedUsers: [],
-            mutedConversations: [],
-            emailVerified: true, // Google accounts are pre-verified
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-        }
+        await authService.ensureUserDocument(result.user);
 
         // Register device securely for both new and existing users
         const deviceResult = await registerDeviceSecurely(result.user);

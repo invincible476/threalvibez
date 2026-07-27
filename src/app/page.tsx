@@ -11,37 +11,16 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !user) return;
 
-    const checkAuth = async () => {
-      if (!user) {
-        console.log('No user found, redirecting to login');
-        router.replace('/login');
-        return;
-      }
-
-      // Validate Firebase session
-      try {
-        const token = await user.getIdToken();
-        // Verify token exists and is valid
-        if (!token) {
-          throw new Error('Invalid token');
-        }
-
-        // Store last successful auth time
-        localStorage.setItem('lastLogin', Date.now().toString());
-        localStorage.setItem('sessionUser', user.uid);
-      } catch (error) {
-        console.error('Session validation failed:', error);
-        // Clear any stale auth state
-        localStorage.removeItem('lastLogin');
-        localStorage.removeItem('sessionUser');
-        router.replace('/login');
-      }
-    };
-    
-    checkAuth();
-  }, [user, loading, router]);
+    // Refresh token timestamp for active user session
+    user.getIdToken().then(() => {
+      localStorage.setItem('lastLogin', Date.now().toString());
+      localStorage.setItem('sessionUser', user.uid);
+    }).catch(error => {
+      console.error('Session token refresh failed:', error);
+    });
+  }, [user, loading]);
 
   // Show loading state while checking auth
   if (loading) {

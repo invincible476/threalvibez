@@ -97,6 +97,44 @@ const logDebug = (message: string, data?: any) => {
 
 export const authService = {
   /**
+   * Ensure user document exists with unified schema
+   */
+  async ensureUserDocument(user: any, customData?: { name?: string; photoURL?: string }) {
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists()) {
+      let photoURL = customData?.photoURL || user.photoURL || '';
+      if (photoURL && photoURL.includes('googleusercontent.com')) {
+        photoURL = photoURL.replace(/=s\d+-c/, '=s400-c');
+      }
+
+      const name = customData?.name || user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+
+      await setDoc(userDocRef, {
+        uid: user.uid,
+        email: user.email ?? '',
+        name,
+        photoURL,
+        status: 'online',
+        about: '',
+        devices: [],
+        background: 'galaxy',
+        useCustomBackground: true,
+        friends: [],
+        friendRequestsSent: [],
+        friendRequestsReceived: [],
+        blockedUsers: [],
+        mutedConversations: [],
+        emailVerified: user.emailVerified ?? true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return userDoc;
+  },
+
+  /**
    * Create a new user account
    */
   async createAccount(email: string, password: string, name?: string) {
@@ -119,27 +157,8 @@ export const authService = {
         displayName: name
       });
       
-      // Create the user document
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        email,
-        name,
-        photoURL: null,
-        status: 'online',
-        about: '',
-        devices: [],
-        background: 'galaxy',
-        useCustomBackground: true,
-        friends: [],
-        friendRequestsSent: [],
-        friendRequestsReceived: [],
-        blockedUsers: [],
-        mutedConversations: [],
-        emailVerified: true,
-        verifiedAt: new Date(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      // Create the user document using unified schema
+      await this.ensureUserDocument(userCredential.user, { name });
       
       // Force token refresh
       await userCredential.user.getIdToken(true);
@@ -162,24 +181,13 @@ export const authService = {
       // Clear any existing corrupted auth state
       if (auth.currentUser) {
         await auth.signOut();
-        // Clear any persisted auth data
+        // Clear any persisted session markers safely without wiping IndexedDB
         if (typeof window !== 'undefined') {
           localStorage.removeItem('lastLogin');
           localStorage.removeItem('sessionUser');
-          // Clear IndexedDB auth data
-          try {
-            const dbs = await window.indexedDB.databases();
-            for (const db of dbs) {
-              if (db.name?.includes('firebase') && db.name) {
-                await window.indexedDB.deleteDatabase(db.name);
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to clear IndexedDB:', e);
-          }
         }
         // Wait for auth state to clear
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       // Attempt sign in
@@ -236,33 +244,12 @@ export const authService = {
         apiKey: auth.config.apiKey
       });
 
-      // Clear any persisted auth data regardless of current user
+      // Clear any persisted auth session markers safely without wiping IndexedDB
       if (typeof window !== 'undefined') {
         try {
-          // Clear local storage
           localStorage.removeItem('lastLogin');
           localStorage.removeItem('sessionUser');
-          localStorage.removeItem('firebase:host:*');
-          
-          // Clear session storage
           sessionStorage.clear();
-          
-          // Clear IndexedDB
-          const dbs = await window.indexedDB.databases();
-          for (const db of dbs) {
-            if (db.name?.includes('firebase') && db.name) {
-              await window.indexedDB.deleteDatabase(db.name);
-            }
-          }
-
-          // Clear cookies related to Firebase auth
-          document.cookie.split(';').forEach(c => {
-            if (c.includes('firebase')) {
-              document.cookie = c
-                .replace(/^ +/, '')
-                .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-            }
-          });
         } catch (e) {
           console.warn('Failed to clear some browser data:', e);
         }
@@ -405,37 +392,8 @@ export const authService = {
         // Force token refresh before accessing Firestore
         await result.user.getIdToken(true);
         
-        userDoc = await getDoc(doc(db, 'users', result.user.uid));
-        
-        if (!userDoc.exists()) {
-          // Process Google photo URL to ensure high quality
-          let photoURL = result.user.photoURL;
-          if (photoURL && photoURL.includes('googleusercontent.com')) {
-            // Remove size parameter and request a larger image
-            photoURL = photoURL.replace(/=s\d+-c/, '=s400-c');
-          }
-
-          // Create new user document
-          await setDoc(doc(db, 'users', result.user.uid), {
-            uid: result.user.uid,
-            email: result.user.email ?? '',
-            name: result.user.displayName ?? (result.user.email ? result.user.email.split('@')[0] : 'User'),
-            photoURL: photoURL ?? '',
-            status: 'online',
-            about: '',
-            devices: [],
-            background: 'default',
-            useCustomBackground: false,
-            friends: [],
-            friendRequestsSent: [],
-            friendRequestsReceived: [],
-            blockedUsers: [],
-            mutedConversations: [],
-            emailVerified: true,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-        }
+        // Ensure user document exists with unified schema
+        await this.ensureUserDocument(result.user);
         
         // Update online status
         await setupPresence(result.user.uid);
@@ -513,29 +471,7 @@ export const authService = {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('lastLogin');
           localStorage.removeItem('sessionUser');
-          localStorage.removeItem('firebase:host:*');
           sessionStorage.clear();
-
-          // Clear IndexedDB
-          try {
-            const dbs = await window.indexedDB.databases();
-            for (const db of dbs) {
-              if (db.name?.includes('firebase') && db.name) {
-                await window.indexedDB.deleteDatabase(db.name);
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to clear IndexedDB:', e);
-          }
-
-          // Clear auth-related cookies
-          document.cookie.split(';').forEach(c => {
-            if (c.includes('firebase')) {
-              document.cookie = c
-                .replace(/^ +/, '')
-                .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-            }
-          });
         }
       }
 
