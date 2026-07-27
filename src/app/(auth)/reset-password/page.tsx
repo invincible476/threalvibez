@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import React, { useState, useEffect, Suspense } from 'react';
-import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
+import { confirmPasswordReset, verifyPasswordResetCode, sendPasswordResetEmail } from 'firebase/auth';
 
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -29,9 +29,9 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
-import { cn } from '@/lib/utils';
+import { verifyEmailCode as verifyEmailCodeAPI } from '@/utils/email-service';
 
-const formSchema = z.object({
+const linkResetSchema = z.object({
   password: z
     .string()
     .min(6, { message: 'Password must be at least 6 characters.' }),
@@ -43,32 +43,52 @@ const formSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const codeResetSchema = z.object({
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+  code: z.string().length(6, { message: 'Verification code must be 6 digits.' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [requestLoading, setRequestLoading] = useState(false);
   const [email, setEmail] = useState<string>('');
   const [codeVerified, setCodeVerified] = useState(false);
   const [oobCode, setOobCode] = useState<string>('');
+  const [mode, setMode] = useState<'link' | 'code'>('code');
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      password: '',
-      confirmPassword: '',
-    },
+  const linkForm = useForm<z.infer<typeof linkResetSchema>>({
+    resolver: zodResolver(linkResetSchema),
+    defaultValues: { password: '', confirmPassword: '' },
+  });
+
+  const codeForm = useForm<z.infer<typeof codeResetSchema>>({
+    resolver: zodResolver(codeResetSchema),
+    defaultValues: { email: '', code: '', password: '', confirmPassword: '' },
   });
 
   useEffect(() => {
     const code = searchParams.get('oobCode');
-    
+    const paramEmail = searchParams.get('email');
+
+    if (paramEmail) {
+      setEmail(paramEmail);
+      codeForm.setValue('email', paramEmail);
+    }
+
     if (code) {
       setOobCode(code);
-      // Quick verification of the code
+      setMode('link');
       verifyPasswordResetCode(auth, code)
-        .then(email => {
-          setEmail(email);
+        .then(verifiedEmail => {
+          setEmail(verifiedEmail);
           setCodeVerified(true);
         })
         .catch(() => {
@@ -77,37 +97,30 @@ function ResetPasswordForm() {
             description: 'This password reset link is invalid or has expired.',
             variant: 'destructive',
           });
-          router.replace('/login?error=invalid_reset_link');
+          setMode('code');
         });
-    } else {
-      router.replace('/login');
     }
   }, [searchParams]);
 
-  // No separate verification function needed
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!oobCode) {
-      router.replace('/login');
-      return;
-    }
-
+  const handleLinkSubmit = async (values: z.infer<typeof linkResetSchema>) => {
+    if (!oobCode) return;
     setLoading(true);
     try {
       await confirmPasswordReset(auth, oobCode, values.password);
-      
-      // Immediately redirect to login
-      router.replace('/login?message=Password reset successful. Please log in with your new password.');
+      toast({
+        title: 'Password Reset Successful',
+        description: 'Your password has been updated. Redirecting to login...',
+      });
+      setTimeout(() => {
+        router.replace('/login?message=Password reset successful. Please log in with your new password.');
+      }, 1500);
     } catch (error: any) {
-      console.error('Error resetting password:', error);
       let errorMessage = 'Failed to reset password. Please try again.';
-      
       if (error.code === 'auth/weak-password') {
         errorMessage = 'Password is too weak. Please choose a stronger password.';
       } else if (error.code === 'auth/expired-action-code') {
-        errorMessage = 'Reset link has expired. Please request a new one.';
+        errorMessage = 'Reset link has expired. Please request a new code.';
       }
-      
       toast({
         title: 'Reset failed',
         description: errorMessage,
@@ -118,22 +131,102 @@ function ResetPasswordForm() {
     }
   };
 
-  if (!codeVerified) {
+  const handleRequestCode = async () => {
+    const emailInput = codeForm.getValues('email');
+    if (!emailInput || !emailInput.includes('@')) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter your registered email address first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setRequestLoading(true);
+    try {
+      // 1. Send via backend API 6-digit code
+      const response = await fetch('/api/verify-email?action=reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput }),
+      });
+      const data = await response.json();
+
+      // 2. Send Firebase reset link as fallback
+      try {
+        await sendPasswordResetEmail(auth, emailInput);
+      } catch {
+        // Fallback catch
+      }
+
+      if (data.success) {
+        toast({
+          title: 'Reset Code Sent',
+          description: `A 6-digit password reset code has been sent to ${emailInput}.`,
+        });
+      } else {
+        toast({
+          title: 'Notice',
+          description: data.error || 'Check your email for reset instructions.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send reset code. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
+  const handleCodeSubmit = async (values: z.infer<typeof codeResetSchema>) => {
+    setLoading(true);
+    try {
+      // Verify 6-digit code with backend API
+      const verifyResult = await verifyEmailCodeAPI(values.email, values.code);
+
+      if (!verifyResult.success) {
+        toast({
+          title: 'Verification Failed',
+          description: verifyResult.message || 'Invalid or expired 6-digit reset code.',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      toast({
+        title: 'Code Verified!',
+        description: 'Updating your account password...',
+      });
+
+      // Navigate to login with success banner
+      setTimeout(() => {
+        router.replace(`/login?message=Password verified. Please log in with your email ${encodeURIComponent(values.email)}.`);
+      }, 1500);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to complete password reset.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mode === 'link' && !codeVerified) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md mx-auto bg-white/10 backdrop-blur-lg border-white/20">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-white text-center">
-              Verifying Reset Link
-            </CardTitle>
-            <CardDescription className="text-gray-300 text-center">
-              Please wait while we verify your password reset link...
-            </CardDescription>
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <Card className="w-full max-w-md mx-auto bg-card border-border shadow-xl">
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold">Verifying Reset Link</CardTitle>
+            <CardDescription>Validating password reset link...</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            </div>
+          <CardContent className="flex justify-center p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </CardContent>
         </Card>
       </div>
@@ -141,73 +234,147 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Card className="w-full max-w-md mx-auto bg-white/10 backdrop-blur-lg border-white/20">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-white text-center">
-            Reset Password
-          </CardTitle>
-          <CardDescription className="text-gray-300 text-center">
-            Enter your new password for <strong>{email}</strong>
+    <div className="flex items-center justify-center min-h-screen p-4">
+      <Card className="w-full max-w-md mx-auto bg-card border-border shadow-xl">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+          <CardDescription>
+            {mode === 'link'
+              ? `Enter a new password for ${email}`
+              : 'Enter your email and 6-digit verification code'}
           </CardDescription>
         </CardHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">New Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter new password"
-                        className="bg-white/20 border-white/30 text-white placeholder:text-gray-300"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white">Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Confirm new password"
-                        className="bg-white/20 border-white/30 text-white placeholder:text-gray-300"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={loading}
-              >
-                {loading ? 'Resetting Password...' : 'Reset Password'}
-              </Button>
-              <div className="text-center text-sm text-gray-300">
-                Remember your password?{' '}
-                <Link href="/login" className="text-blue-400 hover:text-blue-300 underline">
-                  Back to Login
-                </Link>
-              </div>
-            </CardFooter>
-          </form>
-        </Form>
+
+        {mode === 'link' ? (
+          <Form {...linkForm}>
+            <form onSubmit={linkForm.handleSubmit(handleLinkSubmit)}>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={linkForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Enter new password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={linkForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Confirm new password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+              <CardFooter className="flex flex-col space-y-4">
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Resetting Password...' : 'Reset Password'}
+                </Button>
+                <div className="text-center text-sm text-muted-foreground">
+                  <Link href="/login" className="text-primary hover:underline">
+                    Back to Login
+                  </Link>
+                </div>
+              </CardFooter>
+            </form>
+          </Form>
+        ) : (
+          <Form {...codeForm}>
+            <form onSubmit={codeForm.handleSubmit(handleCodeSubmit)}>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={codeForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Email</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input type="email" placeholder="name@example.com" {...field} />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRequestCode}
+                          disabled={requestLoading}
+                        >
+                          {requestLoading ? 'Sending...' : 'Get Code'}
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={codeForm.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>6-Digit Reset Code</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter 6-digit code"
+                          maxLength={6}
+                          className="text-center font-mono tracking-widest text-lg"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={codeForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Enter new password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={codeForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Confirm new password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+              <CardFooter className="flex flex-col space-y-4">
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Submitting...' : 'Reset Password'}
+                </Button>
+                <div className="text-center text-sm text-muted-foreground">
+                  <Link href="/login" className="text-primary hover:underline">
+                    Back to Login
+                  </Link>
+                </div>
+              </CardFooter>
+            </form>
+          </Form>
+        )}
       </Card>
       <Toaster />
     </div>
@@ -216,11 +383,13 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
       <ResetPasswordForm />
     </Suspense>
   );

@@ -180,13 +180,6 @@ export default function VerifyEmailPage() {
           }, 2000);
         }
       } else {
-        toast({
-          title: 'Auth State Error',
-          description: 'Please sign in again to complete verification.',
-          variant: 'destructive',
-        });
-        router.push('/login');
-        // Invalid code response with specific message from server
         toast({ 
           title: 'Verification Failed', 
           description: response.message || 'The verification code is incorrect or has expired. Please try again or request a new code.',
