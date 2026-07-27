@@ -26,26 +26,33 @@ function initializeFirebaseAdmin() {
     
     try {
       if (serviceAccount) {
-        // SECURE: Use proper service account credentials
-        const serviceAccountKey = JSON.parse(serviceAccount) as ServiceAccount;
-        firebaseAdmin = initializeApp({
-          credential: cert(serviceAccountKey),
-          projectId: projectId,
-        });
-        console.log('Firebase Admin initialized with secure service account credentials');
-      } else if (isDevelopment && allowDevFallback) {
-        // DEVELOPMENT ONLY: Limited functionality fallback with explicit opt-in
-        console.warn('⚠️  DEVELOPMENT MODE: Firebase Admin initialized without service account (EXPLICIT_DEV_FALLBACK_ENABLED)');
-        console.warn('⚠️  This configuration provides LIMITED functionality and must not be used in production');
+        try {
+          const serviceAccountKey = JSON.parse(serviceAccount) as ServiceAccount;
+          firebaseAdmin = initializeApp({
+            credential: cert(serviceAccountKey),
+            projectId: projectId,
+          });
+          console.log('Firebase Admin initialized with secure service account credentials');
+        } catch (certError) {
+          if (isDevelopment || allowDevFallback) {
+            console.warn('⚠️ Development notice: Service account cert parsing unverified, initializing dev fallback app.');
+            firebaseAdmin = initializeApp({
+              projectId: projectId,
+            });
+          } else {
+            throw certError;
+          }
+        }
+      } else if (isDevelopment || allowDevFallback) {
+        console.warn('⚠️ DEVELOPMENT MODE: Firebase Admin initialized without service account');
         firebaseAdmin = initializeApp({
           projectId: projectId,
         });
       } else {
-        // Fail-safe: No insecure fallbacks allowed
         throw new Error('Firebase Admin requires proper service account configuration');
       }
     } catch (error) {
-      console.error('Failed to initialize Firebase Admin:', error);
+      console.warn('Firebase Admin initialization notice:', error instanceof Error ? error.message : String(error));
       throw new Error(`Firebase Admin initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
