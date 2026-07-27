@@ -182,10 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = userDoc.data() as DocumentData | undefined;
           
           // Consider email verified if either Firebase auth or Firestore says so
-          const isVerified = user.emailVerified || userData?.emailVerified;
-          sessionStorage.setItem(`emailVerified_${user.uid}`, isVerified.toString());
+          const isVerified = Boolean(user.emailVerified || userData?.emailVerified);
 
           if (isVerified) {
+            sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
             // Update Firestore if needed
             if (user.emailVerified && !userData?.emailVerified) {
               await updateDoc(doc(db, 'users', user.uid), {
@@ -197,6 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
 
+          // Clear cached verified state if not verified
+          sessionStorage.removeItem(`emailVerified_${user.uid}`);
+
           // Handle unverified user - only redirect if not in a navigation cooldown
           const lastVerifyRedirect = parseInt(sessionStorage.getItem(`lastVerifyRedirect_${user.uid}`) || '0');
           if (now - lastVerifyRedirect >= REDIRECT_COOLDOWN && !navigationInProgress.current) {
@@ -204,13 +207,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             lastRedirectTime.current = now;
             navigationInProgress.current = true;
             router.replace(`/verify-email?email=${encodeURIComponent(user.email || '')}`);
-            setTimeout(() => { navigationInProgress.current = false; }, 500); // Increased timeout
+            setTimeout(() => { navigationInProgress.current = false; }, 500);
           }
         } catch (error) {
           console.error('Error checking email verification status from Firestore:', error);
-          // Fall back strictly to Firebase Auth's verified state without overwriting sessionStorage
           if (user.emailVerified) {
             sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          } else {
+            sessionStorage.removeItem(`emailVerified_${user.uid}`);
           }
         }
       }

@@ -18,12 +18,12 @@ export async function setupPresence(userId: string) {
       lastSeen: Timestamp.now(),
       updatedAt: serverTimestamp()
     });
-    transaction.update(userRef, {
+    transaction.set(userRef, {
       deviceCount: increment(1),
       status: 'online',
       lastSeen: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
   });
 
   // Setup heartbeat interval

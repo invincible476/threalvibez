@@ -203,37 +203,20 @@ export default function SignupPage() {
 
   const handleGoogleSignup = async () => {
     try {
-      // Configure provider with proper settings
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
-      if (!auth) {
-        throw new Error('Authentication is not initialized');
-      }
       console.log('Starting Google signup...');
-      const result = await signInWithPopup(auth, provider);
-      console.log('Google signup result:', result);
-      
-      if (result?.user) {
-        await authService.ensureUserDocument(result.user);
+      const user = await authService.signInWithGoogle();
 
+      if (user) {
         // Register device securely for both new and existing users
-        const deviceResult = await registerDeviceSecurely(result.user);
+        const deviceResult = await registerDeviceSecurely(user);
         if (!deviceResult.success) {
           console.warn('Device registration failed:', deviceResult.error);
-          // Continue anyway - device registration failure shouldn't block login
         }
 
         toast({
           title: 'Welcome!',
           description: 'Successfully signed up with Google.',
         });
-        
-        router.push('/');
       }
     } catch (error: any) {
       console.error("Google signup error:", error);
