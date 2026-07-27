@@ -24,7 +24,9 @@
     "logs:tail": "node scripts/log-cli.js tail",
     "logs:analyze": "node scripts/log-cli.js analyze",
     "logs:rotate": "node scripts/log-cli.js rotate",
-    "logs:clean": "node scripts/log-cli.js clean"
+    "logs:clean": "node scripts/log-cli.js clean",
+    "test:auth": "node scripts/test-auth-e2e.js",
+    "monitor:auth": "node scripts/auth-monitor-loop.js"
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",

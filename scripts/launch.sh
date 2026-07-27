@@ -189,8 +189,16 @@ case "$1" in
     check-env)
         check_env
         ;;
+    test-auth)
+        log_banner
+        node "${WORKSPACE_DIR}/scripts/test-auth-e2e.js"
+        ;;
+    monitor-auth)
+        log_banner
+        node "${WORKSPACE_DIR}/scripts/auth-monitor-loop.js"
+        ;;
     *)
-        echo "Usage: $0 {dev|prod|daemon|genkit|stop|status|health|check-env}"
+        echo "Usage: $0 {dev|prod|daemon|genkit|stop|status|health|check-env|test-auth|monitor-auth}"
         exit 1
         ;;
 esac
