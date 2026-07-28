@@ -152,27 +152,6 @@ export async function initializeFirebase() {
   }
 }
 
-// Initialize with retry mechanism
-async function initializeWithRetry(maxRetries = 3): Promise<{ app: FirebaseApp, auth: Auth }> {
-  let lastError;
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return initializeFirebase();
-    } catch (error) {
-      lastError = error;
-      console.warn(`Firebase initialization attempt ${i + 1} failed:`, error);
-      // Clear any stale initialization data
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('lastLogin');
-        localStorage.removeItem('sessionUser');
-        sessionStorage.clear();
-      }
-    }
-  }
-  throw lastError;
-}
-
-// Initialize Firebase instance
-const instance = await initializeWithRetry();
-export const firebaseApp = instance.app;
-export const firebaseAuth = instance.auth;
+// Initialize Firebase app synchronously to avoid top-level await bundling issues
+export const firebaseApp: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const firebaseAuth: Auth = getAuth(firebaseApp);

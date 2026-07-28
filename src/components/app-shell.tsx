@@ -1756,9 +1756,18 @@ function AppBackground() {
   }
 }
 
+import { usePathname } from 'next/navigation';
+
 export function AppShell({ children }: { children: React.ReactNode }): JSX.Element {
+  const pathname = usePathname();
+  const isAuthRoute = ['/login', '/signup', '/verify-email', '/reset-password'].includes(pathname || '');
+
   const chatData = useChatData();
   const { toast } = useToast();
+  
+  if (isAuthRoute) {
+    return <>{children}</>;
+  }
   
   // Check for blocked Firestore requests
   useEffect(() => {
