@@ -143,6 +143,8 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
     )
 }
 
+import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
+
 export function ChatList() {
   const {
     conversations,
@@ -158,6 +160,8 @@ export function ChatList() {
   } = useAppShell();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const { keyboardOpen } = useMobileKeyboardHeight();
   const { isWeatherVisible } = useAppearance();
 
   const filteredConversations = useMemo(() => {
@@ -207,10 +211,17 @@ export function ChatList() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search..." 
+            type="search"
+            placeholder="Search existing chats..." 
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             className="pl-10 bg-background/50 group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
           />
            <div className="hidden group-[[data-sidebar-state=collapsed]]/sidebar:flex items-center justify-center">
              <Button variant="ghost" size="icon">
@@ -306,7 +317,24 @@ export function ChatList() {
             </div>
 
             {regularChats.length === 0 && unreadChats.length === 0 && favoriteChats.length === 0 && (
-                <p className="p-4 text-center text-muted-foreground group-[[data-sidebar-state=collapsed]]/sidebar:hidden">No user chats yet.</p>
+                searchTerm.trim().length > 0 ? (
+                    <div className="p-4 text-center space-y-3 group-[[data-sidebar-state=collapsed]]/sidebar:hidden rounded-xl border border-border/60 bg-muted/20 my-2 backdrop-blur-sm">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                            No existing chats match "{searchTerm}"
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Looking for new friends? Use the Friends section to search all registered users!
+                        </p>
+                        <Button asChild size="sm" variant="outline" className="w-full">
+                            <Link href="/friends">
+                                <UserPlus className="mr-2 h-4 w-4 text-primary" />
+                                Find New Friends →
+                            </Link>
+                        </Button>
+                    </div>
+                ) : (
+                    <p className="p-4 text-center text-muted-foreground group-[[data-sidebar-state=collapsed]]/sidebar:hidden">No user chats yet.</p>
+                )
             )}
             
             {shouldShowAiChat && (
@@ -361,9 +389,9 @@ export function ChatList() {
         </div>
       </ScrollArea>
 
-    <div className="flex-none p-2 border-t border-border/50">
-            <UserProfileMenu currentUser={currentUser} />
-        </div>
+    <div className={cn("flex-none p-2 border-t border-border/50 transition-all duration-200", (keyboardOpen || isSearchFocused) && "hidden")}>
+      <UserProfileMenu currentUser={currentUser} />
+    </div>
     </div>
     </>
   );

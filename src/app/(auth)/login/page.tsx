@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { auth } from '@/lib/firebase';
 import { authService } from '@/lib/auth-service';
-import { sendPasswordResetEmail, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { sendPasswordResetEmail, browserLocalPersistence, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import {
   CardContent,
@@ -16,6 +16,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  Card,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,22 +30,42 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
-import type { User } from '@/lib/types';
-
+import { Mail, Lock, Eye, EyeOff, Loader2, CheckSquare, Square } from 'lucide-react';
 
 const formSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address.' }),
+  email: z
+    .string()
+    .min(1, { message: 'Email address is required.' })
+    .email({ message: 'Please enter a valid email address.' }),
   password: z
     .string()
+    .min(1, { message: 'Password is required.' })
     .min(6, { message: 'Password must be at least 6 characters.' }),
 });
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Check for success/notification messages from redirect params
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message) {
+      toast({
+        title: 'Notice',
+        description: message,
+      });
+      // Replace URL quietly without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.delete('message');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams, toast]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -57,14 +78,20 @@ export default function LoginPage() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
-    // Clear any existing error states
+    // Clear any existing stored auth error markers
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('auth_error');
       localStorage.removeItem('lastAuthError');
     }
     
     try {
-      // Clear any existing auth state first
+      // Set persistence based on rememberMe selection
+      await setPersistence(
+        auth,
+        rememberMe ? browserLocalPersistence : browserSessionPersistence
+      );
+
+      // Clear any existing auth state first if signed in as another user
       if (auth.currentUser) {
         await auth.signOut();
       }
@@ -76,70 +103,64 @@ export default function LoginPage() {
         throw new Error('No user returned from sign in');
       }
       
-      // Verify the session is valid
+      // Verify session token
       const token = await user.getIdToken(true);
       if (!token) {
         throw new Error('Failed to obtain valid session token');
       }
       
-      // Success! Redirect to home
-      console.log('Login successful, redirecting to home');
+      toast({
+        title: 'Welcome back!',
+        description: 'Successfully signed in.',
+      });
+      
       router.push('/');
     } catch (e: any) {
         console.error("Login submission error:", e);
-        console.error("Error code:", e.code);
-        console.error("Error message:", e.message);
         
         let errorMessage = 'An unexpected error occurred. Please try again.';
-        form.reset();
         
-        // Handle specific Firebase auth error codes
+        // Clear password on error, preserve email field for UX
+        form.setValue('password', '');
+        
+        // Handle specific Firebase auth error codes & set field-level errors
         switch (e.code) {
           case 'auth/user-not-found':
-            errorMessage = 'The email address you entered is not registered. Please check your email or click "Sign up" to create a new account.';
+            errorMessage = 'No account found with this email address.';
+            form.setError('email', { message: errorMessage });
             break;
           case 'auth/wrong-password':
-            errorMessage = 'The password you entered is incorrect. You can click "Forgot your password?" to reset it.';
+            errorMessage = 'Incorrect password. Click "Forgot password?" to reset it.';
+            form.setError('password', { message: errorMessage });
             break;
           case 'auth/invalid-credential':
-            console.error('Invalid credential error details:', e);
-            await auth.signOut();
-            
-            // Clear session data safely
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('lastLogin');
-              localStorage.removeItem('sessionUser');
-              sessionStorage.clear();
-            }
-            
-            errorMessage = 'Your session has expired. The page will refresh in a moment - please try logging in again.';
-            
-            setTimeout(() => {
-              window.location.href = '/login';
-            }, 1500);
+            errorMessage = 'Invalid email or password. Please double-check your credentials.';
+            form.setError('password', { message: 'Invalid email or password.' });
             break;
           case 'auth/invalid-email':
-            errorMessage = 'This email address is not valid. Please make sure you entered a correct email address (e.g., name@example.com).';
+            errorMessage = 'Please enter a valid email address.';
+            form.setError('email', { message: errorMessage });
             break;
           case 'auth/user-disabled':
-            errorMessage = 'This account has been disabled. If you believe this is a mistake, please contact support for assistance.';
+            errorMessage = 'This account has been disabled. Please contact support.';
+            form.setError('email', { message: errorMessage });
             break;
           case 'auth/too-many-requests':
-            errorMessage = 'Access temporarily blocked due to multiple failed attempts. You can:\n1. Wait a few minutes and try again\n2. Click "Forgot your password?" to reset your password\n3. Try signing in with Google instead';
+            errorMessage = 'Too many failed login attempts. Please wait a few minutes or reset your password.';
             break;
           case 'auth/network-request-failed':
-            errorMessage = 'Unable to connect to the server. Please check that:\n1. Your internet connection is working\n2. You are not in airplane mode\n3. Your firewall is not blocking the connection';
+            errorMessage = 'Unable to connect to the server. Please check your internet connection.';
             break;
           default:
             if (e.message) {
-              errorMessage = `Login failed: ${e.message}. Please try again or contact support if the problem persists.`;
+              errorMessage = e.message;
             }
         }
         
         toast({
-            title: 'Login Failed',
-            description: errorMessage,
-            variant: 'destructive',
+          title: 'Login Failed',
+          description: errorMessage,
+          variant: 'destructive',
         });
     } finally {
         setLoading(false);
@@ -147,65 +168,53 @@ export default function LoginPage() {
   };
 
   const handleForgotPassword = async () => {
+    const isEmailValid = await form.trigger('email');
     const email = form.getValues('email');
-    if (!email) {
+    
+    if (!email || !isEmailValid) {
+      form.setError('email', { message: 'Please enter a valid email address first.' });
       toast({
         title: 'Email required',
-        description: 'Please enter your email address first.',
+        description: 'Please enter a valid email address in the field above.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Get the current domain for the reset URL
       const currentDomain = typeof window !== 'undefined' ? window.location.origin : 
-        process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` :
-        'https://2b711deb-9881-4c8e-9864-f2078ec28923-00-1z7caopfvm8sp.picard.replit.dev';
+        process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : '';
       
-      // Configure action code settings for the password reset email
       const actionCodeSettings = {
         url: `${currentDomain}/reset-password`,
-        handleCodeInApp: false, // We want to handle the reset in the web app, not mobile
+        handleCodeInApp: false,
       };
 
-      // Ensure auth is properly initialized
       if (!auth) {
         throw new Error('Authentication is not initialized');
       }
-      
-      // Log auth configuration for debugging
-      console.log('Auth configuration:', {
-        isInitialized: !!auth,
-        hasAuthDomain: !!auth.config?.authDomain,
-        currentDomain: window.location.hostname
-      });
 
-      // Use Firebase's built-in sendPasswordResetEmail method
       await sendPasswordResetEmail(auth, email, actionCodeSettings);
       
       toast({
         title: 'Password reset email sent',
-        description: 'Check your email for a link to reset your password. If you don\'t see it, check your spam folder.',
+        description: `Check ${email} for instructions to reset your password.`,
       });
     } catch (error: any) {
       console.error('Password reset error:', error);
-      
       let errorMessage = 'Failed to send password reset email. Please try again.';
       
-      // Handle specific Firebase auth error codes
       switch (error.code) {
         case 'auth/user-not-found':
-          errorMessage = 'No account found with this email address. Please check your email or create a new account.';
+          errorMessage = 'No account found with this email address.';
+          form.setError('email', { message: errorMessage });
           break;
         case 'auth/invalid-email':
           errorMessage = 'Please enter a valid email address.';
+          form.setError('email', { message: errorMessage });
           break;
         case 'auth/too-many-requests':
           errorMessage = 'Too many reset requests. Please wait a few minutes before trying again.';
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = 'Network error. Please check your connection and try again.';
           break;
         default:
           if (error.message) {
@@ -224,101 +233,60 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     
-    // Clear any existing error states
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('auth_error');
       localStorage.removeItem('lastAuthError');
     }
     
     try {
-      // Clear existing auth state first
       if (auth.currentUser) {
         await auth.signOut();
-        // Wait for auth state to clear
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      // Set persistence to LOCAL before sign-in
-      await setPersistence(auth, browserLocalPersistence);
+      await setPersistence(
+        auth,
+        rememberMe ? browserLocalPersistence : browserSessionPersistence
+      );
       
-      // Prevent automatic reload and set up loading state
-      if (typeof window !== 'undefined') {
-        const loadingToast = toast({
-          title: 'Signing in...',
-          description: 'Please wait while we securely log you in.',
-        });
-
-        window.onbeforeunload = (e) => {
-          e.preventDefault();
-          e.returnValue = '';
-        };
-
-        // Clean up toast after 3 seconds
-        setTimeout(() => loadingToast.dismiss(), 3000);
-      }
-
       const user = await authService.signInWithGoogle();
       
-      // If user is null, it means we're being redirected
       if (!user) {
-        // Show loading message since we're about to redirect
         toast({
           title: 'Redirecting to Google',
-          description: 'Please complete sign in with Google...',
+          description: 'Please complete sign in in the Google window...',
         });
-        return; // Don't continue since we're being redirected
+        return;
       }
 
-      // Re-enable automatic reload after successful login
-      if (typeof window !== 'undefined') {
-        window.onbeforeunload = null;
-      }
-    
-      console.log('Google sign-in successful:', user.uid);
+      toast({
+        title: 'Welcome!',
+        description: 'Successfully signed in with Google.',
+      });
       router.push('/');
     } catch (e: any) {
-      // Re-enable automatic reload on error
-      if (typeof window !== 'undefined') {
-        window.onbeforeunload = null;
-      }
-
-      console.error("Google Sign-In error:", {
-        error: e,
-        code: e.code,
-        message: e.message,
-        stack: e.stack
-      });
+      console.error("Google Sign-In error:", e);
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
       switch (e.code) {
+        case 'auth/api-key-not-valid':
+        case 'auth/invalid-api-key':
+          errorMessage = 'Firebase API key is invalid or truncated. Please set a valid NEXT_PUBLIC_FIREBASE_API_KEY in .env.';
+          break;
         case 'auth/popup-closed-by-user':
           errorMessage = 'Google sign-in was cancelled. Please try again.';
           break;
         case 'auth/popup-blocked':
-          errorMessage = 'Popup was blocked. Please allow popups for this site and try again.';
+          errorMessage = 'Popup was blocked by your browser. Please allow popups for this site.';
           break;
         case 'auth/invalid-credential':
-          errorMessage = 'Sign-in failed. Please clear your browser cache and try again.';
-          // Clear auth state for next attempt
+          errorMessage = 'Sign-in failed due to an invalid credential. Please try again.';
           if (auth) {
             await auth.signOut();
           }
           break;
         case 'auth/network-request-failed':
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-          break;
-        case 'auth/cancelled-popup-request':
-          errorMessage = 'Another popup is already open. Please close it and try again.';
-          break;
-        case 'auth/argument-error':
-          // Clear session data safely
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('lastLogin');
-            localStorage.removeItem('sessionUser');
-            sessionStorage.clear();
-          }
-          errorMessage = 'Authentication error. Please try again after the page reloads.';
-          setTimeout(() => window.location.reload(), 1500);
+          errorMessage = 'Network error. Please check your connection and try again.';
           break;
         default:
           if (e.message) {
@@ -327,7 +295,7 @@ export default function LoginPage() {
       }
       
       toast({
-        title: 'Error signing in with Google',
+        title: 'Google Sign-In Error',
         description: errorMessage,
         variant: 'destructive',
       });
@@ -336,7 +304,6 @@ export default function LoginPage() {
     }
   };
 
-  // Cleanup loading states when component unmounts
   useEffect(() => {
     return () => {
       setLoading(false);
@@ -344,33 +311,37 @@ export default function LoginPage() {
     };
   }, []);
 
-
   return (
     <>
       <Toaster />
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Card className="bg-transparent border-0 shadow-none">
-            <CardHeader className="space-y-1 text-center">
-              <CardTitle className="text-2xl">Welcome Back</CardTitle>
-              <CardDescription>
-                Enter your email below to log in to your account
+            <CardHeader className="space-y-1.5 text-center pb-4">
+              <CardTitle className="text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground">
+                Enter your credentials to access your account
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4">
+            <CardContent className="grid gap-4 px-6">
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem className="grid gap-2">
-                    <FormLabel>Email</FormLabel>
+                  <FormItem className="grid gap-1.5">
+                    <FormLabel className="text-sm font-medium">Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="m@example.com"
-                        {...field}
-                        disabled={loading || googleLoading}
-                      />
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          type="email"
+                          placeholder="name@example.com"
+                          autoComplete="email"
+                          className="pl-9 bg-background/50 backdrop-blur-sm border-border/70 focus:border-primary transition-colors"
+                          {...field}
+                          disabled={loading || googleLoading}
+                        />
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -380,53 +351,105 @@ export default function LoginPage() {
                 control={form.control}
                 name="password"
                 render={({ field }) => (
-                  <FormItem className="grid gap-2">
-                    <FormLabel>Password</FormLabel>
+                  <FormItem className="grid gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <FormLabel className="text-sm font-medium">Password</FormLabel>
+                      <Button
+                        type="button"
+                        variant="link"
+                        tabIndex={-1}
+                        className="p-0 h-auto text-xs text-primary hover:underline font-medium"
+                        onClick={handleForgotPassword}
+                        disabled={loading || googleLoading}
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                     <FormControl>
-                      <Input type="password" {...field} disabled={loading || googleLoading} />
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          className="pl-9 pr-10 bg-background/50 backdrop-blur-sm border-border/70 focus:border-primary transition-colors"
+                          {...field}
+                          disabled={loading || googleLoading}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={loading || googleLoading}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button className="w-full" type="submit" disabled={loading || googleLoading}>
-                {loading ? 'Logging in...' : 'Login'}
-              </Button>
 
-              <div className="text-center">
-                <Button
+              <div className="flex items-center justify-between pt-1">
+                <button
                   type="button"
-                  variant="link"
-                  className="text-sm text-muted-foreground hover:text-primary"
-                  onClick={() => handleForgotPassword()}
+                  onClick={() => setRememberMe(!rememberMe)}
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors select-none"
                   disabled={loading || googleLoading}
                 >
-                  Forgot your password?
-                </Button>
+                  {rememberMe ? (
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                  ) : (
+                    <Square className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span>Remember me on this device</span>
+                </button>
               </div>
+            </CardContent>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
+            <CardFooter className="flex flex-col gap-4 px-6 pb-6 pt-2">
+              <Button
+                className="w-full h-10 font-semibold shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 active:scale-[0.99]"
+                type="submit"
+                disabled={loading || googleLoading}
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Logging in...
                   </span>
+                ) : (
+                  'Login'
+                )}
+              </Button>
+
+              <div className="relative my-1 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/60" />
                 </div>
+                <span className="relative z-10 bg-card px-3 py-0.5 text-xs text-muted-foreground font-medium rounded-full border border-border/50 shadow-sm">
+                  Or continue with
+                </span>
               </div>
 
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full h-10 bg-background/40 hover:bg-background/80 border-border/70 font-medium transition-all"
                 onClick={handleGoogleSignIn}
                 disabled={loading || googleLoading}
               >
                 {googleLoading ? (
-                  'Signing in...'
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Signing in...
+                  </span>
                 ) : (
                   <>
                     <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -452,12 +475,12 @@ export default function LoginPage() {
                 )}
               </Button>
 
-              <div className="text-center text-sm text-muted-foreground">
-                Don't have an account?{' '}
+              <div className="text-center text-sm text-muted-foreground pt-1">
+                Don&apos;t have an account?{' '}
                 <Link
                   href="/signup"
                   className={cn(
-                    "font-medium text-primary underline-offset-4 hover:underline",
+                    "font-semibold text-primary underline-offset-4 hover:underline transition-colors",
                     (loading || googleLoading) && "pointer-events-none opacity-50"
                   )}
                   aria-disabled={loading || googleLoading}
@@ -471,5 +494,19 @@ export default function LoginPage() {
         </form>
       </Form>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

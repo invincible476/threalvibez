@@ -1,6 +1,4 @@
-
 import Link from 'next/link';
-import { MessagesSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function VibezLogo({ className }: { className?: string }) {

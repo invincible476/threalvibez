@@ -1,12 +1,14 @@
+'use client';
 
 import React from 'react';
 import { motion, MotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useAppearance } from '@/components/providers/appearance-provider';
 
 interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   variant?: 'primary' | 'secondary';
-  blurStrength?: number; // 0-20
+  blurStrength?: number; // 0-30 override
   accent?: string; // e.g., 'hsl(var(--primary))'
   as?: any;
   className?: string;
@@ -16,30 +18,36 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps & MotionProps>
   ({ 
     children, 
     variant = 'primary', 
-    blurStrength = 10, 
+    blurStrength, 
     accent, 
     as: Component = motion.div, 
     className, 
+    style,
     ...props 
   }, ref) => {
+    const { isGlassEnabled, glassBlur, glassOpacity } = useAppearance();
+
+    const effectiveBlur = blurStrength ?? glassBlur;
+    const effectiveOpacity = glassOpacity / 100;
+    const isGlassActive = isGlassEnabled && effectiveBlur > 0;
 
     const cardStyle: React.CSSProperties = {
-      '--glass-blur': `${blurStrength}px`,
-      '--glass-accent-glow': accent ? `0 8px 24px ${accent}` : 'none',
-    } as React.CSSProperties;
+      ...style,
+      backdropFilter: isGlassActive ? `blur(${effectiveBlur}px)` : 'none',
+      WebkitBackdropFilter: isGlassActive ? `blur(${effectiveBlur}px)` : 'none',
+      backgroundColor: isGlassActive 
+        ? `rgba(20, 16, 35, ${effectiveOpacity})` 
+        : 'hsl(var(--card))',
+      boxShadow: accent ? `0 8px 24px ${accent}` : undefined,
+    };
 
     return (
       <Component
         ref={ref}
         style={cardStyle}
         className={cn(
-          'rounded-lg border',
-          'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-on-glass)]',
-          'backdrop-blur-[var(--glass-blur)]',
-          '[--glass-bg:rgba(255,255,255,0.04)] [--glass-border:rgba(255,255,255,0.06)] [--text-on-glass:rgba(255,255,255,0.92)]',
-          'dark:[--glass-bg:rgba(30,30,30,0.5)] dark:[--glass-border:rgba(255,255,255,0.1)] dark:[--text-on-glass:rgba(255,255,255,0.95)]',
-          'shadow-[var(--glass-accent-glow)]',
-          'transition-colors duration-300',
+          'rounded-xl border border-border/60 text-card-foreground',
+          'transition-all duration-200',
           className
         )}
         {...props}

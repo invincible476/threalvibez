@@ -138,7 +138,7 @@ export const authService = {
       status: 'online',
       about: '',
       devices: [],
-      background: 'galaxy',
+      background: 'black',
       useCustomBackground: true,
       friends: [],
       friendRequestsSent: [],
@@ -189,6 +189,13 @@ export const authService = {
       
       // Create the user document using unified schema
       await this.ensureUserDocument(userCredential.user, { name });
+
+      // Mark email as verified in local storage since user passed 6-digit code before creation
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
+        localStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
+        sessionStorage.setItem(`lastVerificationCheck_${userCredential.user.uid}`, Date.now().toString());
+      }
       
       // Force token refresh
       await userCredential.user.getIdToken(true);
@@ -437,6 +444,10 @@ export const authService = {
         let errorCode = error.code || 'auth/unknown';
         
         switch (error.code) {
+          case 'auth/api-key-not-valid':
+          case 'auth/invalid-api-key':
+            errorMessage = 'Firebase API key is invalid or truncated. Please update NEXT_PUBLIC_FIREBASE_API_KEY in .env.';
+            break;
           case 'auth/popup-blocked':
             errorMessage = 'Sign-in popup was blocked. Please allow popups for this site and try again.';
             break;
@@ -470,12 +481,16 @@ export const authService = {
           console.warn('Failed to clean up auth state:', e);
         }
 
-        throw new AuthError(error.message || errorMessage, errorCode);
+        throw new AuthError(errorMessage, errorCode);
       }
     } catch (error: any) {
       logDebug('Google sign-in error:', { code: error.code, message: error.message });
+      let friendlyMessage = error.message || 'Failed to sign in with Google';
+      if (error.code === 'auth/api-key-not-valid' || error.message?.includes('api-key-not-valid')) {
+        friendlyMessage = 'Firebase API key is invalid or truncated. Please set a valid NEXT_PUBLIC_FIREBASE_API_KEY in .env.';
+      }
       throw new AuthError(
-        error.message || 'Failed to sign in with Google',
+        friendlyMessage,
         error.code || 'auth/unknown'
       );
     }

@@ -234,7 +234,7 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
       animate="animate"
       layout
       className={cn(
-        'group flex w-full items-start gap-3 relative',
+        'group flex w-full items-start gap-2.5 relative my-0.5',
         isCurrentUser && 'flex-row-reverse',
         message.isAiMessage && 'flex-row bg-transparent'
       )}
@@ -243,58 +243,58 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
       dragElastic={{ right: isCurrentUser ? 0 : 0.1, left: isCurrentUser ? 0.1 : 0 }}
-      style={{ x: 0 }} // Initialize x to avoid layout jumps
+      style={{ x: 0 }}
     >
-      <UserAvatar user={sender} className="h-8 w-8" />
+      <UserAvatar user={sender} className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 mt-0.5" />
       <div
         className={cn(
-          'relative flex max-w-[70%] flex-col rounded-xl shadow-md',
+          'relative flex max-w-[82%] sm:max-w-[70%] flex-col shadow-sm transition-all overflow-hidden',
           message.isAiMessage
-            ? 'rounded-tl-none bg-green-100 dark:bg-green-900/20 text-foreground border border-green-200 dark:border-green-800'
+            ? 'rounded-2xl rounded-tl-xs bg-green-500/10 text-foreground border border-green-500/30 backdrop-blur-md'
             : isCurrentUser
-              ? 'rounded-tr-none bg-gradient-to-br from-gradient-from to-gradient-to text-primary-foreground animated-gradient'
-              : 'rounded-tl-none bg-card',
-            (message.file && !message.text) ? 'p-1.5' : 'px-4 py-2'
+              ? 'rounded-2xl rounded-tr-xs bg-gradient-to-br from-primary via-primary/90 to-accent text-primary-foreground'
+              : 'rounded-2xl rounded-tl-xs bg-card/90 border border-border/50 text-foreground backdrop-blur-md',
+          (message.file && !message.text) ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
         )}
       >
         {!isCurrentUser && (
-            <p className="text-sm font-semibold text-primary px-2 pt-1 font-heading">{sender.name}</p>
+            <p className="text-[12px] font-semibold text-primary/90 mb-0.5 px-0.5 tracking-tight">{sender.name}</p>
         )}
         
         {message.replyTo && (
           <div className={cn(
-            "p-2 mb-2 bg-black/20 rounded-md",
+            "p-2 mb-1.5 bg-black/20 rounded-lg text-xs border-l-2 border-primary",
             message.replyTo.storyMedia && "flex items-center gap-2"
           )}>
                 {message.replyTo.storyMedia && (
-                    <Image src={message.replyTo.storyMedia} alt="Story reply" width={40} height={40} className="rounded-md object-cover h-10 w-10" />
+                    <Image src={message.replyTo.storyMedia} alt="Story reply" width={36} height={36} className="rounded-md object-cover h-9 w-9" />
                 )}
-                <div>
-                  <p className="text-sm font-semibold">{message.replyTo.messageSender}</p>
-                  <p className="text-sm text-white/80 line-clamp-2">{message.replyTo.messageText}</p>
+                <div className="overflow-hidden">
+                  <p className="font-semibold truncate">{message.replyTo.messageSender}</p>
+                  <p className="text-white/80 line-clamp-1 truncate">{message.replyTo.messageText}</p>
                 </div>
           </div>
         )}
 
         {renderMessageContent()}
         
-    {message.text && (
-      <p className={cn(
-        "text-base whitespace-pre-wrap break-words chat-list-force-break",
-        (message.file) ? "mt-2 px-2 pb-1" : "",
-        message.deleted && "italic text-muted-foreground"
-      )}>
-        {formatText(message.text)}
-      </p>
-    )}
+        {message.text && (
+          <p className={cn(
+            "text-[14.5px] sm:text-base leading-relaxed whitespace-pre-wrap break-words chat-list-force-break",
+            (message.file) ? "mt-1.5 px-1 pb-0.5" : "",
+            message.deleted && "italic text-muted-foreground"
+          )}>
+            {formatText(message.text)}
+          </p>
+        )}
 
         {message.reactions && message.reactions.length > 0 && (
             <div className={cn(
-                "absolute -bottom-4 flex gap-1",
+                "absolute -bottom-3 flex gap-1 z-10",
                 isCurrentUser ? 'left-2' : 'right-2'
             )}>
                 {message.reactions.map(r => (
-                    <div key={r.emoji} className="flex items-center bg-background/70 backdrop-blur-md border rounded-full px-2 py-0.5 text-xs shadow">
+                    <div key={r.emoji} className="flex items-center bg-background/90 backdrop-blur-md border rounded-full px-2 py-0.5 text-[11px] shadow-sm">
                         <span>{r.emoji}</span>
                         <span className="ml-1 font-semibold">{r.count}</span>
                     </div>
@@ -304,10 +304,10 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
         
         {hasContent && !message.deleted && <MessageActions />}
 
-        <div className="mt-1 flex items-center gap-2 self-end px-2">
-          <p className={cn('text-xs', isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
+        <div className="mt-0.5 flex items-center justify-end gap-1 self-end px-0.5 text-[11px] opacity-80">
+          <span className={cn(isCurrentUser ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
             {formattedTimestamp}
-          </p>
+          </span>
           {isCurrentUser && getReadReceiptIcon()}
         </div>
       </div>

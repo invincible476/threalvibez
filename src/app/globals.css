@@ -170,3 +170,19 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* Prevent discolored autofill strips on mobile virtual keyboard popup */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(var(--foreground)) !important;
+  -webkit-box-shadow: 0 0 0px 1000px hsl(var(--card)) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+body {
+  background-color: transparent;
+}

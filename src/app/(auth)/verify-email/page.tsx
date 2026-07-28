@@ -165,7 +165,15 @@ export default function VerifyEmailPage() {
           
           // Cache the new verification status
           localStorage.setItem(`emailVerified_${user.uid}`, 'true');
-          localStorage.setItem(`lastVerificationCheck_${user.uid}`, Date.now().toString());
+          sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          sessionStorage.setItem(`lastVerificationCheck_${user.uid}`, Date.now().toString());
+
+          toast({
+            title: 'Email Verified!',
+            description: 'Your email has been verified successfully.',
+          });
+          
+          router.push('/');
         } catch (error) {
           toast({
             title: 'Verification Issue',

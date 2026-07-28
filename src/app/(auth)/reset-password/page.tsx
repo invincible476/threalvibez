@@ -219,8 +219,9 @@ function ResetPasswordForm() {
 
   if (mode === 'link' && !codeVerified) {
     return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="w-full max-w-md mx-auto bg-card border-border shadow-xl">
+      <>
+        <Toaster />
+        <Card className="bg-transparent border-0 shadow-none">
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl font-bold">Verifying Reset Link</CardTitle>
             <CardDescription>Validating password reset link...</CardDescription>
@@ -229,13 +230,14 @@ function ResetPasswordForm() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </CardContent>
         </Card>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <Card className="w-full max-w-md mx-auto bg-card border-border shadow-xl">
+    <>
+      <Toaster />
+      <Card className="bg-transparent border-0 shadow-none">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
           <CardDescription>
@@ -376,8 +378,7 @@ function ResetPasswordForm() {
           </Form>
         )}
       </Card>
-      <Toaster />
-    </div>
+    </>
   );
 }
 

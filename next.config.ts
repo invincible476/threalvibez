@@ -30,13 +30,35 @@ const nextConfig: NextConfig = {
   },
 
   // Configure allowed dev origins for cross-origin requests (Next.js 15 requires exact origins)
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        'localhost:5000',
+        '0.0.0.0:5000',
+        'localhost:3000',
+        '0.0.0.0:3000',
+        'super-duper-cod-5g96jrr6qw7934p7v-5000.app.github.dev',
+        'super-duper-cod-5g96jrr6qw7934p7v-3000.app.github.dev',
+        '*.app.github.dev',
+        '*.github.dev',
+      ]
+    }
+  },
   allowedDevOrigins: process.env.NODE_ENV === 'development' 
     ? [
-        // Current Replit domain (dynamically determined)
+        'localhost:5000',
+        '0.0.0.0:5000',
+        'localhost:3000',
+        '0.0.0.0:3000',
+        'super-duper-cod-5g96jrr6qw7934p7v-5000.app.github.dev',
+        'super-duper-cod-5g96jrr6qw7934p7v-3000.app.github.dev',
+        '*.app.github.dev',
+        '*.github.dev',
+        ...(process.env.CODESPACE_NAME ? [
+          `${process.env.CODESPACE_NAME}-5000.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev'}`,
+          `${process.env.CODESPACE_NAME}-3000.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev'}`
+        ] : []),
         process.env.REPLIT_DOMAINS || '2b711deb-9881-4c8e-9864-f2078ec28923-00-1z7caopfvm8sp.picard.replit.dev',
-        // Additional common Replit subdomains for compatibility
-        'localhost:9000',
-        '0.0.0.0:9000'
       ]
     : [],
   // Optimize for Vercel deployment

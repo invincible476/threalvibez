@@ -29,6 +29,7 @@ import { AuraBackground } from './aura-background';
 import { GridBackground } from './grid-background';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileGalaxyBackground } from './mobile-galaxy-background';
+import { useTheme } from 'next-themes';
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -1736,10 +1737,12 @@ export function useAppShell(): AppShellContextType {
 
 function AppBackground() {
   const { appBackground, useCustomBackground } = useAppearance();
+  const { theme } = useTheme();
   const isMobile = useIsMobile();
 
-  if (!useCustomBackground) {
-    return isMobile ? <MobileGalaxyBackground /> : <GalaxyBackground />;
+  // In Light mode OR True Black mode, unmount canvas completely so background is clean!
+  if (theme === 'light' || appBackground === 'black' || !appBackground || !useCustomBackground) {
+    return null;
   }
 
   switch(appBackground) {
@@ -1750,9 +1753,9 @@ function AppBackground() {
     case 'aura':
       return <AuraBackground />;
     case 'grid':
-        return <GridBackground />;
+      return <GridBackground />;
     default:
-      return isMobile ? <MobileGalaxyBackground /> : <GalaxyBackground />;
+      return null;
   }
 }
 

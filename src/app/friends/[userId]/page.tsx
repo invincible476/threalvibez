@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
@@ -13,8 +13,9 @@ import { MessageSquare, UserPlus, UserCheck, UserX } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
-export default function UserProfilePage({ params }: { params: { userId: string } }) {
-  const { userId } = params;
+export default function UserProfilePage({ params }: { params: Promise<{ userId: string }> | { userId: string } }) {
+  const resolvedParams = params && 'then' in params ? use(params) : params;
+  const userId = resolvedParams?.userId;
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { user: authUser } = useAuth();

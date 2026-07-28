@@ -1,9 +1,8 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Plus } from 'lucide-react';
+import { Sun, Moon, Plus, Sparkles, CircleDot, Layers, Grid as GridIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
@@ -14,12 +13,21 @@ import { Switch } from '@/components/ui/switch';
 import { useMobileDesign } from '@/components/providers/mobile-provider';
 import { motion } from 'framer-motion';
 import { Slider } from '@/components/ui/slider';
-import useGlassTheme from '@/components/settings/hooks/useGlassTheme';
+import { useAuth } from '@/hooks/use-auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const themes = [
     { name: 'Light', value: 'light', icon: Sun },
     { name: 'Dark', value: 'dark', icon: Moon },
-]
+];
+
+const backgroundStyles = [
+    { id: 'black', label: 'True Black', description: 'Pure #000000 OLED background (Default)', icon: CircleDot },
+    { id: 'galaxy', label: 'Galaxy Stars', description: 'Animated space star canvas background', icon: Sparkles },
+    { id: 'glow', label: 'Gradient Glow', description: 'Soft ambient color glows', icon: Layers },
+    { id: 'grid', label: 'Tech Grid', description: 'Subtle cyberpunk grid pattern', icon: GridIcon },
+];
 
 const accentColors = [
     { name: 'Default', value: '283 51% 53%' },
@@ -28,7 +36,7 @@ const accentColors = [
     { name: 'Green', value: '145 65% 45%' },
     { name: 'Orange', value: '25 95% 55%' },
     { name: 'Pink', value: '330 85% 60%' },
-]
+];
 
 const defaultChatBackgrounds = [
   { id: 'default', url: 'https://picsum.photos/seed/bg-default/600/1000', hint: 'abstract pattern' },
@@ -49,13 +57,29 @@ export default function AppearancePage() {
         accentColor, setAccentColor,
         gradientFrom, setGradientFrom,
         gradientTo, setGradientTo, 
-        chatBackground, setChatBackground, 
+        chatBackground, setChatBackground,
+        appBackground, setAppBackground,
         isAmoled, setIsAmoled,
-        chatListOpacity, setChatListOpacity
+        chatListOpacity, setChatListOpacity,
+        isGlassEnabled, setIsGlassEnabled,
+        glassBlur, setGlassBlur,
+        glassOpacity, setGlassOpacity,
     } = useAppearance();
-    const { blurStrength, setBlurStrength, isGlassEnabled, setIsGlassEnabled, isMounted } = useGlassTheme();
+
+    const { user } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { isMobileDesign, setIsMobileDesign } = useMobileDesign();
+
+    const handleBackgroundSelect = async (id: string) => {
+        setAppBackground(id);
+        if (user) {
+            try {
+                await updateDoc(doc(db, 'users', user.uid), { background: id });
+            } catch (e) {
+                console.warn("Could not sync background to Firestore:", e);
+            }
+        }
+    };
 
     const handleCustomBgUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -70,10 +94,9 @@ export default function AppearancePage() {
         }
     };
 
-
     return (
         <motion.div 
-            className="space-y-8"
+            className="space-y-8 max-w-4xl mx-auto pb-12"
             initial="initial"
             animate="animate"
             variants={{
@@ -86,14 +109,62 @@ export default function AppearancePage() {
         >
              <motion.header variants={cardVariants}>
                 <h1 className="text-3xl font-bold font-heading">Appearance</h1>
-                <p className="text-muted-foreground mt-1">Customize the look and feel of your app.</p>
+                <p className="text-muted-foreground mt-1">Customize your themes, background styles, and frosted glass controls.</p>
             </motion.header>
 
+            {/* Background Style Toggle */}
+            <motion.div variants={cardVariants}>
+                <Card className="border border-border/60 backdrop-blur-xl bg-card/75">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                            App Background Style
+                        </CardTitle>
+                        <CardDescription>
+                            Switch between True Black (#000000) and Starry Galaxy themes.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {backgroundStyles.map((style) => {
+                            const Icon = style.icon;
+                            const isSelected = appBackground === style.id;
+
+                            return (
+                                <motion.div key={style.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleBackgroundSelect(style.id)}
+                                        className={cn(
+                                            "w-full h-24 px-4 py-3.5 flex items-center justify-start gap-3.5 text-left border rounded-xl transition-all",
+                                            isSelected 
+                                                ? "bg-purple-500/15 border-purple-500/30 text-purple-300 font-semibold shadow-lg shadow-purple-500/10" 
+                                                : "hover:border-border hover:bg-muted/30"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "p-3 rounded-lg shrink-0",
+                                            isSelected ? "bg-purple-500/20 text-purple-300" : "bg-muted text-muted-foreground"
+                                        )}>
+                                            <Icon className="h-6 w-6" />
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <p className="font-semibold text-base truncate">{style.label}</p>
+                                            <p className="text-xs text-muted-foreground line-clamp-1">{style.description}</p>
+                                        </div>
+                                    </Button>
+                                </motion.div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            {/* App Theme */}
             <motion.div variants={cardVariants}>
                 <Card>
                     <CardHeader>
                         <CardTitle>App Theme</CardTitle>
-                        <CardDescription>Select a theme for the entire application.</CardDescription>
+                        <CardDescription>Select Light or Dark mode for the application.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {themes.map((t) => (
@@ -102,8 +173,8 @@ export default function AppearancePage() {
                                     variant="outline" 
                                     onClick={() => setTheme(t.value)}
                                     className={cn(
-                                        "w-full h-28 flex flex-col gap-2 items-center justify-center text-lg transition-colors",
-                                        theme === t.value && "border-primary ring-2 ring-primary bg-primary/10"
+                                        "w-full h-24 flex flex-col gap-2 items-center justify-center text-lg transition-colors rounded-xl",
+                                        theme === t.value && "bg-purple-500/15 border-purple-500/30 text-purple-300 font-semibold"
                                     )}
                                 >
                                     <t.icon className="h-6 w-6"/>
@@ -114,11 +185,11 @@ export default function AppearancePage() {
                     </CardContent>
                     {theme === 'dark' && (
                         <CardContent>
-                            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                            <div className="flex items-center justify-between space-x-2 rounded-xl border px-4 py-3.5">
                                 <Label htmlFor="amoled-mode" className="flex flex-col space-y-1">
-                                    <span>AMOLED Black</span>
-                                    <span className="font-normal leading-snug text-muted-foreground">
-                                    Use a true black background for OLED screens.
+                                    <span className="font-semibold">AMOLED True Black</span>
+                                    <span className="font-normal leading-snug text-muted-foreground text-xs">
+                                        Uses pure #000000 background for maximum OLED battery savings.
                                     </span>
                                 </Label>
                                 <Switch id="amoled-mode" checked={isAmoled} onCheckedChange={setIsAmoled} />
@@ -128,54 +199,101 @@ export default function AppearancePage() {
                 </Card>
             </motion.div>
 
-            {isMounted && (
-              <motion.div variants={cardVariants}>
-                  <Card>
-                      <CardHeader>
-                          <CardTitle>Glass UI</CardTitle>
-                          <CardDescription>Configure the frosted glass effect for UI cards.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                          <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
-                              <Label htmlFor="glass-enabled" className="flex flex-col space-y-1">
-                                  <span>Enable Glass Effect</span>
-                                  <span className="font-normal leading-snug text-muted-foreground">
-                                      Toggles the frosted glass background on cards.
-                                  </span>
-                              </Label>
-                              <Switch id="glass-enabled" checked={isGlassEnabled} onCheckedChange={setIsGlassEnabled} />
-                          </div>
-                          {isGlassEnabled && (
-                              <div className="space-y-2">
-                                  <Label htmlFor="blur-strength">Blur Strength ({blurStrength}px)</Label>
-                                  <Slider
-                                      id="blur-strength"
-                                      value={[blurStrength]}
-                                      onValueChange={(value) => setBlurStrength(value[0])}
-                                      max={20}
-                                      step={1}
-                                  />
-                              </div>
-                          )}
-                      </CardContent>
-                  </Card>
-              </motion.div>
-            )}
-
+            {/* Frosted Glass & Sliders */}
             <motion.div variants={cardVariants}>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Mobile Redesign (Beta)</CardTitle>
+                        <CardTitle>Frosted Glass Controls</CardTitle>
+                        <CardDescription>Adjust backdrop blur strength and card opacity in real time.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between space-x-2 rounded-xl border px-4 py-3.5">
+                            <Label htmlFor="glass-enabled" className="flex flex-col space-y-1">
+                                <span className="font-semibold">Enable Frosted Glass Effect</span>
+                                <span className="font-normal leading-snug text-muted-foreground text-xs">
+                                    Applies dynamic backdrop blur and glass translucency to UI cards.
+                                </span>
+                            </Label>
+                            <Switch id="glass-enabled" checked={isGlassEnabled} onCheckedChange={setIsGlassEnabled} />
+                        </div>
+
+                        {isGlassEnabled && (
+                            <div className="space-y-6 pt-2">
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center text-sm font-medium">
+                                        <Label htmlFor="blur-strength">Blur Strength</Label>
+                                        <span className="text-purple-300 font-mono">
+                                            {glassBlur === 0 ? '0px (Solid Crisp)' : `${glassBlur}px`}
+                                        </span>
+                                    </div>
+                                    <Slider
+                                        id="blur-strength"
+                                        value={[glassBlur]}
+                                        onValueChange={(value) => setGlassBlur(value[0])}
+                                        min={0}
+                                        max={30}
+                                        step={1}
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center text-sm font-medium">
+                                        <Label htmlFor="glass-opacity">Glass Card Opacity</Label>
+                                        <span className="text-primary font-mono">{glassOpacity}%</span>
+                                    </div>
+                                    <Slider
+                                        id="glass-opacity"
+                                        value={[glassOpacity]}
+                                        onValueChange={(value) => setGlassOpacity(value[0])}
+                                        min={10}
+                                        max={100}
+                                        step={1}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            {/* Chat List Transparency */}
+            <motion.div variants={cardVariants}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Chat List Sidebar Transparency</CardTitle>
+                        <CardDescription>Adjust the opacity of the left chat navigation panel.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex justify-between items-center text-sm font-medium">
+                            <span>Sidebar Opacity</span>
+                            <span className="text-primary font-mono">{chatListOpacity}%</span>
+                        </div>
+                        <Slider
+                            value={[chatListOpacity]}
+                            onValueChange={(value) => setChatListOpacity(value[0])}
+                            min={20}
+                            max={100}
+                            step={1}
+                        />
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            {/* Mobile Redesign Toggle */}
+            <motion.div variants={cardVariants}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Mobile Layout Optimization</CardTitle>
                         <CardDescription>
-                            Enable the new experimental mobile-optimized layout.
+                            Enable compact mobile redesign for smartphone viewports.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                        <div className="flex items-center justify-between space-x-2 rounded-xl border p-4">
                             <Label htmlFor="mobile-redesign-mode" className="flex flex-col space-y-1">
-                                <span>Enable Mobile Redesign</span>
-                                <span className="font-normal leading-snug text-muted-foreground">
-                                    Experience the new compact layout on mobile devices.
+                                <span className="font-semibold">Enable Compact Mobile Layout</span>
+                                <span className="font-normal leading-snug text-muted-foreground text-xs">
+                                    Optimizes navigation and spacing for mobile screens.
                                 </span>
                             </Label>
                             <Switch id="mobile-redesign-mode" checked={isMobileDesign} onCheckedChange={setIsMobileDesign} />
@@ -184,11 +302,12 @@ export default function AppearancePage() {
                 </Card>
             </motion.div>
             
+            {/* Accent Color Selection */}
             <motion.div variants={cardVariants}>
                 <Card>
                     <CardHeader>
                         <CardTitle>Accent Color</CardTitle>
-                        <CardDescription>Pick an accent color for buttons, highlights, and more.</CardDescription>
+                        <CardDescription>Pick an accent color for buttons, highlights, and icons.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-wrap gap-4">
                     {accentColors.map((color) => (
@@ -210,83 +329,12 @@ export default function AppearancePage() {
                 </Card>
             </motion.div>
 
+            {/* Chat Wallpapers */}
             <motion.div variants={cardVariants}>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Gradient Colors</CardTitle>
-                        <CardDescription>Customize the gradient for your chat bubbles.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <Label>From</Label>
-                            <div className="flex flex-wrap gap-4 mt-2">
-                                {accentColors.map((color) => (
-                                    <motion.div key={color.name} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                        <Button
-                                            size="icon"
-                                            onClick={() => setGradientFrom(color.value)}
-                                            className={cn(
-                                                "rounded-full h-8 w-8 transition-shadow",
-                                                gradientFrom === color.value && "ring-2 ring-offset-2 ring-primary ring-offset-background"
-                                            )}
-                                            style={{ backgroundColor: `hsl(${color.value})` }}
-                                        >
-                                            <span className="sr-only">{color.name}</span>
-                                        </Button>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </div>
-                         <div>
-                            <Label>To</Label>
-                             <div className="flex flex-wrap gap-4 mt-2">
-                                {accentColors.map((color) => (
-                                    <motion.div key={color.name} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                        <Button
-                                            size="icon"
-                                            onClick={() => setGradientTo(color.value)}
-                                            className={cn(
-                                                "rounded-full h-8 w-8 transition-shadow",
-                                                gradientTo === color.value && "ring-2 ring-offset-2 ring-primary ring-offset-background"
-                                            )}
-                                            style={{ backgroundColor: `hsl(${color.value})` }}
-                                        >
-                                            <span className="sr-only">{color.name}</span>
-                                        </Button>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-
-            <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Chat List Transparency</CardTitle>
-                        <CardDescription>Adjust the transparency of the chat list sidebar.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center gap-4">
-                           <span className="text-sm font-medium">Opaque</span>
-                            <Slider
-                                value={[100 - chatListOpacity]}
-                                onValueChange={(value) => setChatListOpacity(100 - value[0])}
-                                max={100}
-                                step={1}
-                            />
-                           <span className="text-sm font-medium">Transparent</span>
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-
-            <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Chat Background</CardTitle>
-                        <CardDescription>Choose a wallpaper for your conversations.</CardDescription>
+                        <CardTitle>Chat Wallpapers</CardTitle>
+                        <CardDescription>Choose a custom background wallpaper for conversation threads.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                         <input
@@ -299,7 +347,7 @@ export default function AppearancePage() {
                         <motion.div className="relative group" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-full aspect-[9/16] rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center hover:border-primary hover:text-primary transition-colors"
+                                className="w-full aspect-[9/16] rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center hover:border-primary hover:text-primary transition-colors"
                             >
                                 <Plus className="h-8 w-8"/>
                                 <span className="mt-2 text-sm font-medium">Custom</span>
@@ -315,7 +363,7 @@ export default function AppearancePage() {
                                     height={300}
                                     onClick={() => setChatBackground(bg.url)}
                                     className={cn(
-                                        "rounded-lg object-cover aspect-[9/16] cursor-pointer transition-transform",
+                                        "rounded-xl object-cover aspect-[9/16] cursor-pointer transition-transform",
                                         chatBackground === bg.url && "ring-2 ring-offset-2 ring-primary ring-offset-background"
                                     )}
                                     data-ai-hint={bg.hint}

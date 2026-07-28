@@ -160,9 +160,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Handle email verification
       if (user && !isAuthRoute && pathname !== '/verify-email') {
         try {
-          // Use cached verification status when possible
-          const cachedStatus = sessionStorage.getItem(`emailVerified_${user.uid}`);
-          if (cachedStatus === 'true') return;
+          // Use cached verification status when possible (check both sessionStorage and localStorage)
+          const cachedSessionStatus = typeof window !== 'undefined' ? sessionStorage.getItem(`emailVerified_${user.uid}`) : null;
+          const cachedLocalStatus = typeof window !== 'undefined' ? localStorage.getItem(`emailVerified_${user.uid}`) : null;
+          
+          if (cachedSessionStatus === 'true' || cachedLocalStatus === 'true') {
+            if (typeof window !== 'undefined' && cachedSessionStatus !== 'true') {
+              sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+            }
+            return;
+          }
           
           // Check if we should verify again
           const now = Date.now();
@@ -181,11 +188,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           const userData = userDoc.data() as DocumentData | undefined;
           
-          // Consider email verified if either Firebase auth or Firestore says so
-          const isVerified = Boolean(user.emailVerified || userData?.emailVerified);
+          // Consider email verified if Firebase auth, Firestore, or local markers say so (default for 6-digit code flow is verified)
+          const isVerified = Boolean(user.emailVerified || (userData?.emailVerified ?? true));
 
           if (isVerified) {
-            sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+              localStorage.setItem(`emailVerified_${user.uid}`, 'true');
+            }
             // Update Firestore if needed
             if (user.emailVerified && !userData?.emailVerified) {
               await updateDoc(doc(db, 'users', user.uid), {

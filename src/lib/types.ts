@@ -12,6 +12,7 @@ export type User = {
   id: string;
   uid: string;
   name: string;
+  username?: string;
   photoURL?: string | null;
   status: 'online' | 'offline';
   email?: string;

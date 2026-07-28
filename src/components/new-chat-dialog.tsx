@@ -47,79 +47,58 @@ export function NewChatDialog({ users, onCreateChat, onCreateGroupChat, children
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
   const [groupName, setGroupName] = useState('');
   
-  const publicUsers = useMemo(() => users.filter(u => 
-    u.uid !== currentUser?.uid && !u.isPrivate
+  const availableUsers = useMemo(() => users.filter(u => 
+    u.uid !== currentUser?.uid
   ), [users, currentUser]);
 
   const handleSearch = useCallback(async (term: string) => {
     if (!term.trim()) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
     }
     setIsSearching(true);
+    const searchLower = term.trim().toLowerCase();
+
     try {
-        if (isEmail(term)) {
-            // For email searches, check both private and public accounts
-            // Search directly in all users since we need to check private accounts too
-            const exactEmailUsers = users.filter(user => 
-                user.uid !== currentUser?.uid && 
-                !currentUser?.blockedUsers?.includes(user.uid) &&
-                user.email?.toLowerCase() === term.toLowerCase()
-            );
-            
-            setSearchResults(exactEmailUsers);
-            
-            if (exactEmailUsers.length === 0) {
-                toast({ 
-                    title: "User not found", 
-                    description: "No user found with that exact email address.", 
-                    variant: "destructive" 
-                });
-            }
-        } else {
-            // For non-email searches, only show public accounts
-            const filtered = publicUsers.filter(user => {
-                const searchLower = term.toLowerCase();
-                return (user.name && user.name.toLowerCase().includes(searchLower)) ||
-                       (user.email && user.email.toLowerCase().includes(searchLower));
-            });
-            setSearchResults(filtered);
-            
-            if (filtered.length === 0) {
-                toast({ 
-                    title: "No results", 
-                    description: isEmail(term) ? 
-                        "No user found with that email address." : 
-                        "No users found matching your search.", 
-                    variant: "default" 
-                });
-            }
-        }
-    } catch (error) {
-        console.error("Error searching users:", error);
-        // Fallback to client-side search if Firebase fails
-        const filtered = publicUsers.filter(user => {
-            const searchLower = term.toLowerCase();
-            return (user.name && user.name.toLowerCase().includes(searchLower)) ||
-                   (user.email && user.email.toLowerCase().includes(searchLower));
-        });
-        setSearchResults(filtered);
-        
-        toast({ 
-            title: "Search completed", 
-            description: filtered.length > 0 ? `Found ${filtered.length} users in local search.` : 
-                        isEmail(searchTerm) ? 'No user found with that exact email address.' :
-                        'No users found matching your search.', 
-            variant: filtered.length > 0 ? "default" : "destructive" 
-        });
-    } finally {
+      // Filter local users by name, email, or username
+      const localMatches = availableUsers.filter(user => {
+        if (currentUser?.blockedUsers?.includes(user.uid)) return false;
+        const nameMatch = user.name?.toLowerCase().includes(searchLower);
+        const emailMatch = user.email?.toLowerCase().includes(searchLower);
+        const usernameMatch = user.username?.toLowerCase().includes(searchLower);
+        return Boolean(nameMatch || emailMatch || usernameMatch);
+      });
+
+      if (localMatches.length > 0) {
+        setSearchResults(localMatches);
         setIsSearching(false);
+        return;
+      }
+
+      // Query Firestore collection 'users' if no local cache match
+      const usersRef = collection(db, 'users');
+      const qSnap = await getDocs(query(usersRef, limit(50)));
+      const remoteMatches = qSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as User))
+        .filter(user => {
+          if (user.uid === currentUser?.uid) return false;
+          if (currentUser?.blockedUsers?.includes(user.uid)) return false;
+          const nameMatch = user.name?.toLowerCase().includes(searchLower);
+          const emailMatch = user.email?.toLowerCase().includes(searchLower);
+          const usernameMatch = user.username?.toLowerCase().includes(searchLower);
+          return Boolean(nameMatch || emailMatch || usernameMatch);
+        });
+
+      setSearchResults(remoteMatches);
+    } catch (error) {
+      console.error("Error searching users:", error);
+    } finally {
+      setIsSearching(false);
     }
-  }, [publicUsers, toast, searchTerm]);
+  }, [availableUsers, currentUser]);
 
-
-  const displayedUsers = searchTerm ? searchResults : publicUsers;
+  const displayedUsers = searchTerm ? searchResults : availableUsers;
 
   const handleCreateChatClick = (user: User) => {
     if (!currentUser) {

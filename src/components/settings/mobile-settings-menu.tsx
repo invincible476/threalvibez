@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ChevronRight, User, Shield, Palette, Bell, Mail, Image as ImageIcon, CloudSun } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const settingsItems = [
     {
@@ -49,20 +51,41 @@ const settingsItems = [
 ];
 
 export function MobileSettingsMenu() {
+    const pathname = usePathname();
+
     return (
-        <div className="p-2 space-y-2">
-            {settingsItems.map(item => (
-                <Link href={item.href} key={item.href} className="flex items-center justify-between p-4 rounded-lg bg-card/50 hover:bg-card/80 transition-colors">
-                    <div className="flex items-center gap-4">
-                        <item.icon className="h-6 w-6 text-primary" />
-                        <div className="flex flex-col">
-                            <span className="font-semibold">{item.title}</span>
-                            <span className="text-sm text-muted-foreground">{item.description}</span>
+        <div className="p-3 space-y-2.5 max-w-2xl mx-auto">
+            {settingsItems.map(item => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+
+                return (
+                    <Link 
+                        href={item.href} 
+                        key={item.href} 
+                        className={cn(
+                            "flex items-center justify-between px-4 py-3.5 rounded-xl border transition-all duration-200",
+                            isActive 
+                                ? "bg-purple-500/15 border-purple-500/30 text-purple-300 font-semibold shadow-lg shadow-purple-500/10" 
+                                : "bg-card/75 border-border/50 hover:bg-card hover:border-border/80 text-foreground"
+                        )}
+                    >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                            <div className={cn(
+                                "p-2.5 rounded-lg shrink-0",
+                                isActive ? "bg-purple-500/20 text-purple-300" : "bg-muted/50 text-muted-foreground"
+                            )}>
+                                <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col min-w-0 truncate">
+                                <span className="font-semibold text-base truncate">{item.title}</span>
+                                <span className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</span>
+                            </div>
                         </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Link>
-            ))}
+                        <ChevronRight className={cn("h-5 w-5 shrink-0 ml-2", isActive ? "text-purple-300" : "text-muted-foreground")} />
+                    </Link>
+                );
+            })}
         </div>
     );
 }
