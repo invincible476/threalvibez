@@ -479,7 +479,7 @@ const ChatViewComponent = ({
 
       {/* FIXED THIS WRAPPER: Changed h-full to flex-1 and added relative */}
       <div className="flex flex-1 flex-col min-h-0 relative w-full max-w-full">
-        <div className="flex-1 min-h-0 overflow-y-auto relative w-full">
+        <div className="flex-1 min-h-0 relative w-full overflow-hidden">
         {(isVoiceEnabled || isVoiceConnected) && (
           <VoiceChat
             participants={voiceParticipants}

@@ -234,9 +234,9 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
       animate="animate"
       layout
       className={cn(
-        'group flex items-end gap-2 relative my-1 w-full',
-        isCurrentUser ? 'flex-row-reverse justify-end max-w-[85%] ml-auto' : 'flex-row justify-start max-w-[85%] mr-auto',
-        message.isAiMessage && 'flex-row bg-transparent'
+        'group flex w-full items-end gap-2 relative my-1',
+        isCurrentUser ? 'justify-end' : 'justify-start',
+        message.isAiMessage && 'justify-start'
       )}
       // Swipe to reply gesture
       drag="x"
@@ -245,10 +245,12 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
       dragElastic={{ right: isCurrentUser ? 0 : 0.1, left: isCurrentUser ? 0.1 : 0 }}
       style={{ x: 0 }}
     >
-      <UserAvatar user={sender} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
+      {!isCurrentUser && (
+        <UserAvatar user={sender} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
+      )}
       <div
         className={cn(
-          'relative flex max-w-[75%] flex-col shadow-sm transition-all overflow-hidden',
+          'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-sm transition-all overflow-hidden',
           message.isAiMessage
             ? 'rounded-2xl rounded-tl-xs bg-green-500/10 text-foreground border border-green-500/30 backdrop-blur-md'
             : isCurrentUser
@@ -311,6 +313,9 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
           {isCurrentUser && getReadReceiptIcon()}
         </div>
       </div>
+      {isCurrentUser && (
+        <UserAvatar user={sender} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
+      )}
     </motion.div>
   );
 }
