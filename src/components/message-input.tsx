@@ -248,7 +248,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
     }
     
   return (
-    <div className="border-t border-border/50 bg-card/80 backdrop-blur-sm p-2">
+    <div className="p-1.5 sm:p-2">
       <div className="flex items-end gap-2">
         {!isAiChat && recordingStatus === 'idle' && (
             <>

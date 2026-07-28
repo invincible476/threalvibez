@@ -535,7 +535,7 @@ const ChatViewComponent = ({
         </div>
       )}
     </div>
-    <div className="sticky bottom-0 left-0 right-0 w-full bg-background z-10 px-2 sm:px-4 pb-safe">
+    <div className="shrink-0 w-full bg-card/90 backdrop-blur-xl border-t border-border/50 px-2 sm:px-4 pb-safe z-20">
       {replyToMessage && (
         <div className="p-2 px-4 border-t border-border/50 bg-background/50 flex justify-between items-center">
           <div className="flex items-center gap-2">

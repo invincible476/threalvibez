@@ -47,9 +47,9 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0 flex-shrink-0 select-none">
       <Avatar className={cn(
-        'border-2 border-background rounded-full overflow-hidden', 
+        'border-2 border-background rounded-full overflow-hidden shrink-0 flex-shrink-0', 
         isFriend && 'border-green-500',
         className
       )}>
