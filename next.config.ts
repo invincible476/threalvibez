@@ -28,33 +28,7 @@ const nextConfig: NextConfig = {
     // Remove console logs in production
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  // Optimize for development
-  webpack: (config, { dev, isServer }) => {
-    // Development optimizations
-    if (dev) {
-      // Optimize development build speed
-      config.optimization = {
-        ...config.optimization,
-        runtimeChunk: false,
-        minimize: false,
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            // Combine all node_modules into a single chunk
-            commons: {
-              name: 'commons',
-              chunks: 'all',
-              minChunks: 2,
-              reuseExistingChunk: true,
-            },
-          },
-        },
-      };
-    }
-    return config;
-  },
+
   // Configure allowed dev origins for cross-origin requests (Next.js 15 requires exact origins)
   allowedDevOrigins: process.env.NODE_ENV === 'development' 
     ? [
