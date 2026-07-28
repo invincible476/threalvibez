@@ -345,7 +345,7 @@ const ChatViewComponent = ({
 
 
   return (
-    <div className="flex h-full w-full flex-col bg-transparent overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden w-full bg-transparent">
       <header className="flex items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
         <div className="flex items-center gap-3">
             {isMobileView && onBack ? (
@@ -535,7 +535,7 @@ const ChatViewComponent = ({
         </div>
       )}
     </div>
-    <div className="shrink-0 w-full bg-card/90 backdrop-blur-xl border-t border-border/50 px-2 sm:px-4 pb-safe z-20">
+    <div className="flex-none shrink-0 p-3 bg-black/90 backdrop-blur-md border-t border-purple-500/20 z-20 w-full pb-safe">
       {replyToMessage && (
         <div className="p-2 px-4 border-t border-border/50 bg-background/50 flex justify-between items-center">
           <div className="flex items-center gap-2">
