@@ -1795,14 +1795,10 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
     }
   }, [toast, isAuthRoute]);
   
-  // Setup presence and online status monitoring (skipped on auth routes by passing undefined user)
+  // Setup presence and online status monitoring (skipped on auth routes)
   usePresence(isAuthRoute ? undefined : chatData.currentUser);
   useOnlineStatus(isAuthRoute ? undefined : chatData.currentUser);
 
-  if (isAuthRoute) {
-    return <>{children}</>;
-  }
-  
   return (
     <AppShellContext.Provider value={chatData}>
       <StoriesContext.Provider value={{
@@ -1814,13 +1810,13 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
         usersCache: chatData.usersCache,
       }}>
         <div className="relative">
-          <AppBackground />
+          {!isAuthRoute && <AppBackground />}
           <div className="relative z-10">
             {children}
           </div>
         </div>
 
-        {chatData.previewStoryFile && (
+        {!isAuthRoute && chatData.previewStoryFile && (
           <ImagePreviewDialog
             file={chatData.previewStoryFile}
             mode="story"
@@ -1829,7 +1825,7 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
           />
         )}
         
-        {chatData.viewingStory && (
+        {!isAuthRoute && chatData.viewingStory && (
             <StoryViewer 
                 isOpen={!!chatData.viewingStory}
                 onOpenChange={(open) => !open && chatData.setViewingStory(null)}
@@ -1845,5 +1841,5 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
         )}
       </StoriesContext.Provider>
     </AppShellContext.Provider>
-  )
+  );
 }
