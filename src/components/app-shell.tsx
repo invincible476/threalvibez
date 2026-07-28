@@ -1765,12 +1765,10 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
   const chatData = useChatData();
   const { toast } = useToast();
   
-  if (isAuthRoute) {
-    return <>{children}</>;
-  }
-  
   // Check for blocked Firestore requests
   useEffect(() => {
+    if (isAuthRoute) return;
+
     const checkFirestore = async () => {
       try {
         // Try a simple Firestore operation
@@ -1795,11 +1793,15 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
     if (typeof window !== 'undefined') {
       checkFirestore();
     }
-  }, [toast]);
+  }, [toast, isAuthRoute]);
   
-  // Setup presence and online status monitoring
-  usePresence(chatData.currentUser);
-  useOnlineStatus(chatData.currentUser);
+  // Setup presence and online status monitoring (skipped on auth routes by passing undefined user)
+  usePresence(isAuthRoute ? undefined : chatData.currentUser);
+  useOnlineStatus(isAuthRoute ? undefined : chatData.currentUser);
+
+  if (isAuthRoute) {
+    return <>{children}</>;
+  }
   
   return (
     <AppShellContext.Provider value={chatData}>
