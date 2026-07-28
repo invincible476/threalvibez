@@ -40,6 +40,7 @@ import { Timestamp } from 'firebase/firestore';
 import { useAppShell } from './app-shell';
 import { useVoiceChat } from '@/hooks/voice/use-voice-chat';
 import { VoiceChat } from '@/components/voice-chat/voice-chat';
+import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
 
@@ -65,6 +66,7 @@ const ChatViewComponent = ({
     isLoadingMore
 }: ChatViewProps) => {
   const { toast } = useToast();
+  const { viewportHeight } = useMobileKeyboardHeight();
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   
@@ -345,7 +347,10 @@ const ChatViewComponent = ({
 
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden w-full bg-transparent">
+    <div 
+      className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden w-full bg-transparent"
+      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+    >
       <header className="flex items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
         <div className="flex items-center gap-3">
             {isMobileView && onBack ? (
