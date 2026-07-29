@@ -417,6 +417,33 @@ useEffect(() => {
 
     return () => unsubscribeConversations();
   }, [authUser?.uid, getParticipantDetails]);
+
+  // Sync usersCache updates dynamically into conversations (upgrades fallback names/avatars as profile data arrives)
+  useEffect(() => {
+    if (!usersCache || usersCache.size === 0) return;
+    setConversations(prev => {
+      if (!prev || prev.length === 0) return prev;
+      return prev.map(convo => {
+        if (convo.type !== 'private') return convo;
+        const otherId = convo.participants.find(p => p !== authUser?.uid);
+        if (!otherId) return convo;
+        const cachedUser = usersCache.get(otherId);
+        if (!cachedUser) return convo;
+        
+        const newName = (cachedUser.name && cachedUser.name !== 'User') ? cachedUser.name : convo.name;
+        const newAvatar = cachedUser.photoURL || convo.avatar;
+        
+        if (convo.name === newName && convo.avatar === newAvatar) return convo;
+
+        return {
+          ...convo,
+          name: newName,
+          avatar: newAvatar,
+          participantsDetails: convo.participants.map(id => usersCache.get(id) || convo.participantsDetails?.find(p => p.uid === id)).filter(Boolean) as User[],
+        };
+      });
+    });
+  }, [usersCache, authUser?.uid]);
   
   useEffect(() => {
     if (newlyCreatedChatId) {

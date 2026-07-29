@@ -200,9 +200,20 @@ export function ChatList() {
   const filteredConversations = useMemo(() => {
     const blockedUserIds = currentUser?.blockedUsers || [];
     if (!conversations) return [];
+    const term = searchTerm.trim().toLowerCase();
+
     return conversations.filter(convo => {
-      const isBlocked = convo.type === 'private' && convo.participants.some(p => blockedUserIds.includes(p));
-      return !isBlocked && convo.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const isBlocked = convo.type === 'private' && convo.participants.some(p => blockedUserIds.includes(p) && p !== currentUser?.uid);
+      if (isBlocked) return false;
+      if (!term) return true;
+
+      const convoName = (convo.name || '').toLowerCase();
+      const otherParticipant = convo.participantsDetails?.find(p => p.uid !== currentUser?.uid);
+      const otherEmail = (otherParticipant?.email || '').toLowerCase();
+      const otherUser = (otherParticipant?.username || '').toLowerCase();
+      const lastMsgText = (convo.lastMessage?.text || '').toLowerCase();
+
+      return convoName.includes(term) || otherEmail.includes(term) || otherUser.includes(term) || lastMsgText.includes(term);
     });
   }, [conversations, searchTerm, currentUser]);
   
