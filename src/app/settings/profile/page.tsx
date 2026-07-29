@@ -8,9 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Camera, Loader2, Shield } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
+import { authService } from '@/lib/auth-service';
+import { useAppShell } from '@/components/app-shell';
 import { useToast } from '@/hooks/use-toast';
 import { updateProfile } from 'firebase/auth';
 import type { User as UserType } from '@/lib/types';
@@ -148,8 +150,9 @@ function ProfileSkeleton() {
 
 export default function ProfilePage() {
   const { user: authUser, loading: authLoading } = useAuth();
-  const [user, setUser] = useState<UserType | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { currentUser: shellCurrentUser } = useAppShell();
+  const [user, setUser] = useState<UserType | null>(shellCurrentUser || null);
+  const [loading, setLoading] = useState(!shellCurrentUser);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
@@ -163,6 +166,23 @@ export default function ProfilePage() {
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const { appBackground, useCustomBackground } = useAppearance();
 
+  const fallbackUser = useMemo(() => {
+    if (!authUser) return null;
+    return {
+      id: authUser.uid,
+      uid: authUser.uid,
+      name: authUser.displayName || (authUser.email ? authUser.email.split('@')[0] : 'User'),
+      email: authUser.email || '',
+      photoURL: authUser.photoURL || '',
+      status: 'online',
+      about: '',
+      friends: [],
+      friendRequestsSent: [],
+      friendRequestsReceived: [],
+      blockedUsers: [],
+    } as UserType;
+  }, [authUser]);
+
   const handleUpdatePhotoUrl = useCallback(async (newPhotoUrl: string) => {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error("No authenticated user found.");
@@ -170,7 +190,7 @@ export default function ProfilePage() {
     await updateProfile(currentUser, { photoURL: newPhotoUrl });
     
     const userDocRef = doc(db, 'users', currentUser.uid);
-    await updateDoc(userDocRef, { photoURL: newPhotoUrl });
+    await setDoc(userDocRef, { photoURL: newPhotoUrl }, { merge: true });
     
     setAvatarUrl(newPhotoUrl);
     toast({ title: 'Success', description: 'Your avatar has been updated.' });
@@ -247,32 +267,51 @@ export default function ProfilePage() {
     if (!authUser) {
       setLoading(false);
       return;
-    };
+    }
+
+    const activeInitialUser = shellCurrentUser || fallbackUser;
+    if (activeInitialUser) {
+      setUser(prev => prev || activeInitialUser);
+      setName(prev => prev || activeInitialUser.name || '');
+      setAbout(prev => prev || activeInitialUser.about || '');
+      setAvatarUrl(prev => prev || activeInitialUser.photoURL || '');
+      setIsPrivate(prev => prev || activeInitialUser.isPrivate || false);
+      setInstagramUrl(prev => prev || activeInitialUser.instagramUrl || '');
+      setLoading(false);
+    }
 
     const userDocRef = doc(db, 'users', authUser.uid);
-    const unsubscribe = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-            const userData = { id: doc.id, ...doc.data() } as UserType;
+    const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
+        if (docSnap.exists()) {
+            const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as UserType;
             setUser(userData);
             setName(userData.name || '');
             setAbout(userData.about || '');
             setAvatarUrl(userData.photoURL || '');
             setIsPrivate(userData.isPrivate || false);
             setInstagramUrl(userData.instagramUrl || '');
+        } else {
+            // Self-healing: ensure user document is created in Firestore
+            await authService.ensureUserDocument(authUser);
         }
+        setLoading(false);
+    }, (err) => {
+        console.warn('Profile page snapshot warning:', err);
         setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [authUser, authLoading]);
+  }, [authUser, authLoading, shellCurrentUser, fallbackUser]);
+
+  const activeUser = user || shellCurrentUser || fallbackUser;
 
   // Conditional returns must come AFTER all hooks have been called.
-  if (loading || authLoading) {
+  if ((loading && !activeUser) || authLoading) {
     return <ProfileSkeleton />;
   }
 
-  if (!user) {
-    return <div className="text-center text-muted-foreground p-8">User not found. Please log in again.</div>;
+  if (!activeUser) {
+    return <div className="text-center text-muted-foreground p-8">No active user session. Please log in again.</div>;
   }
 
   const handleNameInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,21 +345,21 @@ export default function ProfilePage() {
 
   const handleSaveChanges = async () => {
     const currentUser = auth.currentUser;
-    if (!currentUser || !user) return;
+    if (!currentUser || !activeUser) return;
     
     setIsSaving(true);
     try {
         const dataToUpdate: any = {};
-        if(name !== user.name) {
+        if(name !== activeUser.name) {
             await updateProfile(currentUser, { displayName: name });
             dataToUpdate.name = name;
         }
 
-        if(about !== (user.about || '')) {
+        if(about !== (activeUser.about || '')) {
             dataToUpdate.about = about;
         }
 
-        if(instagramUrl !== (user.instagramUrl || '')) {
+        if(instagramUrl !== (activeUser.instagramUrl || '')) {
             // Validate Instagram URL format
             if (instagramUrl && !instagramUrl.match(/^https?:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9_.]+\/?$/)) {
                 throw new Error('Please enter a valid Instagram profile URL');
@@ -333,7 +372,7 @@ export default function ProfilePage() {
 
         if (Object.keys(dataToUpdate).length > 0) {
             const userDocRef = doc(db, 'users', currentUser.uid);
-            await updateDoc(userDocRef, dataToUpdate);
+            await setDoc(userDocRef, dataToUpdate, { merge: true });
         }
         
         toast({
@@ -341,11 +380,11 @@ export default function ProfilePage() {
             description: "Your profile information has been updated."
         });
 
-    } catch(error) {
+    } catch(error: any) {
         console.error("Error saving profile:", error);
         toast({
             title: "Error",
-            description: "Failed to save profile changes.",
+            description: error.message || "Failed to save profile changes.",
             variant: "destructive"
         });
     } finally {
@@ -361,7 +400,7 @@ export default function ProfilePage() {
 
     try {
         const userDocRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(userDocRef, { isPrivate: isPrivate });
+        await setDoc(userDocRef, { isPrivate: isPrivate }, { merge: true });
         toast({
             title: "Privacy settings updated",
             description: isPrivate ? "Your account is now private." : "Your account is now public."
@@ -377,7 +416,7 @@ export default function ProfilePage() {
     }
   }
 
-  const isSaveDisabled = !user || (name === user.name && about === (user.about || '') && instagramUrl === (user.instagramUrl || ''));
+  const isSaveDisabled = !activeUser || (name === activeUser.name && about === (activeUser.about || '') && instagramUrl === (activeUser.instagramUrl || ''));
 
   return (
     <motion.div 
@@ -406,7 +445,7 @@ export default function ProfilePage() {
             <CardContent className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="relative">
-                    <UserAvatar user={user} className="h-24 w-24 sm:h-28 sm:w-28 text-3xl" />
+                    <UserAvatar user={activeUser} className="h-24 w-24 sm:h-28 sm:w-28 text-3xl" />
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -439,7 +478,7 @@ export default function ProfilePage() {
                             onChange={(e) => setAvatarUrl(e.target.value)}
                             disabled={isUploading}
                         />
-                         <Button asChild variant="secondary" onClick={handleSetAvatarFromUrl} disabled={isUploading || !avatarUrl || avatarUrl === user.photoURL}>
+                         <Button asChild variant="secondary" onClick={handleSetAvatarFromUrl} disabled={isUploading || !avatarUrl || avatarUrl === activeUser.photoURL}>
                             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                                 {isUploading ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Set'}
                             </motion.button>
@@ -473,7 +512,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={user.email || ''} disabled />
+                    <Input id="email" type="email" value={activeUser.email || ''} disabled />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="instagram">Instagram Profile</Label>
