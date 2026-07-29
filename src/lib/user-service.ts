@@ -53,7 +53,8 @@ export function normalizeUser(data: any, docId?: string): User {
 }
 
 /**
- * Client-side matcher for user search query (case-insensitive tokenized substring match).
+ * Client-side matcher for user search query.
+ * Smart prefix matching for single letters + tokenized substring matching for longer queries.
  */
 export function matchesUserSearch(user: User, searchTerm: string, currentUserId?: string): boolean {
   if (!user) return false;
@@ -67,14 +68,27 @@ export function matchesUserSearch(user: User, searchTerm: string, currentUserId?
   const cleanTerm = rawTerm.replace(/^@/, '');
   if (!cleanTerm) return false;
 
-  const tokens = cleanTerm.split(/\s+/).filter(Boolean);
-
   const nameStr = (user.name || '').toLowerCase();
   const emailStr = (user.email || '').toLowerCase();
   const usernameStr = (user.username || '').toLowerCase();
   const emailPrefix = emailStr.split('@')[0] || '';
+  const nameWords = nameStr.split(/\s+/).filter(Boolean);
 
-  // 1. Substring match on full clean query
+  // For 1-character queries (e.g. 'm'), ONLY match if name, email, or username STARTS with 'm'
+  if (cleanTerm.length === 1) {
+    const startsWithChar =
+      nameStr.startsWith(cleanTerm) ||
+      emailStr.startsWith(cleanTerm) ||
+      usernameStr.startsWith(cleanTerm) ||
+      emailPrefix.startsWith(cleanTerm) ||
+      nameWords.some(w => w.startsWith(cleanTerm));
+
+    return startsWithChar;
+  }
+
+  const tokens = cleanTerm.split(/\s+/).filter(Boolean);
+
+  // 1. Direct substring match on full clean query
   const directMatch =
     nameStr.includes(cleanTerm) ||
     emailStr.includes(cleanTerm) ||
@@ -90,6 +104,47 @@ export function matchesUserSearch(user: User, searchTerm: string, currentUserId?
     usernameStr.includes(token) ||
     emailPrefix.includes(token)
   );
+}
+
+/**
+ * Ranks search results by relevance so prefix & exact matches appear at the top.
+ */
+export function sortSearchResults(users: User[], searchTerm: string): User[] {
+  const cleanTerm = searchTerm.trim().toLowerCase().replace(/^@/, '');
+  if (!cleanTerm) return users;
+
+  return [...users].sort((a, b) => {
+    const aName = (a.name || '').toLowerCase();
+    const bName = (b.name || '').toLowerCase();
+    const aEmail = (a.email || '').toLowerCase();
+    const bEmail = (b.email || '').toLowerCase();
+    const aUser = (a.username || '').toLowerCase();
+    const bUser = (b.username || '').toLowerCase();
+
+    // 1. Exact email match
+    if (aEmail === cleanTerm && bEmail !== cleanTerm) return -1;
+    if (bEmail === cleanTerm && aEmail !== cleanTerm) return 1;
+
+    // 2. Exact username / name match
+    if (aUser === cleanTerm && bUser !== cleanTerm) return -1;
+    if (bUser === cleanTerm && aUser !== cleanTerm) return 1;
+    if (aName === cleanTerm && bName !== cleanTerm) return -1;
+    if (bName === cleanTerm && aName !== cleanTerm) return 1;
+
+    // 3. Name/Email/Username Starts With cleanTerm
+    const aStarts = aName.startsWith(cleanTerm) || aEmail.startsWith(cleanTerm) || aUser.startsWith(cleanTerm);
+    const bStarts = bName.startsWith(cleanTerm) || bEmail.startsWith(cleanTerm) || bUser.startsWith(cleanTerm);
+    if (aStarts && !bStarts) return -1;
+    if (bStarts && !aStarts) return 1;
+
+    // 4. Word in name starts with cleanTerm
+    const aWordStarts = aName.split(/\s+/).some(w => w.startsWith(cleanTerm));
+    const bWordStarts = bName.split(/\s+/).some(w => w.startsWith(cleanTerm));
+    if (aWordStarts && !bWordStarts) return -1;
+    if (bWordStarts && !aWordStarts) return 1;
+
+    return aName.localeCompare(bName);
+  });
 }
 
 // In-memory search cache for remote queries
@@ -119,22 +174,18 @@ export async function searchUsers(
     }
   });
 
-  // 2. Return instantly if we already have local results or cache
-  if (map.size > 0) {
-    return Array.from(map.values());
-  }
-
-  if (searchCache.has(lowerTerm)) {
+  // 2. Check cache if local pool has no matches
+  if (map.size === 0 && searchCache.has(lowerTerm)) {
     const cached = searchCache.get(lowerTerm) || [];
     cached.forEach(u => {
       if (matchesUserSearch(u, cleanTerm, currentUserId)) {
         map.set(u.uid, u);
       }
     });
-    return Array.from(map.values());
+    return sortSearchResults(Array.from(map.values()), cleanTerm);
   }
 
-  // 3. Fast targeted Firestore query fallback with 1000ms timeout guard
+  // 3. Targeted Firestore query fallback with 1000ms timeout guard
   try {
     const usersRef = collection(db, 'users');
     const titleTerm = cleanTerm
@@ -175,7 +226,7 @@ export async function searchUsers(
     console.warn('Firestore targeted search notice:', err);
   }
 
-  return Array.from(map.values());
+  return sortSearchResults(Array.from(map.values()), cleanTerm);
 }
 
 /**

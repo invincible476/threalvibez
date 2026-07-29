@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useAppShell } from '@/components/app-shell';
-import { normalizeUser, matchesUserSearch, searchUsers, fetchMissingUsers } from '@/lib/user-service';
+import { normalizeUser, matchesUserSearch, searchUsers, fetchMissingUsers, sortSearchResults } from '@/lib/user-service';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -210,7 +210,7 @@ export default function FriendsPage() {
             }
         });
 
-        return Array.from(map.values());
+        return sortSearchResults(Array.from(map.values()), clean);
     }, [searchQuery, userPool, remoteResults, authUser?.uid]);
 
     // Optimistic friend action handler

@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { normalizeUser, matchesUserSearch, searchUsers } from '@/lib/user-service';
+import { normalizeUser, matchesUserSearch, searchUsers, sortSearchResults } from '@/lib/user-service';
 
 interface NewChatDialogProps {
   users: User[];
@@ -50,7 +50,8 @@ export function NewChatDialog({ users, onCreateChat, onCreateGroupChat, children
     const clean = searchTerm.trim();
     if (!clean) return availableUsers;
 
-    return availableUsers.filter(u => matchesUserSearch(u, clean, currentUser?.uid));
+    const matches = availableUsers.filter(u => matchesUserSearch(u, clean, currentUser?.uid));
+    return sortSearchResults(matches, clean);
   }, [searchTerm, availableUsers, currentUser?.uid]);
 
   const handleCreateChatClick = (user: User) => {
