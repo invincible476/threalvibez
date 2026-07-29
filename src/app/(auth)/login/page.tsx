@@ -8,6 +8,7 @@ import { z } from 'zod';
 import React, { useState, useEffect, Suspense } from 'react';
 import { auth } from '@/lib/firebase';
 import { authService } from '@/lib/auth-service';
+import { registerDeviceSecurely } from '@/utils/device-auth';
 import { sendPasswordResetEmail, browserLocalPersistence, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import {
@@ -248,6 +249,8 @@ function LoginForm() {
         });
         return;
       }
+
+      await registerDeviceSecurely(user);
 
       toast({
         title: 'Welcome!',
