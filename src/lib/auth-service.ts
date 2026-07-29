@@ -12,7 +12,7 @@ import {
   onAuthStateChanged,
   deleteUser
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, getDocFromCache, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { auth as firebaseAuth, db } from './firebase';
 import { setupPresence, setOfflineStatus } from './presence-final';
 import { getHighQualityGooglePhotoUrl } from '@/utils/avatar';
@@ -119,7 +119,14 @@ export const authService = {
    */
   async ensureUserDocument(user: any, customData?: { name?: string; username?: string; photoURL?: string }) {
     const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
+    let userDoc: any = null;
+    try {
+      userDoc = await getDoc(userDocRef);
+    } catch (err: any) {
+      if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
+        userDoc = await getDocFromCache(userDocRef).catch(() => null);
+      }
+    }
 
     let photoURL = customData?.photoURL || user.photoURL || '';
     if (photoURL && photoURL.includes('googleusercontent.com')) {
@@ -149,7 +156,7 @@ export const authService = {
       updatedAt: serverTimestamp(),
     };
 
-    if (!userDoc.exists()) {
+    if (!userDoc || !userDoc.exists()) {
       await setDoc(userDocRef, {
         ...initialData,
         createdAt: serverTimestamp(),

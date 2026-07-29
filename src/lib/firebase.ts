@@ -26,7 +26,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Initialize Firestore with offline persistence
-import { enableIndexedDbPersistence, getFirestore, initializeFirestore, persistentLocalCache, persistentSingleTabManager, Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentSingleTabManager, Firestore } from 'firebase/firestore';
 
 // Initialize Firestore only if it hasn't been initialized yet
 let db: Firestore;
@@ -34,27 +34,12 @@ try {
   // Try to get existing Firestore instance
   db = getFirestore(app);
 } catch (e) {
-  // If no instance exists, initialize with persistence settings
+  // If no instance exists, initialize with modern persistent cache settings
   db = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentSingleTabManager({ forceOwnership: true })
     })
   });
-}
-
-// Enable offline persistence only if it hasn't been enabled
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Firestore persistence failed to enable. Multiple tabs might be open.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('Browser doesn\'t support persistence');
-    }
-  });
-} catch (err: any) {
-  if (err?.code !== 'persistence-already-enabled') {
-    console.error('Error enabling persistence:', err);
-  }
 }
 
 // Handle user online presence
@@ -123,11 +108,16 @@ export const storage = getStorage(app);
 // Export Firestore functions
 export { setDoc };
 
-// Add error handler for unhandled Firestore errors
+// Add error handler for unhandled Firestore errors and offline glitches
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason?.message?.includes('ERR_BLOCKED_BY_CLIENT')) {
-      console.warn('Firestore request was blocked. This might be caused by an ad blocker or privacy extension.');
+    const msg = event.reason?.message || event.reason?.code || '';
+    if (msg.includes('ERR_BLOCKED_BY_CLIENT')) {
+      console.warn('Firestore request was blocked by a browser extension or ad blocker.');
+      event.preventDefault();
+    } else if (msg.includes('offline') || msg === 'unavailable' || msg.includes('Failed to get document')) {
+      console.warn('Firestore request deferred due to temporary offline or network transition.');
+      event.preventDefault();
     }
   });
 }
