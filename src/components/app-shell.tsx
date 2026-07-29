@@ -31,7 +31,7 @@ import { GridBackground } from './grid-background';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileGalaxyBackground } from './mobile-galaxy-background';
 import { useTheme } from 'next-themes';
-import { normalizeUser } from '@/lib/user-service';
+import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -343,10 +343,39 @@ useEffect(() => {
     );
 
     const unsubscribeConversations = onSnapshot(conversationsQuery, async (snapshot) => {
-      const convosPromises = snapshot.docs.map(async (doc) => {
-          const data = doc.data() as Omit<Conversation, 'id'|'participantsDetails'>;
-          const participantIds = data.participants;
-          const participantsDetails = getParticipantDetails(participantIds);
+      const allParticipantIds = Array.from(
+        new Set(snapshot.docs.flatMap(d => (d.data().participants || [])))
+      );
+      
+      const knownUsers = Array.from(usersCacheRef.current.values());
+      const missing = await fetchMissingUsers(allParticipantIds, knownUsers);
+      if (missing.length > 0) {
+        missing.forEach(u => updateUserInCache(u));
+      }
+
+      const convosPromises = snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data() as Omit<Conversation, 'id'|'participantsDetails'>;
+          const participantIds = data.participants || [];
+          
+          const participantsDetails = participantIds.map(id => {
+            const cached = usersCacheRef.current.get(id);
+            if (cached) return cached;
+            const fetched = missing.find(m => m.uid === id);
+            if (fetched) return fetched;
+            return {
+              id,
+              uid: id,
+              name: 'User',
+              email: '',
+              photoURL: '',
+              status: 'offline' as const,
+              friends: [],
+              friendRequestsSent: [],
+              friendRequestsReceived: [],
+              blockedUsers: [],
+            };
+          });
+
           let name = data.name;
           let avatar = data.avatar;
           let otherParticipantLastRead: Timestamp | undefined = undefined;
@@ -354,9 +383,9 @@ useEffect(() => {
           if (data.type === 'private') {
               const otherParticipant = participantsDetails.find(p => p.uid !== authUser.uid);
               if (otherParticipant) {
-                  name = otherParticipant.name;
-                  avatar = otherParticipant.photoURL;
-                  if(data.lastRead) {
+                  name = (otherParticipant.name && otherParticipant.name !== 'User') ? otherParticipant.name : (name || 'User');
+                  avatar = otherParticipant.photoURL || avatar || '';
+                  if (data.lastRead) {
                     otherParticipantLastRead = data.lastRead[otherParticipant.uid];
                   }
               }
@@ -372,13 +401,13 @@ useEffect(() => {
 
           return {
               ...data,
-              id: doc.id,
-              name,
-              avatar,
+              id: docSnap.id,
+              name: name || 'Chat',
+              avatar: avatar || '',
               participantsDetails,
               unreadCount,
               otherParticipantLastRead,
-          } as Conversation
+          } as Conversation;
       });
 
       const convos = await Promise.all(convosPromises);
@@ -594,36 +623,28 @@ useEffect(() => {
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        // Get the current conversation state
-        const chatRef = doc(db, 'conversations', chatId);
-        const chatDoc = await transaction.get(chatRef);
-        
-        if (!chatDoc.exists()) {
-          throw new Error('Conversation not found');
-        }
+      const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
+      const newMessageRef = doc(messageCollectionRef);
+      const messageData = {
+        senderId: senderId,
+        text: messageText,
+        timestamp: serverTimestamp(),
+        clientTempId: tempId,
+        ...(replyTo && { replyTo })
+      };
 
-        // Create new message
-        const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
-        const newMessageRef = doc(messageCollectionRef);
-        const messageData = {
-          senderId: senderId,
-          text: messageText,
-          timestamp: serverTimestamp(),
-          clientTempId: tempId,
-          ...(replyTo && { replyTo })
-        };
+      const chatRef = doc(db, 'conversations', chatId);
 
-        // Update both the message and conversation atomically
-        transaction.set(newMessageRef, messageData);
-        transaction.update(chatRef, {
+      await Promise.all([
+        setDoc(newMessageRef, messageData),
+        updateDoc(chatRef, {
           lastMessage: {
             text: messageText,
             senderId: senderId,
             timestamp: serverTimestamp(),
           },
-        });
-      });
+        })
+      ]);
       
       return tempId;
     } catch (error) {
@@ -1406,6 +1427,35 @@ useEffect(() => {
               friends: arrayUnion(currentUser.uid),
               friendRequestsSent: arrayRemove(currentUser.uid)
           }, { merge: true });
+
+          try {
+            const participants = [currentUser.uid, targetUserId].sort();
+            const q = query(
+              collection(db, 'conversations'),
+              where('type', '==', 'private'),
+              where('participants', '==', participants)
+            );
+            const snapshot = await getDocs(q);
+            if (snapshot.empty) {
+              await addDoc(collection(db, 'conversations'), {
+                type: 'private',
+                participants: participants,
+                createdAt: serverTimestamp(),
+                lastMessage: {
+                  text: 'You are now connected as friends!',
+                  senderId: currentUser.uid,
+                  timestamp: serverTimestamp(),
+                },
+                lastRead: {
+                  [currentUser.uid]: serverTimestamp(),
+                  [targetUserId]: serverTimestamp(),
+                }
+              });
+            }
+          } catch (convoError) {
+            console.error("Error auto-creating conversation on friend accept:", convoError);
+          }
+
           toast({ title: 'Friend Added', description: 'You are now friends!' });
       } else if (action === 'declineRequest') {
           await setDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) }, { merge: true });
