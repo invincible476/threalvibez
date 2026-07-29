@@ -14,7 +14,7 @@ const zVerifyCodeRequest = z.object({
   code: z.string().min(1),
 });
 
-// In-memory fallback for local dev
+// In-memory fallback for fast execution
 const globalForVerification = globalThis as unknown as {
   verificationStore?: Map<string, { code: string; expiresAt: number; attempts: number }>;
   rateLimitStore?: Map<string, { count: number; resetTime: number }>;
@@ -111,21 +111,20 @@ async function sendVerificationCode(
     const code = generateVerificationCode();
     const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes validity
 
-    // Store code in local memory AND Firestore for serverless persistence on Vercel
+    // Store code in global memory instantly (0ms latency)
     verificationStore.set(cleanEmail, { code, expiresAt, attempts: 0 });
 
-    try {
-      const codeRef = doc(db, 'emailVerifications', cleanEmail.replace(/[^a-z0-9]/g, '_'));
-      await setDoc(codeRef, {
-        email: cleanEmail,
-        code,
-        expiresAt,
-        attempts: 0,
-        createdAt: Date.now(),
-      }, { merge: true });
-    } catch (fsErr) {
-      console.warn('Firestore code store warning (using in-memory fallback):', fsErr);
-    }
+    // Non-blocking background sync to Firestore for serverless multi-instance support
+    const docId = cleanEmail.replace(/[^a-z0-9]/g, '_');
+    setDoc(doc(db, 'emailVerifications', docId), {
+      email: cleanEmail,
+      code,
+      expiresAt,
+      attempts: 0,
+      createdAt: Date.now(),
+    }, { merge: true }).catch((fsErr) => {
+      console.warn('Non-blocking Firestore code store notice:', fsErr);
+    });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -166,24 +165,27 @@ async function verifyCode(
     let expiresAt = 0;
     let attempts = 0;
 
-    // Check memory store first
+    // Check memory store first (0ms)
     const memoryRecord = verificationStore.get(cleanEmail);
     if (memoryRecord) {
       storedCode = memoryRecord.code;
       expiresAt = memoryRecord.expiresAt;
       attempts = memoryRecord.attempts;
     } else {
-      // Check Firestore store for Vercel serverless functions
+      // Fast timeout-guarded Firestore check for multi-instance Vercel Lambdas
       try {
-        const codeSnap = await getDoc(doc(db, 'emailVerifications', docId));
-        if (codeSnap.exists()) {
+        const fetchPromise = getDoc(doc(db, 'emailVerifications', docId));
+        const timeoutPromise = new Promise<null>(resolve => setTimeout(() => resolve(null), 1000));
+        const codeSnap = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (codeSnap && 'exists' in codeSnap && codeSnap.exists()) {
           const data = codeSnap.data();
           storedCode = data.code;
           expiresAt = data.expiresAt;
           attempts = data.attempts || 0;
         }
       } catch (fsErr) {
-        console.warn('Firestore code fetch error:', fsErr);
+        console.warn('Firestore code fetch notice:', fsErr);
       }
     }
 

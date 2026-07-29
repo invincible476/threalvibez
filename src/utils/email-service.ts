@@ -21,11 +21,17 @@ export async function sendEmail(message: { to: string; subject: string; html: st
 // Server-backed verification API integration
 export async function sendVerificationRequest(email: string): Promise<boolean> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout guard
+
     const response = await fetch('/api/verify-email?action=send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     const result = await response.json();
     if (!response.ok || !result.success) {
