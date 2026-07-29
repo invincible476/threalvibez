@@ -59,38 +59,41 @@ export function NewChatDialog({ users, onCreateChat, onCreateGroupChat, children
     }
     setIsSearching(true);
     const searchLower = term.trim().toLowerCase();
+    const tokens = searchLower.split(/\s+/).filter(Boolean);
+
+    const matchesUser = (user: User) => {
+      if (user.uid === currentUser?.uid || user.id === currentUser?.uid) return false;
+      if (currentUser?.blockedUsers?.includes(user.uid)) return false;
+
+      const nameLower = (user.name || (user as any).displayName || (user as any).fullName || '').toLowerCase();
+      const emailLower = (user.email || '').toLowerCase();
+      const usernameLower = (user.username || (user as any).handle || '').toLowerCase();
+
+      const fullMatch = nameLower.includes(searchLower) || emailLower.includes(searchLower) || usernameLower.includes(searchLower);
+      if (fullMatch) return true;
+
+      return tokens.every(token => nameLower.includes(token) || emailLower.includes(token) || usernameLower.includes(token));
+    };
 
     try {
-      // Filter local users by name, email, or username
-      const localMatches = availableUsers.filter(user => {
-        if (currentUser?.blockedUsers?.includes(user.uid)) return false;
-        const nameMatch = user.name?.toLowerCase().includes(searchLower);
-        const emailMatch = user.email?.toLowerCase().includes(searchLower);
-        const usernameMatch = user.username?.toLowerCase().includes(searchLower);
-        return Boolean(nameMatch || emailMatch || usernameMatch);
-      });
+      const localMatches = availableUsers.filter(matchesUser);
 
-      if (localMatches.length > 0) {
-        setSearchResults(localMatches);
-        setIsSearching(false);
-        return;
-      }
-
-      // Query Firestore collection 'users' if no local cache match
+      // Fetch full user collection from Firestore (up to 500) to guarantee no user is missed
       const usersRef = collection(db, 'users');
-      const qSnap = await getDocs(query(usersRef, limit(50)));
+      const qSnap = await getDocs(query(usersRef, limit(500)));
       const remoteMatches = qSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as User))
-        .filter(user => {
-          if (user.uid === currentUser?.uid) return false;
-          if (currentUser?.blockedUsers?.includes(user.uid)) return false;
-          const nameMatch = user.name?.toLowerCase().includes(searchLower);
-          const emailMatch = user.email?.toLowerCase().includes(searchLower);
-          const usernameMatch = user.username?.toLowerCase().includes(searchLower);
-          return Boolean(nameMatch || emailMatch || usernameMatch);
-        });
+        .map(docSnap => {
+          const uData = docSnap.data();
+          const targetId = uData.uid || uData.id || docSnap.id;
+          return { ...uData, id: targetId, uid: targetId } as User;
+        })
+        .filter(matchesUser);
 
-      setSearchResults(remoteMatches);
+      const map = new Map<string, User>();
+      localMatches.forEach(u => map.set(u.uid, u));
+      remoteMatches.forEach(u => map.set(u.uid, u));
+
+      setSearchResults(Array.from(map.values()));
     } catch (error) {
       console.error("Error searching users:", error);
     } finally {

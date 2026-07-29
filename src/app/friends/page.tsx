@@ -137,7 +137,7 @@ export default function FriendsPage() {
     useEffect(() => {
         const fetchInitial = async () => {
             try {
-                const snap = await getDocs(query(collection(db, 'users'), limit(200)));
+                const snap = await getDocs(query(collection(db, 'users'), limit(500)));
                 const userList = snap.docs.map(docSnap => {
                     const uData = docSnap.data();
                     const targetId = uData.uid || uData.id || docSnap.id;
@@ -150,7 +150,7 @@ export default function FriendsPage() {
         };
         fetchInitial();
 
-        const unsub = onSnapshot(query(collection(db, 'users'), limit(200)), (snapshot) => {
+        const unsub = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
             const userList = snapshot.docs.map(docSnap => {
                 const uData = docSnap.data();
                 const targetId = uData.uid || uData.id || docSnap.id;
@@ -254,26 +254,27 @@ export default function FriendsPage() {
         const timer = setTimeout(async () => {
             try {
                 const lower = cleanTerm.toLowerCase();
-                const capitalized = cleanTerm.charAt(0).toUpperCase() + cleanTerm.slice(1).toLowerCase();
+                const wordTokens = cleanTerm.split(/\s+/).filter(Boolean);
+                const capitalizedTokens = wordTokens.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
                 const usersRef = collection(db, 'users');
 
-                const [byEmailExact, byEmailLower, byUsernameLower, byNameCap, byNameLower, byNameRaw] = await Promise.all([
+                const queries = [
                     getDocs(query(usersRef, where('email', '==', cleanTerm))),
                     getDocs(query(usersRef, where('email', '==', lower))),
                     getDocs(query(usersRef, where('username', '==', lower))),
-                    getDocs(query(usersRef, where('name', '>=', capitalized), where('name', '<=', capitalized + '\uf8ff'))),
-                    getDocs(query(usersRef, where('name', '>=', lower), where('name', '<=', lower + '\uf8ff'))),
-                    getDocs(query(usersRef, where('name', '>=', cleanTerm), where('name', '<=', cleanTerm + '\uf8ff')))
-                ]);
-
-                const fetchedDocs = [
-                    ...byEmailExact.docs,
-                    ...byEmailLower.docs,
-                    ...byUsernameLower.docs,
-                    ...byNameCap.docs,
-                    ...byNameLower.docs,
-                    ...byNameRaw.docs
+                    getDocs(query(usersRef, limit(500)))
                 ];
+
+                wordTokens.forEach(t => {
+                    const l = t.toLowerCase();
+                    const c = t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+                    queries.push(getDocs(query(usersRef, where('name', '>=', c), where('name', '<=', c + '\uf8ff'))));
+                    queries.push(getDocs(query(usersRef, where('name', '>=', l), where('name', '<=', l + '\uf8ff'))));
+                });
+
+                const snapshots = await Promise.all(queries);
+                const fetchedDocs = snapshots.flatMap(s => s.docs);
 
                 if (fetchedDocs.length > 0) {
                     setExtraUsersMap(prev => {
@@ -298,8 +299,10 @@ export default function FriendsPage() {
     // Continuous real-time instant search calculation
     const searchResults = useMemo(() => {
         const rawTerm = searchQuery.trim().toLowerCase();
-        const term = rawTerm.replace(/^@/, '');
-        if (!term) return [];
+        const cleanTerm = rawTerm.replace(/^@/, '');
+        if (!cleanTerm) return [];
+
+        const tokens = cleanTerm.split(/\s+/).filter(Boolean);
 
         return userPool.filter(u => {
             if (u.uid === authUser?.uid || u.id === authUser?.uid) return false;
@@ -309,7 +312,10 @@ export default function FriendsPage() {
             const usernameStr = (u.username || (u as any).handle || '').toLowerCase();
             const emailPrefix = emailStr.split('@')[0] || '';
 
-            return nameStr.includes(term) || emailStr.includes(term) || usernameStr.includes(term) || emailPrefix.includes(term);
+            const fullMatch = nameStr.includes(cleanTerm) || emailStr.includes(cleanTerm) || usernameStr.includes(cleanTerm) || emailPrefix.includes(cleanTerm);
+            if (fullMatch) return true;
+
+            return tokens.every(t => nameStr.includes(t) || emailStr.includes(t) || usernameStr.includes(t));
         });
     }, [searchQuery, userPool, authUser?.uid]);
 

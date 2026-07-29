@@ -294,7 +294,7 @@ useEffect(() => {
     });
     
     // Limit users query to prevent fetching entire database into memory
-    const usersQuery = query(collection(db, 'users'), limit(200));
+    const usersQuery = query(collection(db, 'users'), limit(500));
     const unsubscribeAllUsers = onSnapshot(usersQuery, (snapshot) => {
       const usersData = snapshot.docs.map(docSnap => {
         const data = docSnap.data();
