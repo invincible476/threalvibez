@@ -134,9 +134,13 @@ export const authService = {
     }
 
     const name = customData?.name || user.displayName || (user.email ? user.email.split('@')[0] : 'User');
-    const username = customData?.username || name.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const emailPrefix = user.email ? user.email.split('@')[0] : 'user';
+    const cleanEmailPrefix = emailPrefix.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const cleanName = (name || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const username = customData?.username || cleanName || cleanEmailPrefix || `user_${user.uid.slice(0, 6)}`;
 
     const initialData = {
+      id: user.uid,
       uid: user.uid,
       email: user.email ?? '',
       name,
@@ -163,6 +167,8 @@ export const authService = {
       }, { merge: true });
     } else {
       await setDoc(userDocRef, {
+        id: user.uid,
+        uid: user.uid,
         name,
         photoURL,
         updatedAt: serverTimestamp(),

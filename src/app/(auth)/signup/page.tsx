@@ -85,15 +85,13 @@ export default function SignupPage() {
     setIsSendingCode(true);
     try {
       const success = await sendVerificationRequest(email);
-      // Regardless of exact delivery success, show the verification UI (keeps UX consistent)
-      setVerificationEmail(email);
-      setVerificationCodeInput('');
-      setShowVerification(true);
-
       if (success) {
-        toast({ title: 'Verification code sent', description: 'Please check your email for the verification code.' });
+        setVerificationEmail(email);
+        setVerificationCodeInput('');
+        setShowVerification(true);
+        toast({ title: 'Verification Code Sent!', description: `Please check your email (${email}) for your 6-digit code.` });
       } else {
-        toast({ title: 'Verification queued', description: 'Verification requested — check your email shortly.' });
+        toast({ title: 'Error', description: 'Failed to send verification code to your email. Please check the address and try again.', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error sending verification code:', error);

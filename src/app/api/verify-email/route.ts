@@ -1,8 +1,7 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { headers } from 'next/headers';
-import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 const zSendVerificationRequest = z.object({
   email: z.string().email(),
@@ -10,17 +9,27 @@ const zSendVerificationRequest = z.object({
 
 const zVerifyCodeRequest = z.object({
   email: z.string().email(),
-  code: z.string().length(6),
+  code: z.string().min(1),
 });
 
-// In-memory storage for development (use Redis in production)
-const verificationStore = new Map<string, { 
-  code: string; 
-  expiresAt: number; 
-  attempts: number; 
-}>();
+// Global storage for verification codes in Next.js dev & serverless execution contexts
+const globalForVerification = globalThis as unknown as {
+  verificationStore?: Map<string, { code: string; expiresAt: number; attempts: number }>;
+  rateLimitStore?: Map<string, { count: number; resetTime: number }>;
+};
 
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const verificationStore =
+  globalForVerification.verificationStore ||
+  new Map<string, { code: string; expiresAt: number; attempts: number }>();
+
+const rateLimitStore =
+  globalForVerification.rateLimitStore ||
+  new Map<string, { count: number; resetTime: number }>();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForVerification.verificationStore = verificationStore;
+  globalForVerification.rateLimitStore = rateLimitStore;
+}
 
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -29,7 +38,7 @@ function generateVerificationCode(): string {
 function isRateLimited(identifier: string): boolean {
   const now = Date.now();
   const windowMs = 60 * 1000; // 1 minute
-  const maxRequests = 3; // Max 3 attempts per minute
+  const maxRequests = 5; // Max 5 attempts per minute
 
   const record = rateLimitStore.get(identifier);
   if (!record || now > record.resetTime) {
@@ -45,21 +54,28 @@ function isRateLimited(identifier: string): boolean {
   return false;
 }
 
-// Use Firebase Admin and Gmail SMTP
-async function sendEmailDirectly(to: string, subject: string, html: string, text: string): Promise<{ success: boolean; message?: string }> {
-  const nodemailer = require('nodemailer');
+function getTransporter() {
+  const user = process.env.GMAIL_EMAIL || process.env.GMAIL_USER || 'madara24uchihaa@gmail.com';
+  const pass = process.env.GMAIL_PASSWORD || process.env.GMAIL_APP_PASSWORD || 'disi jmkj kefu htbo';
 
-  const transporter = nodemailer.createTransport({
+  return nodemailer.createTransport({
     service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_EMAIL || 'invincibleshinmen@gmail.com',
-      pass: process.env.GMAIL_PASSWORD || 'qzyl czow daei xabj',
-    },
+    auth: { user, pass },
   });
+}
+
+async function sendEmailDirectly(
+  to: string,
+  subject: string,
+  html: string,
+  text: string
+): Promise<{ success: boolean; message?: string }> {
+  const transporter = getTransporter();
+  const from = process.env.GMAIL_EMAIL || process.env.GMAIL_USER || 'madara24uchihaa@gmail.com';
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.GMAIL_EMAIL || 'invincibleshinmen@gmail.com',
+      from: `Vibez Verification <${from}>`,
       to,
       subject,
       text,
@@ -67,162 +83,128 @@ async function sendEmailDirectly(to: string, subject: string, html: string, text
     });
 
     console.log('Email sent successfully to:', to, 'Message ID:', info.messageId);
-    return { success: true };
-  } catch (error) {
-    console.error('Gmail SMTP error:', error);
-    
-    // In development, log the verification code for testing
+    return { success: true, message: 'Verification email sent successfully' };
+  } catch (error: any) {
+    console.error('Gmail SMTP error sending to', to, 'Error:', error);
+
+    // If SMTP fails, log code in console for development fallback
     if (process.env.NODE_ENV === 'development') {
-      console.log('\n=== EMAIL VERIFICATION CODE (For Development Testing) ===');
+      console.log('\n=== EMAIL VERIFICATION CODE (Console Fallback) ===');
       console.log('To:', to);
       console.log('Subject:', subject);
       console.log('Content:', text);
-      console.log('========================================================\n');
-      return { success: true, message: 'Development mode - code logged to console' };
+      console.log('==================================================\n');
     }
-    
-    return { success: false, message: 'Email service unavailable' };
+
+    return {
+      success: false,
+      message: error?.message || 'Failed to deliver verification email via SMTP. Please try again.',
+    };
   }
 }
 
-async function sendVerificationCode(email: string, clientIP: string): Promise<{ success: boolean; message?: string }> {
+async function sendVerificationCode(
+  email: string,
+  clientIP: string
+): Promise<{ success: boolean; message?: string }> {
   try {
-    // Rate limiting per email and IP
-    const emailKey = `email:${email}`;
+    const cleanEmail = email.trim().toLowerCase();
+    const emailKey = `email:${cleanEmail}`;
     const ipKey = `ip:${clientIP}`;
-    
+
     if (isRateLimited(emailKey) || isRateLimited(ipKey)) {
-      return { success: false, message: 'Rate limit exceeded' };
+      return { success: false, message: 'Too many verification requests. Please wait a minute and try again.' };
     }
 
     const code = generateVerificationCode();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes validity
 
-    // Store verification code in memory
-    verificationStore.set(email, {
+    // Store verification code in global store
+    verificationStore.set(cleanEmail, {
       code,
       expiresAt,
       attempts: 0,
     });
 
-    // Send email directly
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #6366f1; margin: 0;">Vibez</h1>
+          <h1 style="color: #6366f1; margin: 0; font-size: 28px;">Vibez</h1>
         </div>
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; text-align: center;">
-          <h2 style="margin: 0 0 20px 0;">Verify Your Email</h2>
-          <p style="margin: 0 0 30px 0; font-size: 16px;">Welcome to Vibez! Please use the verification code below to complete your registration:</p>
-          <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+          <h2 style="margin: 0 0 15px 0;">Verify Your Email Address</h2>
+          <p style="margin: 0 0 25px 0; font-size: 16px; opacity: 0.95;">Welcome to Vibez! Enter the code below to verify your email and complete your registration:</p>
+          <div style="background: rgba(255,255,255,0.25); padding: 18px 24px; border-radius: 10px; font-size: 34px; font-weight: bold; letter-spacing: 10px; margin: 20px 0; display: inline-block;">
             ${code}
           </div>
-          <p style="margin: 20px 0 0 0; font-size: 14px; opacity: 0.9;">This code will expire in 10 minutes. If you didn't request this, please ignore this email.</p>
+          <p style="margin: 25px 0 0 0; font-size: 14px; opacity: 0.85;">This verification code will expire in 15 minutes.</p>
         </div>
       </div>
     `;
 
-    const text = `Welcome to Vibez! Your verification code is: ${code}. This code will expire in 10 minutes.`;
+    const text = `Welcome to Vibez! Your email verification code is: ${code}. This code will expire in 15 minutes.`;
 
-    const emailResult = await sendEmailDirectly(email, 'Vibez - Email Verification Code', html, text);
+    const emailResult = await sendEmailDirectly(cleanEmail, 'Vibez - Email Verification Code', html, text);
     return emailResult;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending verification code:', error);
-    return { success: false, message: 'Failed to send verification code' };
+    return { success: false, message: error?.message || 'Failed to send verification code' };
   }
 }
 
-async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; message?: string }> {
+async function verifyCode(
+  email: string,
+  code: string
+): Promise<{ success: boolean; message?: string }> {
   try {
-    const resetCode = generateVerificationCode();
-    const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes for password reset
-    
-    // Store reset code
-    verificationStore.set(`reset:${email}`, {
-      code: resetCode,
-      expiresAt,
-      attempts: 0,
-    });
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim();
+    const record = verificationStore.get(cleanEmail);
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #6366f1; margin: 0;">Vibez</h1>
-        </div>
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; text-align: center;">
-          <h2 style="margin: 0 0 20px 0;">Reset Your Password</h2>
-          <p style="margin: 0 0 30px 0; font-size: 16px;">You requested a password reset. Use the code below to reset your password:</p>
-          <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
-            ${resetCode}
-          </div>
-          <p style="margin: 20px 0 0 0; font-size: 14px; opacity: 0.9;">This code will expire in 30 minutes. If you didn't request this, please ignore this email.</p>
-        </div>
-      </div>
-    `;
-
-    const text = `Password reset code for Vibez: ${resetCode}. This code will expire in 30 minutes.`;
-
-    const emailResult = await sendEmailDirectly(email, 'Vibez - Password Reset Code', html, text);
-    return emailResult;
-  } catch (error) {
-    console.error('Error sending password reset email:', error);
-    return { success: false, message: 'Failed to send password reset email' };
-  }
-}
-
-async function verifyCode(email: string, code: string): Promise<{ success: boolean; message?: string }> {
-  try {
-    const record = verificationStore.get(email);
-    
     if (!record) {
-      return { 
-        success: false, 
-        message: 'No verification code found. Please request a new code.'
+      return {
+        success: false,
+        message: 'No verification code found for this email. Please request a new code.',
       };
     }
 
     const { code: storedCode, expiresAt, attempts } = record;
 
-    // Check if expired
     if (Date.now() > expiresAt) {
-      verificationStore.delete(email);
-      return { 
-        success: false, 
-        message: 'Verification code has expired. Please request a new code.'
+      verificationStore.delete(cleanEmail);
+      return {
+        success: false,
+        message: 'Verification code has expired. Please request a new code.',
       };
     }
 
-    // Check attempts (rate limiting)
     if (attempts >= 5) {
-      verificationStore.delete(email);
-      return { 
-        success: false, 
-        message: 'Too many attempts. Please request a new code.'
+      verificationStore.delete(cleanEmail);
+      return {
+        success: false,
+        message: 'Too many incorrect attempts. Please request a new verification code.',
       };
     }
 
-    // Verify the code
-    if (code === storedCode) {
-      // Code is correct, delete the verification record
-      verificationStore.delete(email);
-      return { 
-        success: true, 
-        message: 'Code verified successfully.'
+    if (cleanCode === storedCode) {
+      verificationStore.delete(cleanEmail);
+      return {
+        success: true,
+        message: 'Email code verified successfully.',
       };
     } else {
-      // Increment attempts
       record.attempts += 1;
-      verificationStore.set(email, record);
-      return { 
-        success: false, 
-        message: `Invalid code. ${5 - record.attempts} attempts remaining.`
+      verificationStore.set(cleanEmail, record);
+      return {
+        success: false,
+        message: `Incorrect verification code. ${5 - record.attempts} attempt(s) remaining.`,
       };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error verifying code:', error);
-    return { 
-      success: false, 
-      message: 'An error occurred while verifying the code.'
+    return {
+      success: false,
+      message: 'An error occurred while verifying the code.',
     };
   }
 }
@@ -230,9 +212,8 @@ async function verifyCode(email: string, code: string): Promise<{ success: boole
 export async function POST(request: NextRequest) {
   try {
     const headersList = await headers();
-    const clientIP = headersList.get('x-forwarded-for') || 
-                     headersList.get('x-real-ip') || 
-                     'unknown';
+    const clientIP =
+      headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
 
     const url = new URL(request.url);
     const action = url.searchParams.get('action');
@@ -240,7 +221,7 @@ export async function POST(request: NextRequest) {
     if (action === 'send') {
       const body = await request.json();
       const parseResult = zSendVerificationRequest.safeParse(body);
-      
+
       if (!parseResult.success) {
         return NextResponse.json(
           { success: false, error: 'Invalid email address' },
@@ -249,65 +230,45 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await sendVerificationCode(parseResult.data.email, clientIP);
-      
+
       if (!result.success) {
         return NextResponse.json(
           { success: false, error: result.message || 'Failed to send email. Please try again.' },
-          { status: 500 }
+          { status: 400 }
         );
       }
-      
+
       return NextResponse.json({ success: true, message: result.message });
     }
 
     if (action === 'verify') {
       const body = await request.json();
       const parseResult = zVerifyCodeRequest.safeParse(body);
-      
+
       if (!parseResult.success) {
         return NextResponse.json(
-          { success: false, error: 'Invalid verification data' },
+          { success: false, error: 'Invalid verification data. Code must be provided.' },
           { status: 400 }
         );
       }
 
       const { email, code } = parseResult.data;
       const result = await verifyCode(email, code);
-      
+
       return NextResponse.json({
         success: result.success,
-        message: result.message
-      });
-    }
-
-    if (action === 'reset-password') {
-      const body = await request.json();
-      const parseResult = zSendVerificationRequest.safeParse(body);
-      
-      if (!parseResult.success) {
-        return NextResponse.json(
-          { success: false, error: 'Invalid email address' },
-          { status: 400 }
-        );
-      }
-
-      await sendPasswordResetEmail(parseResult.data.email);
-      
-      // Generic success message preventing user enumeration
-      return NextResponse.json({ 
-        success: true, 
-        message: 'If an account exists with that email address, a password reset code has been sent.'
+        message: result.message,
       });
     }
 
     return NextResponse.json(
-      { success: false, error: 'Invalid action' },
+      { success: false, error: 'Invalid action parameter' },
       { status: 400 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Verification API error:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }
