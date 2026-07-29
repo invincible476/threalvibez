@@ -4,6 +4,7 @@ import { db } from '@/lib/firebase';
 import { normalizeUser, matchesUserSearch, sortSearchResults } from '@/lib/user-service';
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
   try {
     const url = new URL(request.url);
     const q = url.searchParams.get('q') || '';
@@ -61,6 +62,8 @@ export async function GET(request: NextRequest) {
     }
 
     const finalResults = sortSearchResults(Array.from(map.values()), cleanTerm);
+    const duration = Date.now() - startTime;
+    console.log(`[API Search Users] Query: "${cleanTerm}" -> Found: ${finalResults.length} matches in ${duration}ms`);
 
     return NextResponse.json({
       success: true,
