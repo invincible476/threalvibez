@@ -233,17 +233,7 @@ function LoginForm() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('auth_error');
-      localStorage.removeItem('lastAuthError');
-    }
-    
     try {
-      if (auth.currentUser) {
-        await auth.signOut();
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
       await setPersistence(
         auth,
         rememberMe ? browserLocalPersistence : browserSessionPersistence

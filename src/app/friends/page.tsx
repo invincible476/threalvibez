@@ -203,19 +203,53 @@ export default function FriendsPage() {
         });
     }, [activeUser, userPool]);
 
+    // Debounced direct Firestore search fallback for users not yet in memory
+    useEffect(() => {
+        const term = searchQuery.trim().toLowerCase().replace(/^@/, '');
+        if (!term || term.length < 2) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                const usersRef = collection(db, 'users');
+                const [byEmail, byUsername] = await Promise.all([
+                    getDocs(query(usersRef, where('email', '==', term))),
+                    getDocs(query(usersRef, where('username', '==', term)))
+                ]);
+
+                const fetchedDocs = [...byEmail.docs, ...byUsername.docs];
+                if (fetchedDocs.length > 0) {
+                    setExtraUsersMap(prev => {
+                        const next = new Map(prev);
+                        fetchedDocs.forEach(d => {
+                            const u = { id: d.id, uid: d.id, ...d.data() } as User;
+                            next.set(u.uid, u);
+                        });
+                        return next;
+                    });
+                }
+            } catch (err) {
+                console.warn('Firestore live search query error:', err);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     // Continuous real-time instant search calculation
     const searchResults = useMemo(() => {
-        const term = searchQuery.trim().toLowerCase();
+        const rawTerm = searchQuery.trim().toLowerCase();
+        const term = rawTerm.replace(/^@/, '');
         if (!term) return [];
 
         return userPool.filter(u => {
             if (u.uid === authUser?.uid) return false;
 
-            const nameStr = (u.name || '').toLowerCase();
+            const nameStr = (u.name || (u as any).displayName || (u as any).fullName || '').toLowerCase();
             const emailStr = (u.email || '').toLowerCase();
-            const usernameStr = (u.username || '').toLowerCase();
+            const usernameStr = (u.username || (u as any).handle || '').toLowerCase();
+            const emailPrefix = emailStr.split('@')[0] || '';
 
-            return nameStr.includes(term) || emailStr.includes(term) || usernameStr.includes(term);
+            return nameStr.includes(term) || emailStr.includes(term) || usernameStr.includes(term) || emailPrefix.includes(term);
         });
     }, [searchQuery, userPool, authUser?.uid]);
 

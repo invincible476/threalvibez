@@ -225,6 +225,7 @@ export default function SignupPage() {
           title: 'Welcome!',
           description: 'Successfully signed up with Google.',
         });
+        router.push('/');
       }
     } catch (error: any) {
       console.error("Google signup error:", error);
