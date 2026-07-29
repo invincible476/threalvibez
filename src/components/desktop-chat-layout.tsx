@@ -27,10 +27,10 @@ export function DesktopChatLayout() {
   } as React.CSSProperties;
   
   return (
-    <div className="h-screen w-full flex overflow-hidden">
+    <div className="h-full h-[100dvh] max-h-screen w-full flex min-h-0 overflow-hidden">
       <Sidebar
         collapsible="none"
-        className="backdrop-blur-xl border-r border-border/20 w-[22rem] max-w-[22rem] min-w-0 flex-shrink-0 flex-grow-0 overflow-x-hidden"
+        className="backdrop-blur-xl border-r border-border/20 w-[22rem] max-w-[22rem] min-w-0 flex-shrink-0 flex-grow-0 overflow-x-hidden h-full min-h-0"
         style={desktopSidebarStyle}
       >
         <ChatList />

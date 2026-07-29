@@ -221,7 +221,7 @@ export function ChatList() {
 
   return (
     <>
-    <div className="flex flex-col h-full w-full max-w-[22rem] min-w-0 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
+    <div className="flex flex-col h-full min-h-0 w-full max-w-[22rem] flex-1 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
     <div className="flex-none p-4 border-b border-border/50 flex justify-between items-center gap-2">
          <VibezLogo className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden" />
          <div className="flex-1 flex justify-center group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
@@ -272,7 +272,7 @@ export function ChatList() {
         </div>
       </div>
       
-            <ScrollArea className="flex-1 overflow-y-auto">
+            <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
                 <div className="flex flex-col gap-1 p-2 w-full overflow-hidden">
             <div className="space-y-4">
             {favoriteChats.length > 0 && (
@@ -422,7 +422,7 @@ export function ChatList() {
         </div>
       </ScrollArea>
 
-    <div className={cn("flex-none p-2 border-t border-border/50 transition-all duration-200", (isMobileView && (keyboardOpen || isSearchFocused)) && "hidden")}>
+    <div className={cn("flex-none shrink-0 p-2 border-t border-border/50 transition-all duration-200 mt-auto bg-background/30 backdrop-blur-md z-20", (isMobileView && (keyboardOpen || isSearchFocused)) && "hidden")}>
       <UserProfileMenu currentUser={currentUser} />
     </div>
     </div>

@@ -173,10 +173,10 @@ const Sidebar = React.forwardRef<
       return (
         <aside
           className={cn(
-            "flex h-screen w-[var(--sidebar-width)] flex-col group/sidebar",
+            "flex h-full min-h-0 w-[var(--sidebar-width)] flex-col group/sidebar",
             className
           )}
-          data-sidebar-state={state}
+          data-sidebar-state="expanded"
           ref={ref}
           {...props}
         >
@@ -208,7 +208,7 @@ const Sidebar = React.forwardRef<
         <aside
           ref={ref}
           className={cn(
-            'group/sidebar hidden h-screen shrink-0 md:flex flex-col',
+            'group/sidebar hidden h-full min-h-0 shrink-0 md:flex flex-col',
             'transition-[width] duration-300 ease-in-out',
             state === 'expanded' && 'w-[var(--sidebar-width)]',
             state === 'collapsed' && 'w-[var(--sidebar-width-icon)]',
