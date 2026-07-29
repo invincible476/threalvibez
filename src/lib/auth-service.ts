@@ -171,6 +171,7 @@ export const authService = {
         uid: user.uid,
         name,
         photoURL,
+        emailVerified: true,
         updatedAt: serverTimestamp(),
       }, { merge: true });
     }
@@ -186,13 +187,20 @@ export const authService = {
       await auth.signOut();
       
       // Wait for auth state to clear
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Create the user account
       const userCredential = await firebaseCreateUser(auth, email, password);
       
       if (!userCredential?.user) {
         throw new AuthError('Failed to create user account', 'auth/creation-failed');
+      }
+
+      // Mark email as verified immediately since user verified 6-digit code before creation
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
+        localStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
+        sessionStorage.setItem(`lastVerificationCheck_${userCredential.user.uid}`, Date.now().toString());
       }
       
       // Update the user profile
@@ -202,13 +210,6 @@ export const authService = {
       
       // Create the user document using unified schema
       await this.ensureUserDocument(userCredential.user, { name });
-
-      // Mark email as verified in local storage since user passed 6-digit code before creation
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
-        localStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
-        sessionStorage.setItem(`lastVerificationCheck_${userCredential.user.uid}`, Date.now().toString());
-      }
       
       // Force token refresh
       await userCredential.user.getIdToken(true);

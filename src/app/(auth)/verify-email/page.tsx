@@ -54,6 +54,20 @@ export default function VerifyEmailPage() {
   const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
+    const user = auth.currentUser;
+    if (user) {
+      const isVerified = Boolean(
+        user.emailVerified ||
+        sessionStorage.getItem(`emailVerified_${user.uid}`) === 'true' ||
+        localStorage.getItem(`emailVerified_${user.uid}`) === 'true'
+      );
+      if (isVerified) {
+        toast({ title: 'Already Verified', description: 'Your email address is verified.' });
+        router.push('/');
+        return;
+      }
+    }
+
     // Get email from URL params
     const email = searchParams.get('email');
     
@@ -79,11 +93,6 @@ export default function VerifyEmailPage() {
       })
       .catch(error => {
         console.error('Error sending initial verification code:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to send verification code. Please try again or contact support.',
-          variant: 'destructive',
-        });
       });
   }, [searchParams, router, toast]);
 

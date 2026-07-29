@@ -7,7 +7,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { usePathname, useRouter } from 'next/navigation';
 import { VibezLogo } from '../vibez-logo';
 import { GalaxyBackground } from '../galaxy-background';
-import { getDoc, doc, updateDoc, serverTimestamp, DocumentData } from 'firebase/firestore';
+import { getDoc, setDoc, doc, updateDoc, serverTimestamp, DocumentData } from 'firebase/firestore';
 import { db, setupPresence } from '@/lib/firebase';
 import { authService } from '@/lib/auth-service';
 
@@ -188,8 +188,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           const userData = userDoc.data() as DocumentData | undefined;
           
-          // Consider email verified if Firebase auth, Firestore, or local markers say so (default for 6-digit code flow is verified)
-          const isVerified = Boolean(user.emailVerified || (userData?.emailVerified ?? true));
+          // Consider email verified if Firebase auth, local markers, or Firestore indicate so
+          const isVerified = Boolean(
+            user.emailVerified ||
+            cachedSessionStatus === 'true' ||
+            cachedLocalStatus === 'true' ||
+            userData?.emailVerified !== false
+          );
 
           if (isVerified) {
             if (typeof window !== 'undefined') {
@@ -197,12 +202,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem(`emailVerified_${user.uid}`, 'true');
             }
             // Update Firestore if needed
-            if (user.emailVerified && !userData?.emailVerified) {
-              await updateDoc(doc(db, 'users', user.uid), {
+            if (!userData?.emailVerified) {
+              await setDoc(doc(db, 'users', user.uid), {
                 emailVerified: true,
                 verifiedAt: serverTimestamp(),
                 lastUpdated: serverTimestamp()
-              });
+              }, { merge: true });
             }
             return;
           }
