@@ -234,7 +234,8 @@ export const authService = {
         throw new AuthError('Failed to sign in', 'auth/sign-in-failed');
       }
 
-      // Setup presence system
+      // Setup presence system and ensure user document exists
+      await this.ensureUserDocument(userCredential.user);
       await setupPresence(userCredential.user.uid);
 
       return userCredential.user;

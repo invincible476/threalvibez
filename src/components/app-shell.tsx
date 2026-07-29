@@ -14,6 +14,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { v4 as uuidv4 } from 'uuid';
 import { continueConversation } from '@/ai/flows/ai-chat-flow';
 import { useAuth } from '@/hooks/use-auth';
+import { authService } from '@/lib/auth-service';
 import { useNotifications } from '@/hooks/use-notifications';
 import { type Firestore } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
@@ -245,11 +246,29 @@ useEffect(() => {
 
   useEffect(() => {
     if (!authUser || authLoading) return;
+
+    // Immediately supply a fallback user state from authUser so profile UI renders instantly
+    const fallbackUser: User = {
+      id: authUser.uid,
+      uid: authUser.uid,
+      name: authUser.displayName || (authUser.email ? authUser.email.split('@')[0] : 'User'),
+      email: authUser.email || '',
+      photoURL: authUser.photoURL || '',
+      status: 'online',
+      about: '',
+      friends: [],
+      friendRequestsSent: [],
+      friendRequestsReceived: [],
+      blockedUsers: [],
+    };
+
+    setCurrentUser(prev => prev || fallbackUser);
+    updateUserInCache(fallbackUser);
     
     const userDocRef = doc(db, 'users', authUser.uid);
-    const unsubscribeCurrentUser = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-            const userData = { id: doc.id, ...doc.data() } as User;
+    const unsubscribeCurrentUser = onSnapshot(userDocRef, async (docSnap) => {
+        if (docSnap.exists()) {
+            const userData = { id: docSnap.id, ...docSnap.data() } as User;
             setCurrentUser(userData);
             updateUserInCache(userData);
             // Update appearance from user data
@@ -258,6 +277,13 @@ useEffect(() => {
             }
             if(userData.hasOwnProperty('useCustomBackground')) {
               setUseCustomBackground(userData.useCustomBackground ?? false);
+            }
+        } else {
+            console.warn('[AppShell] User document missing in Firestore. Self-healing user document...');
+            try {
+              await authService.ensureUserDocument(authUser);
+            } catch (err) {
+              console.error('[AppShell] Failed to auto-create missing user document:', err);
             }
         }
     });
