@@ -229,6 +229,26 @@ export async function searchUsers(
     console.warn('Firestore targeted search notice:', err);
   }
 
+  // 4. API Endpoint Fallback for production / Vercel security rule resilience
+  if (map.size === 0 && typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/search-users?q=${encodeURIComponent(cleanTerm)}${currentUserId ? `&currentUserId=${currentUserId}` : ''}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.users)) {
+          json.users.forEach((u: any) => {
+            const norm = normalizeUser(u);
+            if (matchesUserSearch(norm, cleanTerm, currentUserId)) {
+              map.set(norm.uid, norm);
+            }
+          });
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API search fallback notice:', apiErr);
+    }
+  }
+
   return sortSearchResults(Array.from(map.values()), cleanTerm);
 }
 
