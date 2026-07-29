@@ -3,11 +3,10 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/types';
-
 
 interface FriendsContextType {
     friends: User[];
@@ -27,7 +26,7 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
   // The FriendsPage will be responsible for fetching the full user objects.
   
   const handleFriendAction = useCallback(async (targetUserId: string, action: 'acceptRequest' | 'declineRequest' | 'removeFriend') => {
-    if (!authUser) {
+    if (!authUser || !targetUserId) {
         toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
         return;
     };
@@ -37,22 +36,22 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
     
     try {
         if (action === 'acceptRequest') {
-            await updateDoc(currentUserRef, { 
+            await setDoc(currentUserRef, { 
                 friends: arrayUnion(targetUserId),
                 friendRequestsReceived: arrayRemove(targetUserId)
-            });
-            await updateDoc(targetUserRef, {
+            }, { merge: true });
+            await setDoc(targetUserRef, {
                 friends: arrayUnion(authUser.uid),
                 friendRequestsSent: arrayRemove(authUser.uid)
-            });
+            }, { merge: true });
             toast({ title: 'Friend Added', description: 'You are now friends!' });
         } else if (action === 'declineRequest') {
-            await updateDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) });
-            await updateDoc(targetUserRef, { friendRequestsSent: arrayRemove(authUser.uid) });
+            await setDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) }, { merge: true });
+            await setDoc(targetUserRef, { friendRequestsSent: arrayRemove(authUser.uid) }, { merge: true });
             toast({ title: 'Request Declined' });
         } else if (action === 'removeFriend') {
-            await updateDoc(currentUserRef, { friends: arrayRemove(targetUserId) });
-            await updateDoc(targetUserRef, { friends: arrayRemove(authUser.uid) });
+            await setDoc(currentUserRef, { friends: arrayRemove(targetUserId) }, { merge: true });
+            await setDoc(targetUserRef, { friends: arrayRemove(authUser.uid) }, { merge: true });
             toast({ title: 'Friend Removed' });
         }
     } catch(e: any) {

@@ -1359,32 +1359,32 @@ useEffect(() => {
       }
     }
   }, [selectedChat, currentUser, messages]);  const handleFriendAction = useCallback(async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend') => {
-    if (!currentUser) return;
+    if (!currentUser || !targetUserId) return;
     const currentUserRef = doc(db, 'users', currentUser.uid);
     const targetUserRef = doc(db, 'users', targetUserId);
 
     try {
       if (action === 'sendRequest') {
-          await updateDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) });
-          await updateDoc(targetUserRef, { friendRequestsReceived: arrayUnion(currentUser.uid) });
+          await setDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) }, { merge: true });
+          await setDoc(targetUserRef, { friendRequestsReceived: arrayUnion(currentUser.uid) }, { merge: true });
           toast({ title: 'Request Sent', description: 'Your friend request has been sent.' });
       } else if (action === 'acceptRequest') {
-          await updateDoc(currentUserRef, { 
+          await setDoc(currentUserRef, { 
               friends: arrayUnion(targetUserId),
               friendRequestsReceived: arrayRemove(targetUserId)
-          });
-          await updateDoc(targetUserRef, {
+          }, { merge: true });
+          await setDoc(targetUserRef, {
               friends: arrayUnion(currentUser.uid),
               friendRequestsSent: arrayRemove(currentUser.uid)
-          });
+          }, { merge: true });
           toast({ title: 'Friend Added', description: 'You are now friends!' });
       } else if (action === 'declineRequest') {
-          await updateDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) });
-          await updateDoc(targetUserRef, { friendRequestsSent: arrayRemove(currentUser.uid) });
+          await setDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) }, { merge: true });
+          await setDoc(targetUserRef, { friendRequestsSent: arrayRemove(currentUser.uid) }, { merge: true });
           toast({ title: 'Request Declined' });
       } else if (action === 'removeFriend') {
-          await updateDoc(currentUserRef, { friends: arrayRemove(targetUserId) });
-          await updateDoc(targetUserRef, { friends: arrayRemove(currentUser.uid) });
+          await setDoc(currentUserRef, { friends: arrayRemove(targetUserId) }, { merge: true });
+          await setDoc(targetUserRef, { friends: arrayRemove(currentUser.uid) }, { merge: true });
           toast({ title: 'Friend Removed' });
       }
     } catch (error: any) {

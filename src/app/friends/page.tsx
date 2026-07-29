@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { doc, getDoc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -67,35 +67,40 @@ export default function FriendsPage() {
             return;
         }
 
+        if (!targetUserId) {
+            toast({ title: 'Error', description: 'Invalid target user.', variant: 'destructive' });
+            return;
+        }
+
         const currentUserRef = doc(db, 'users', authUser.uid);
         const targetUserRef = doc(db, 'users', targetUserId);
         
         try {
             if (action === 'sendRequest') {
-                await updateDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) });
-                await updateDoc(targetUserRef, { friendRequestsReceived: arrayUnion(authUser.uid) });
+                await setDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) }, { merge: true });
+                await setDoc(targetUserRef, { friendRequestsReceived: arrayUnion(authUser.uid) }, { merge: true });
                 toast({ title: 'Friend Request Sent', description: 'Your friend request has been sent successfully.' });
             } else if (action === 'acceptRequest') {
-                await updateDoc(currentUserRef, { 
+                await setDoc(currentUserRef, { 
                     friends: arrayUnion(targetUserId),
                     friendRequestsReceived: arrayRemove(targetUserId)
-                });
-                await updateDoc(targetUserRef, {
+                }, { merge: true });
+                await setDoc(targetUserRef, {
                     friends: arrayUnion(authUser.uid),
                     friendRequestsSent: arrayRemove(authUser.uid)
-                });
+                }, { merge: true });
                 toast({ title: 'Friend Added', description: 'You are now friends!' });
             } else if (action === 'declineRequest') {
-                await updateDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) });
-                await updateDoc(targetUserRef, { friendRequestsSent: arrayRemove(authUser.uid) });
+                await setDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) }, { merge: true });
+                await setDoc(targetUserRef, { friendRequestsSent: arrayRemove(authUser.uid) }, { merge: true });
                 toast({ title: 'Request Declined' });
             } else if (action === 'removeFriend') {
-                await updateDoc(currentUserRef, { friends: arrayRemove(targetUserId) });
-                await updateDoc(targetUserRef, { friends: arrayRemove(authUser.uid) });
+                await setDoc(currentUserRef, { friends: arrayRemove(targetUserId) }, { merge: true });
+                await setDoc(targetUserRef, { friends: arrayRemove(authUser.uid) }, { merge: true });
                 toast({ title: 'Friend Removed' });
             } else if (action === 'cancelRequest') {
-                await updateDoc(currentUserRef, { friendRequestsSent: arrayRemove(targetUserId) });
-                await updateDoc(targetUserRef, { friendRequestsReceived: arrayRemove(authUser.uid) });
+                await setDoc(currentUserRef, { friendRequestsSent: arrayRemove(targetUserId) }, { merge: true });
+                await setDoc(targetUserRef, { friendRequestsReceived: arrayRemove(authUser.uid) }, { merge: true });
                 toast({ title: 'Request Canceled' });
             }
         } catch(e: any) {
@@ -131,7 +136,11 @@ export default function FriendsPage() {
     // Real-time listener for all users for continuous search
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
-            const userList = snapshot.docs.map(docSnap => ({ id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User));
+            const userList = snapshot.docs.map(docSnap => {
+                const uData = docSnap.data();
+                const targetId = uData.uid || uData.id || docSnap.id;
+                return { ...uData, id: targetId, uid: targetId } as User;
+            });
             setAllUsersList(userList);
         }, (err) => {
             console.warn("Realtime users fetch warning:", err);
@@ -139,19 +148,35 @@ export default function FriendsPage() {
         return () => unsub();
     }, []);
 
-    // Derive full user list pool from all available sources
+    // Derive full user list pool from all available sources with normalized keys
     const userPool = useMemo(() => {
         const map = new Map<string, User>();
+
+        const addUserToMap = (u: any) => {
+            if (!u) return;
+            const targetId = u.uid || u.id;
+            if (targetId) {
+                map.set(targetId, {
+                    ...u,
+                    id: targetId,
+                    uid: targetId,
+                    name: u.name || u.displayName || u.fullName || (u.email ? u.email.split('@')[0] : 'User'),
+                    username: u.username || u.handle || '',
+                    email: u.email || ''
+                });
+            }
+        };
+
         // Add shellUsers
-        (shellUsers || []).forEach(u => map.set(u.uid, u));
+        (shellUsers || []).forEach(addUserToMap);
         // Add usersCache entries
         if (usersCache) {
-            usersCache.forEach((u, id) => map.set(id, u));
+            usersCache.forEach((u, id) => addUserToMap({ ...u, id: u.id || u.uid || id }));
         }
         // Add allUsersList
-        (allUsersList || []).forEach(u => map.set(u.uid, u));
+        (allUsersList || []).forEach(addUserToMap);
         // Add extraUsersMap
-        extraUsersMap.forEach((u, id) => map.set(id, u));
+        extraUsersMap.forEach((u, id) => addUserToMap({ ...u, id: u.id || u.uid || id }));
 
         return Array.from(map.values());
     }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
@@ -162,19 +187,19 @@ export default function FriendsPage() {
     const friends = useMemo(() => {
         if (!activeUser?.friends || activeUser.friends.length === 0) return [];
         const set = new Set(activeUser.friends);
-        return userPool.filter(u => set.has(u.uid));
+        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
     }, [activeUser?.friends, userPool]);
 
     const requests = useMemo(() => {
         if (!activeUser?.friendRequestsReceived || activeUser.friendRequestsReceived.length === 0) return [];
         const set = new Set(activeUser.friendRequestsReceived);
-        return userPool.filter(u => set.has(u.uid));
+        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
     }, [activeUser?.friendRequestsReceived, userPool]);
 
     const sentRequests = useMemo(() => {
         if (!activeUser?.friendRequestsSent || activeUser.friendRequestsSent.length === 0) return [];
         const set = new Set(activeUser.friendRequestsSent);
-        return userPool.filter(u => set.has(u.uid));
+        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
     }, [activeUser?.friendRequestsSent, userPool]);
 
     // Fetch individual missing user documents directly by doc ID if not in memory
@@ -187,15 +212,17 @@ export default function FriendsPage() {
             ...(activeUser.friendRequestsSent || [])
         ];
 
-        const missing = neededIds.filter(id => !userPool.some(u => u.uid === id));
+        const missing = neededIds.filter(id => id && !userPool.some(u => u.uid === id || u.id === id));
         if (missing.length === 0) return;
 
         missing.forEach(async (id) => {
             try {
                 const docSnap = await getDoc(doc(db, 'users', id));
                 if (docSnap.exists()) {
-                    const uData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User;
-                    setExtraUsersMap(prev => new Map(prev).set(id, uData));
+                    const uData = docSnap.data();
+                    const targetId = uData.uid || uData.id || docSnap.id;
+                    const u = { ...uData, id: targetId, uid: targetId } as User;
+                    setExtraUsersMap(prev => new Map(prev).set(targetId, u));
                 }
             } catch (err) {
                 console.error(`Failed to fetch user doc for ${id}:`, err);
@@ -205,24 +232,28 @@ export default function FriendsPage() {
 
     // Debounced direct Firestore search fallback for users not yet in memory
     useEffect(() => {
-        const term = searchQuery.trim().toLowerCase().replace(/^@/, '');
+        const rawTerm = searchQuery.trim().toLowerCase();
+        const term = rawTerm.replace(/^@/, '');
         if (!term || term.length < 2) return;
 
         const timer = setTimeout(async () => {
             try {
                 const usersRef = collection(db, 'users');
-                const [byEmail, byUsername] = await Promise.all([
+                const [byEmail, byUsername, byName] = await Promise.all([
                     getDocs(query(usersRef, where('email', '==', term))),
-                    getDocs(query(usersRef, where('username', '==', term)))
+                    getDocs(query(usersRef, where('username', '==', term))),
+                    getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff')))
                 ]);
 
-                const fetchedDocs = [...byEmail.docs, ...byUsername.docs];
+                const fetchedDocs = [...byEmail.docs, ...byUsername.docs, ...byName.docs];
                 if (fetchedDocs.length > 0) {
                     setExtraUsersMap(prev => {
                         const next = new Map(prev);
                         fetchedDocs.forEach(d => {
-                            const u = { id: d.id, uid: d.id, ...d.data() } as User;
-                            next.set(u.uid, u);
+                            const uData = d.data();
+                            const targetId = uData.uid || uData.id || d.id;
+                            const u = { ...uData, id: targetId, uid: targetId } as User;
+                            next.set(targetId, u);
                         });
                         return next;
                     });
@@ -242,7 +273,7 @@ export default function FriendsPage() {
         if (!term) return [];
 
         return userPool.filter(u => {
-            if (u.uid === authUser?.uid) return false;
+            if (u.uid === authUser?.uid || u.id === authUser?.uid) return false;
 
             const nameStr = (u.name || (u as any).displayName || (u as any).fullName || '').toLowerCase();
             const emailStr = (u.email || '').toLowerCase();
