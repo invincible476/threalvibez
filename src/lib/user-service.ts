@@ -53,11 +53,13 @@ export function normalizeUser(data: any, docId?: string): User {
 }
 
 /**
- * Client-side matcher for user search query.
+ * Client-side matcher for user search query (case-insensitive tokenized substring match).
  */
 export function matchesUserSearch(user: User, searchTerm: string, currentUserId?: string): boolean {
   if (!user) return false;
-  if (currentUserId && (user.uid === currentUserId || user.id === currentUserId)) {
+  
+  const targetUid = user.uid || user.id;
+  if (currentUserId && (targetUid === currentUserId)) {
     return false;
   }
 
@@ -72,7 +74,7 @@ export function matchesUserSearch(user: User, searchTerm: string, currentUserId?
   const usernameStr = (user.username || '').toLowerCase();
   const emailPrefix = emailStr.split('@')[0] || '';
 
-  // 1. Direct or partial substring match on full query
+  // 1. Substring match on full clean query
   const directMatch =
     nameStr.includes(cleanTerm) ||
     emailStr.includes(cleanTerm) ||
@@ -85,16 +87,17 @@ export function matchesUserSearch(user: User, searchTerm: string, currentUserId?
   return tokens.every(token =>
     nameStr.includes(token) ||
     emailStr.includes(token) ||
-    usernameStr.includes(token)
+    usernameStr.includes(token) ||
+    emailPrefix.includes(token)
   );
 }
 
-// Lightweight cache for remote search results to prevent duplicate network calls
+// In-memory search cache for remote queries
 const searchCache = new Map<string, User[]>();
 
 /**
- * Fast, resilient user search.
- * Instant local matching + lightweight targeted Firestore remote search.
+ * Fast, resilient user search engine.
+ * Instant local matching + lightweight targeted Firestore fallback.
  */
 export async function searchUsers(
   searchTerm: string,
@@ -106,11 +109,6 @@ export async function searchUsers(
   if (!cleanTerm) return [];
 
   const lowerTerm = cleanTerm.toLowerCase();
-  const titleTerm = cleanTerm
-    .split(/\s+/)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
-
   const map = new Map<string, User>();
 
   // 1. Add matching users from local pool immediately (0ms)
@@ -121,7 +119,11 @@ export async function searchUsers(
     }
   });
 
-  // 2. Check search cache
+  // 2. Return instantly if we already have local results or cache
+  if (map.size > 0) {
+    return Array.from(map.values());
+  }
+
   if (searchCache.has(lowerTerm)) {
     const cached = searchCache.get(lowerTerm) || [];
     cached.forEach(u => {
@@ -132,21 +134,25 @@ export async function searchUsers(
     return Array.from(map.values());
   }
 
-  // 3. Fast targeted Firestore queries with 1500ms timeout
+  // 3. Fast targeted Firestore query fallback with 1000ms timeout guard
   try {
     const usersRef = collection(db, 'users');
+    const titleTerm = cleanTerm
+      .split(/\s+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
 
     const targetedQueries = [
-      getDocs(query(usersRef, where('email', '==', lowerTerm), limit(15))),
-      getDocs(query(usersRef, where('username', '==', lowerTerm), limit(15))),
-      getDocs(query(usersRef, where('name', '==', cleanTerm), limit(15))),
-      getDocs(query(usersRef, where('email', '>=', lowerTerm), where('email', '<=', lowerTerm + '\uf8ff'), limit(25))),
-      getDocs(query(usersRef, where('name', '>=', titleTerm), where('name', '<=', titleTerm + '\uf8ff'), limit(25))),
-      getDocs(query(usersRef, where('name', '>=', lowerTerm), where('name', '<=', lowerTerm + '\uf8ff'), limit(25))),
+      getDocs(query(usersRef, where('email', '==', lowerTerm), limit(10))),
+      getDocs(query(usersRef, where('username', '==', lowerTerm), limit(10))),
+      getDocs(query(usersRef, where('name', '==', cleanTerm), limit(10))),
+      getDocs(query(usersRef, where('email', '>=', lowerTerm), where('email', '<=', lowerTerm + '\uf8ff'), limit(15))),
+      getDocs(query(usersRef, where('name', '>=', titleTerm), where('name', '<=', titleTerm + '\uf8ff'), limit(15))),
+      getDocs(query(usersRef, where('name', '>=', lowerTerm), where('name', '<=', lowerTerm + '\uf8ff'), limit(15))),
     ];
 
     const fetchPromise = Promise.allSettled(targetedQueries);
-    const timeoutPromise = new Promise<null>(resolve => setTimeout(() => resolve(null), 1500));
+    const timeoutPromise = new Promise<null>(resolve => setTimeout(() => resolve(null), 1000));
 
     const result = await Promise.race([fetchPromise, timeoutPromise]);
 
@@ -169,29 +175,7 @@ export async function searchUsers(
     console.warn('Firestore targeted search notice:', err);
   }
 
-  const merged = Array.from(map.values());
-
-  return merged.sort((a, b) => {
-    const aEmail = (a.email || '').toLowerCase();
-    const bEmail = (b.email || '').toLowerCase();
-    const aUser = (a.username || '').toLowerCase();
-    const bUser = (b.username || '').toLowerCase();
-    const aName = (a.name || '').toLowerCase();
-    const bName = (b.name || '').toLowerCase();
-
-    if (aEmail === lowerTerm && bEmail !== lowerTerm) return -1;
-    if (bEmail === lowerTerm && aEmail !== lowerTerm) return 1;
-
-    if (aUser === lowerTerm && bUser !== lowerTerm) return -1;
-    if (bUser === lowerTerm && aUser !== lowerTerm) return 1;
-
-    const aStartsWith = aName.startsWith(lowerTerm) || aEmail.startsWith(lowerTerm) || aUser.startsWith(lowerTerm);
-    const bStartsWith = bName.startsWith(lowerTerm) || bEmail.startsWith(lowerTerm) || bUser.startsWith(lowerTerm);
-    if (aStartsWith && !bStartsWith) return -1;
-    if (bStartsWith && !aStartsWith) return 1;
-
-    return aName.localeCompare(bName);
-  });
+  return Array.from(map.values());
 }
 
 /**

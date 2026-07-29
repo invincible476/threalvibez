@@ -10,12 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, X, UserX, UserPlus, Search, MessageSquare, Ban, Loader2 } from 'lucide-react';
+import { Check, X, UserX, UserPlus, Search, MessageSquare, Ban } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useAppShell } from '@/components/app-shell';
-import { normalizeUser, matchesUserSearch, searchUsers, fetchMissingUsers } from '@/lib/user-service';
+import { normalizeUser, matchesUserSearch, fetchMissingUsers } from '@/lib/user-service';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -58,14 +58,121 @@ export default function FriendsPage() {
     const [allUsersList, setAllUsersList] = useState<User[]>([]);
     const [extraUsersMap, setExtraUsersMap] = useState<Map<string, User>>(new Map());
 
-    // Search state
+    // Search query state (0ms instant continuous filter)
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const [remoteResults, setRemoteResults] = useState<User[]>([]);
+
+    // Sync currentUser with AppShell or direct Firestore listener
+    useEffect(() => {
+        if (shellCurrentUser) {
+            setCurrentUser(normalizeUser(shellCurrentUser));
+        }
+    }, [shellCurrentUser]);
+
+    // Real-time listener for current user profile
+    useEffect(() => {
+        if (!authLoading && !authUser) {
+            router.push('/login');
+            return;
+        }
+        if (!authUser) return;
+
+        const unsub = onSnapshot(doc(db, 'users', authUser.uid), (docSnap) => {
+            if (docSnap.exists()) {
+                setCurrentUser(normalizeUser(docSnap.data(), docSnap.id));
+            }
+        });
+        return () => unsub();
+    }, [authUser, authLoading, router]);
+
+    // Single background real-time listener for all users for 0ms continuous search
+    useEffect(() => {
+        const unsub = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
+            const userList = snapshot.docs.map(docSnap => normalizeUser(docSnap.data(), docSnap.id));
+            setAllUsersList(userList);
+        }, (err) => {
+            console.warn("Realtime users fetch warning:", err);
+        });
+        return () => unsub();
+    }, []);
+
+    // Derive full user pool from all active sources
+    const userPool = useMemo(() => {
+        const map = new Map<string, User>();
+
+        const add = (u: any) => {
+            if (!u) return;
+            const norm = normalizeUser(u);
+            if (norm.uid) map.set(norm.uid, norm);
+        };
+
+        (shellUsers || []).forEach(add);
+        if (usersCache) usersCache.forEach(add);
+        (allUsersList || []).forEach(add);
+        extraUsersMap.forEach(add);
+
+        return Array.from(map.values());
+    }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
+
+    // Keep userPoolRef updated to avoid circular dependencies
+    const userPoolRef = useRef<User[]>(userPool);
+    useEffect(() => {
+        userPoolRef.current = userPool;
+    }, [userPool]);
+
+    const activeUser = currentUser || (shellCurrentUser ? normalizeUser(shellCurrentUser) : null);
+
+    // Derive friends, pending requests, and sent requests
+    const friends = useMemo(() => {
+        if (!activeUser?.friends || activeUser.friends.length === 0) return [];
+        const set = new Set(activeUser.friends);
+        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
+    }, [activeUser?.friends, userPool]);
+
+    const requests = useMemo(() => {
+        if (!activeUser?.friendRequestsReceived || activeUser.friendRequestsReceived.length === 0) return [];
+        const set = new Set(activeUser.friendRequestsReceived);
+        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
+    }, [activeUser?.friendRequestsReceived, userPool]);
+
+    const sentRequests = useMemo(() => {
+        if (!activeUser?.friendRequestsSent || activeUser.friendRequestsSent.length === 0) return [];
+        const set = new Set(activeUser.friendRequestsSent);
+        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
+    }, [activeUser?.friendRequestsSent, userPool]);
+
+    // Fetch missing user documents for friends/requests
+    useEffect(() => {
+        if (!activeUser) return;
+
+        const neededIds = [
+            ...(activeUser.friends || []),
+            ...(activeUser.friendRequestsReceived || []),
+            ...(activeUser.friendRequestsSent || [])
+        ].filter(Boolean);
+
+        if (neededIds.length === 0) return;
+
+        fetchMissingUsers(neededIds, userPoolRef.current).then(missingUsers => {
+            if (missingUsers.length > 0) {
+                setExtraUsersMap(prev => {
+                    const next = new Map(prev);
+                    missingUsers.forEach(u => next.set(u.uid, u));
+                    return next;
+                });
+            }
+        });
+    }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent]);
+
+    // 0ms Instant Live Search Filter (No debounces, no spinners, no flickering!)
+    const searchResults = useMemo(() => {
+        const clean = searchQuery.trim();
+        if (!clean) return [];
+
+        return userPool.filter(u => matchesUserSearch(u, clean, authUser?.uid));
+    }, [searchQuery, userPool, authUser?.uid]);
 
     // Optimistic friend action handler
     const handleFriendAction = async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
-        const activeUser = authUser && (currentUser || shellCurrentUser);
         if (!authUser || !activeUser) {
             toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
             return;
@@ -80,29 +187,29 @@ export default function FriendsPage() {
         setCurrentUser(prev => {
             if (!prev) return prev;
             const updated = { ...prev };
-            const friends = new Set(updated.friends || []);
-            const sent = new Set(updated.friendRequestsSent || []);
-            const received = new Set(updated.friendRequestsReceived || []);
+            const friendsSet = new Set(updated.friends || []);
+            const sentSet = new Set(updated.friendRequestsSent || []);
+            const receivedSet = new Set(updated.friendRequestsReceived || []);
 
             if (action === 'sendRequest') {
-                sent.add(targetUserId);
+                sentSet.add(targetUserId);
             } else if (action === 'acceptRequest') {
-                friends.add(targetUserId);
-                received.delete(targetUserId);
-                sent.delete(targetUserId);
+                friendsSet.add(targetUserId);
+                receivedSet.delete(targetUserId);
+                sentSet.delete(targetUserId);
             } else if (action === 'declineRequest') {
-                received.delete(targetUserId);
+                receivedSet.delete(targetUserId);
             } else if (action === 'removeFriend') {
-                friends.delete(targetUserId);
+                friendsSet.delete(targetUserId);
             } else if (action === 'cancelRequest') {
-                sent.delete(targetUserId);
+                sentSet.delete(targetUserId);
             }
 
             return {
                 ...updated,
-                friends: Array.from(friends),
-                friendRequestsSent: Array.from(sent),
-                friendRequestsReceived: Array.from(received),
+                friends: Array.from(friendsSet),
+                friendRequestsSent: Array.from(sentSet),
+                friendRequestsReceived: Array.from(receivedSet),
             };
         });
 
@@ -143,156 +250,6 @@ export default function FriendsPage() {
         }
     };
 
-    // Sync currentUser with AppShell or direct Firestore listener
-    useEffect(() => {
-        if (shellCurrentUser) {
-            setCurrentUser(normalizeUser(shellCurrentUser));
-        }
-    }, [shellCurrentUser]);
-
-    // Real-time listener for current user profile
-    useEffect(() => {
-        if (!authLoading && !authUser) {
-            router.push('/login');
-            return;
-        }
-        if (!authUser) return;
-
-        const unsub = onSnapshot(doc(db, 'users', authUser.uid), (docSnap) => {
-            if (docSnap.exists()) {
-                setCurrentUser(normalizeUser(docSnap.data(), docSnap.id));
-            }
-        });
-        return () => unsub();
-    }, [authUser, authLoading, router]);
-
-    // Real-time listener for all users (up to 500)
-    useEffect(() => {
-        const unsub = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
-            const userList = snapshot.docs.map(docSnap => normalizeUser(docSnap.data(), docSnap.id));
-            setAllUsersList(userList);
-        }, (err) => {
-            console.warn("Realtime users fetch warning:", err);
-        });
-        return () => unsub();
-    }, []);
-
-    // Derive full user pool from all sources
-    const userPool = useMemo(() => {
-        const map = new Map<string, User>();
-
-        const add = (u: any) => {
-            if (!u) return;
-            const norm = normalizeUser(u);
-            if (norm.uid) map.set(norm.uid, norm);
-        };
-
-        (shellUsers || []).forEach(add);
-        if (usersCache) usersCache.forEach(add);
-        (allUsersList || []).forEach(add);
-        extraUsersMap.forEach(add);
-
-        return Array.from(map.values());
-    }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
-
-    // Keep userPoolRef updated to avoid circular dependencies in useEffect
-    const userPoolRef = useRef<User[]>(userPool);
-    useEffect(() => {
-        userPoolRef.current = userPool;
-    }, [userPool]);
-
-    const activeUser = currentUser || (shellCurrentUser ? normalizeUser(shellCurrentUser) : null);
-
-    // Derive friends, pending requests, and sent requests
-    const friends = useMemo(() => {
-        if (!activeUser?.friends || activeUser.friends.length === 0) return [];
-        const set = new Set(activeUser.friends);
-        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
-    }, [activeUser?.friends, userPool]);
-
-    const requests = useMemo(() => {
-        if (!activeUser?.friendRequestsReceived || activeUser.friendRequestsReceived.length === 0) return [];
-        const set = new Set(activeUser.friendRequestsReceived);
-        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
-    }, [activeUser?.friendRequestsReceived, userPool]);
-
-    const sentRequests = useMemo(() => {
-        if (!activeUser?.friendRequestsSent || activeUser.friendRequestsSent.length === 0) return [];
-        const set = new Set(activeUser.friendRequestsSent);
-        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
-    }, [activeUser?.friendRequestsSent, userPool]);
-
-    // Automatically fetch missing user documents for friends/requests
-    useEffect(() => {
-        if (!activeUser) return;
-
-        const neededIds = [
-            ...(activeUser.friends || []),
-            ...(activeUser.friendRequestsReceived || []),
-            ...(activeUser.friendRequestsSent || [])
-        ].filter(Boolean);
-
-        if (neededIds.length === 0) return;
-
-        fetchMissingUsers(neededIds, userPoolRef.current).then(missingUsers => {
-            if (missingUsers.length > 0) {
-                setExtraUsersMap(prev => {
-                    const next = new Map(prev);
-                    missingUsers.forEach(u => next.set(u.uid, u));
-                    return next;
-                });
-            }
-        });
-    }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent]);
-
-    // Fast debounced remote search (only triggered by searchQuery changes!)
-    useEffect(() => {
-        const clean = searchQuery.trim().replace(/^@/, '');
-        if (!clean) {
-            setRemoteResults([]);
-            setIsSearching(false);
-            return;
-        }
-
-        setIsSearching(true);
-        const timer = setTimeout(async () => {
-            try {
-                const results = await searchUsers(clean, userPoolRef.current, authUser?.uid);
-                setRemoteResults(results);
-            } catch (err) {
-                console.error("Search error:", err);
-            } finally {
-                setIsSearching(false);
-            }
-        }, 150);
-
-        return () => clearTimeout(timer);
-    }, [searchQuery, authUser?.uid]);
-
-    // Combine local pool matches and remote results synchronously (0ms latency!)
-    const searchResults = useMemo(() => {
-        const clean = searchQuery.trim().replace(/^@/, '');
-        if (!clean) return [];
-
-        const map = new Map<string, User>();
-
-        // 1. Local instant matches from pool
-        userPool.forEach(u => {
-            if (matchesUserSearch(u, clean, authUser?.uid)) {
-                map.set(u.uid, u);
-            }
-        });
-
-        // 2. Remote search matches
-        remoteResults.forEach(u => {
-            if (matchesUserSearch(u, clean, authUser?.uid)) {
-                map.set(u.uid, u);
-            }
-        });
-
-        return Array.from(map.values());
-    }, [searchQuery, userPool, remoteResults, authUser?.uid]);
-
     if (authLoading || (!authUser && !activeUser)) {
         return <FriendsPageSkeleton />;
     }
@@ -327,11 +284,8 @@ export default function FriendsPage() {
                                 spellCheck={false}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-10 h-11 text-base bg-background/50"
+                                className="pl-10 h-11 text-base bg-background/50"
                             />
-                            {isSearching && (
-                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-primary" />
-                            )}
                         </div>
 
                         {/* Instant Live Search Results */}
@@ -395,7 +349,7 @@ export default function FriendsPage() {
                                     })
                                 ) : (
                                     <p className="text-center text-muted-foreground py-6">
-                                        {isSearching ? 'Searching users...' : `No users found matching "${searchQuery}".`}
+                                        No users found matching "{searchQuery}".
                                     </p>
                                 )}
                             </div>

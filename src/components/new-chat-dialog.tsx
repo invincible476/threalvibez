@@ -45,58 +45,13 @@ export function NewChatDialog({ users, onCreateChat, onCreateGroupChat, children
       .filter(u => u.uid !== currentUser?.uid && !(currentUser?.blockedUsers || []).includes(u.uid));
   }, [users, currentUser]);
 
-  const availableUsersRef = useRef<User[]>(availableUsers);
-  useEffect(() => {
-    availableUsersRef.current = availableUsers;
-  }, [availableUsers]);
-
-  // Debounced remote search
-  useEffect(() => {
-    const clean = searchTerm.trim().replace(/^@/, '');
-    if (!clean) {
-      setRemoteResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    const timer = setTimeout(async () => {
-      try {
-        const results = await searchUsers(clean, availableUsersRef.current, currentUser?.uid);
-        setRemoteResults(results);
-      } catch (error) {
-        console.error("Error searching users in dialog:", error);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, currentUser?.uid]);
-
-  // Combine local matches and remote search results
+  // 0ms Instant Live Search Filter for available users
   const displayedUsers = useMemo(() => {
-    const clean = searchTerm.trim().replace(/^@/, '');
+    const clean = searchTerm.trim();
     if (!clean) return availableUsers;
 
-    const map = new Map<string, User>();
-
-    // Local instant matches
-    availableUsers.forEach(u => {
-      if (matchesUserSearch(u, clean, currentUser?.uid)) {
-        map.set(u.uid, u);
-      }
-    });
-
-    // Remote search matches
-    remoteResults.forEach(u => {
-      if (matchesUserSearch(u, clean, currentUser?.uid)) {
-        map.set(u.uid, u);
-      }
-    });
-
-    return Array.from(map.values());
-  }, [searchTerm, availableUsers, remoteResults, currentUser?.uid]);
+    return availableUsers.filter(u => matchesUserSearch(u, clean, currentUser?.uid));
+  }, [searchTerm, availableUsers, currentUser?.uid]);
 
   const handleCreateChatClick = (user: User) => {
     if (!currentUser) {
