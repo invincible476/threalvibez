@@ -233,11 +233,16 @@ useEffect(() => {
   useNotifications({ conversations, usersCache, currentUser, activeChatId: selectedChat?.id });
 
   const updateUserInCache = useCallback((userToCache: User) => {
+    if (!userToCache) return;
+    const targetId = userToCache.uid || userToCache.id;
+    if (!targetId) return;
+
+    const normalizedUser = { ...userToCache, id: targetId, uid: targetId };
     setUsersCache(prev => {
-      const newCache = new Map(prev);
-      const existingUser = newCache.get(userToCache.uid);
-      if (JSON.stringify(existingUser) !== JSON.stringify(userToCache)) {
-        newCache.set(userToCache.uid, userToCache);
+      const existingUser = prev.get(targetId);
+      if (JSON.stringify(existingUser) !== JSON.stringify(normalizedUser)) {
+        const newCache = new Map(prev);
+        newCache.set(targetId, normalizedUser);
         return newCache;
       }
       return prev;
@@ -268,7 +273,7 @@ useEffect(() => {
     const userDocRef = doc(db, 'users', authUser.uid);
     const unsubscribeCurrentUser = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
-            const userData = { id: docSnap.id, ...docSnap.data() } as User;
+            const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User;
             setCurrentUser(userData);
             updateUserInCache(userData);
             // Update appearance from user data
@@ -289,12 +294,18 @@ useEffect(() => {
     });
     
     // Limit users query to prevent fetching entire database into memory
-    const usersQuery = query(collection(db, 'users'), limit(100));
+    const usersQuery = query(collection(db, 'users'), limit(200));
     const unsubscribeAllUsers = onSnapshot(usersQuery, (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
+      const usersData = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        const targetId = data.uid || data.id || docSnap.id;
+        return { ...data, id: targetId, uid: targetId } as User;
+      });
       setUsersCache(prevCache => {
         const newCache = new Map(prevCache);
-        usersData.forEach(user => newCache.set(user.uid, user));
+        usersData.forEach(user => {
+          if (user.uid) newCache.set(user.uid, user);
+        });
         return newCache;
       });
       setAllUsers(usersData);

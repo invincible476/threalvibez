@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -135,7 +135,22 @@ export default function FriendsPage() {
 
     // Real-time listener for all users for continuous search
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
+        const fetchInitial = async () => {
+            try {
+                const snap = await getDocs(query(collection(db, 'users'), limit(200)));
+                const userList = snap.docs.map(docSnap => {
+                    const uData = docSnap.data();
+                    const targetId = uData.uid || uData.id || docSnap.id;
+                    return { ...uData, id: targetId, uid: targetId } as User;
+                });
+                setAllUsersList(userList);
+            } catch (err) {
+                console.warn("Initial users fetch warning:", err);
+            }
+        };
+        fetchInitial();
+
+        const unsub = onSnapshot(query(collection(db, 'users'), limit(200)), (snapshot) => {
             const userList = snapshot.docs.map(docSnap => {
                 const uData = docSnap.data();
                 const targetId = uData.uid || uData.id || docSnap.id;
@@ -232,20 +247,34 @@ export default function FriendsPage() {
 
     // Debounced direct Firestore search fallback for users not yet in memory
     useEffect(() => {
-        const rawTerm = searchQuery.trim().toLowerCase();
-        const term = rawTerm.replace(/^@/, '');
-        if (!term || term.length < 2) return;
+        const rawTerm = searchQuery.trim();
+        const cleanTerm = rawTerm.replace(/^@/, '');
+        if (!cleanTerm || cleanTerm.length < 2) return;
 
         const timer = setTimeout(async () => {
             try {
+                const lower = cleanTerm.toLowerCase();
+                const capitalized = cleanTerm.charAt(0).toUpperCase() + cleanTerm.slice(1).toLowerCase();
                 const usersRef = collection(db, 'users');
-                const [byEmail, byUsername, byName] = await Promise.all([
-                    getDocs(query(usersRef, where('email', '==', term))),
-                    getDocs(query(usersRef, where('username', '==', term))),
-                    getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff')))
+
+                const [byEmailExact, byEmailLower, byUsernameLower, byNameCap, byNameLower, byNameRaw] = await Promise.all([
+                    getDocs(query(usersRef, where('email', '==', cleanTerm))),
+                    getDocs(query(usersRef, where('email', '==', lower))),
+                    getDocs(query(usersRef, where('username', '==', lower))),
+                    getDocs(query(usersRef, where('name', '>=', capitalized), where('name', '<=', capitalized + '\uf8ff'))),
+                    getDocs(query(usersRef, where('name', '>=', lower), where('name', '<=', lower + '\uf8ff'))),
+                    getDocs(query(usersRef, where('name', '>=', cleanTerm), where('name', '<=', cleanTerm + '\uf8ff')))
                 ]);
 
-                const fetchedDocs = [...byEmail.docs, ...byUsername.docs, ...byName.docs];
+                const fetchedDocs = [
+                    ...byEmailExact.docs,
+                    ...byEmailLower.docs,
+                    ...byUsernameLower.docs,
+                    ...byNameCap.docs,
+                    ...byNameLower.docs,
+                    ...byNameRaw.docs
+                ];
+
                 if (fetchedDocs.length > 0) {
                     setExtraUsersMap(prev => {
                         const next = new Map(prev);
@@ -261,7 +290,7 @@ export default function FriendsPage() {
             } catch (err) {
                 console.warn('Firestore live search query error:', err);
             }
-        }, 300);
+        }, 200);
 
         return () => clearTimeout(timer);
     }, [searchQuery]);
