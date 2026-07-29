@@ -55,7 +55,7 @@ function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
                 </Button>
                 <h1 className="text-lg font-semibold">{title}</h1>
             </header>
-            <main className="flex-1 overflow-y-auto min-h-0 w-full p-2 sm:p-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <main className="flex-1 overflow-y-auto min-h-0 w-full p-4 sm:p-6 pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {children}
             </main>
         </div>
@@ -167,12 +167,10 @@ export default function SettingsLayout({
                     </SidebarMenu>
                 </div>
             </Sidebar>
-            <SidebarInset className="flex-1 h-full max-h-screen overflow-hidden min-h-0 flex flex-col">
-                <ScrollArea className="h-full w-full flex-1 min-h-0">
-                    <main className="p-4 sm:p-8 lg:p-12 w-full">
-                        {children}
-                    </main>
-                </ScrollArea>
+            <SidebarInset className="flex-1 h-full max-h-screen min-h-0 flex flex-col overflow-y-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <main className="p-4 sm:p-8 lg:p-12 w-full max-w-5xl mx-auto flex-1 min-h-0 pb-24">
+                    {children}
+                </main>
             </SidebarInset>
       </div>
     </SidebarProvider>
