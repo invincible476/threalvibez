@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { headers } from 'next/headers';
 import nodemailer from 'nodemailer';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const zSendVerificationRequest = z.object({
   email: z.string().email(),
@@ -12,7 +14,7 @@ const zVerifyCodeRequest = z.object({
   code: z.string().min(1),
 });
 
-// Global storage for verification codes in Next.js dev & serverless execution contexts
+// In-memory fallback for local dev
 const globalForVerification = globalThis as unknown as {
   verificationStore?: Map<string, { code: string; expiresAt: number; attempts: number }>;
   rateLimitStore?: Map<string, { count: number; resetTime: number }>;
@@ -37,8 +39,8 @@ function generateVerificationCode(): string {
 
 function isRateLimited(identifier: string): boolean {
   const now = Date.now();
-  const windowMs = 60 * 1000; // 1 minute
-  const maxRequests = 5; // Max 5 attempts per minute
+  const windowMs = 60 * 1000;
+  const maxRequests = 5;
 
   const record = rateLimitStore.get(identifier);
   if (!record || now > record.resetTime) {
@@ -86,16 +88,6 @@ async function sendEmailDirectly(
     return { success: true, message: 'Verification email sent successfully' };
   } catch (error: any) {
     console.error('Gmail SMTP error sending to', to, 'Error:', error);
-
-    // If SMTP fails, log code in console for development fallback
-    if (process.env.NODE_ENV === 'development') {
-      console.log('\n=== EMAIL VERIFICATION CODE (Console Fallback) ===');
-      console.log('To:', to);
-      console.log('Subject:', subject);
-      console.log('Content:', text);
-      console.log('==================================================\n');
-    }
-
     return {
       success: false,
       message: error?.message || 'Failed to deliver verification email via SMTP. Please try again.',
@@ -119,12 +111,21 @@ async function sendVerificationCode(
     const code = generateVerificationCode();
     const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes validity
 
-    // Store verification code in global store
-    verificationStore.set(cleanEmail, {
-      code,
-      expiresAt,
-      attempts: 0,
-    });
+    // Store code in local memory AND Firestore for serverless persistence on Vercel
+    verificationStore.set(cleanEmail, { code, expiresAt, attempts: 0 });
+
+    try {
+      const codeRef = doc(db, 'emailVerifications', cleanEmail.replace(/[^a-z0-9]/g, '_'));
+      await setDoc(codeRef, {
+        email: cleanEmail,
+        code,
+        expiresAt,
+        attempts: 0,
+        createdAt: Date.now(),
+      }, { merge: true });
+    } catch (fsErr) {
+      console.warn('Firestore code store warning (using in-memory fallback):', fsErr);
+    }
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -159,19 +160,43 @@ async function verifyCode(
   try {
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.trim();
-    const record = verificationStore.get(cleanEmail);
+    const docId = cleanEmail.replace(/[^a-z0-9]/g, '_');
 
-    if (!record) {
+    let storedCode = '';
+    let expiresAt = 0;
+    let attempts = 0;
+
+    // Check memory store first
+    const memoryRecord = verificationStore.get(cleanEmail);
+    if (memoryRecord) {
+      storedCode = memoryRecord.code;
+      expiresAt = memoryRecord.expiresAt;
+      attempts = memoryRecord.attempts;
+    } else {
+      // Check Firestore store for Vercel serverless functions
+      try {
+        const codeSnap = await getDoc(doc(db, 'emailVerifications', docId));
+        if (codeSnap.exists()) {
+          const data = codeSnap.data();
+          storedCode = data.code;
+          expiresAt = data.expiresAt;
+          attempts = data.attempts || 0;
+        }
+      } catch (fsErr) {
+        console.warn('Firestore code fetch error:', fsErr);
+      }
+    }
+
+    if (!storedCode) {
       return {
         success: false,
         message: 'No verification code found for this email. Please request a new code.',
       };
     }
 
-    const { code: storedCode, expiresAt, attempts } = record;
-
     if (Date.now() > expiresAt) {
       verificationStore.delete(cleanEmail);
+      deleteDoc(doc(db, 'emailVerifications', docId)).catch(() => {});
       return {
         success: false,
         message: 'Verification code has expired. Please request a new code.',
@@ -180,6 +205,7 @@ async function verifyCode(
 
     if (attempts >= 5) {
       verificationStore.delete(cleanEmail);
+      deleteDoc(doc(db, 'emailVerifications', docId)).catch(() => {});
       return {
         success: false,
         message: 'Too many incorrect attempts. Please request a new verification code.',
@@ -188,16 +214,21 @@ async function verifyCode(
 
     if (cleanCode === storedCode) {
       verificationStore.delete(cleanEmail);
+      deleteDoc(doc(db, 'emailVerifications', docId)).catch(() => {});
       return {
         success: true,
         message: 'Email code verified successfully.',
       };
     } else {
-      record.attempts += 1;
-      verificationStore.set(cleanEmail, record);
+      if (memoryRecord) {
+        memoryRecord.attempts += 1;
+        verificationStore.set(cleanEmail, memoryRecord);
+      }
+      setDoc(doc(db, 'emailVerifications', docId), { attempts: attempts + 1 }, { merge: true }).catch(() => {});
+
       return {
         success: false,
-        message: `Incorrect verification code. ${5 - record.attempts} attempt(s) remaining.`,
+        message: `Incorrect verification code. ${5 - (attempts + 1)} attempt(s) remaining.`,
       };
     }
   } catch (error: any) {
