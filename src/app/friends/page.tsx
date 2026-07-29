@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { doc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -51,17 +51,18 @@ export default function FriendsPage() {
     const { user: authUser, loading: authLoading } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
-    const { allUsers: shellUsers, handleCreateChat } = useAppShell();
+    const { currentUser: shellCurrentUser, allUsers: shellUsers, usersCache, handleCreateChat } = useAppShell();
     
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState<User | null>(shellCurrentUser || null);
     const [allUsersList, setAllUsersList] = useState<User[]>([]);
+    const [extraUsersMap, setExtraUsersMap] = useState<Map<string, User>>(new Map());
 
     // Continuous search query
     const [searchQuery, setSearchQuery] = useState('');
 
     const handleFriendAction = async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
-        if (!authUser || !currentUser) {
+        const activeUser = authUser && (currentUser || shellCurrentUser);
+        if (!authUser || !activeUser) {
             toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
             return;
         }
@@ -81,20 +82,20 @@ export default function FriendsPage() {
                 });
                 await updateDoc(targetUserRef, {
                     friends: arrayUnion(authUser.uid),
-                    friendRequestsSent: arrayRemove(currentUser.uid)
+                    friendRequestsSent: arrayRemove(authUser.uid)
                 });
                 toast({ title: 'Friend Added', description: 'You are now friends!' });
             } else if (action === 'declineRequest') {
                 await updateDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) });
-                await updateDoc(targetUserRef, { friendRequestsSent: arrayRemove(currentUser.uid) });
+                await updateDoc(targetUserRef, { friendRequestsSent: arrayRemove(authUser.uid) });
                 toast({ title: 'Request Declined' });
             } else if (action === 'removeFriend') {
                 await updateDoc(currentUserRef, { friends: arrayRemove(targetUserId) });
-                await updateDoc(targetUserRef, { friends: arrayRemove(currentUser.uid) });
+                await updateDoc(targetUserRef, { friends: arrayRemove(authUser.uid) });
                 toast({ title: 'Friend Removed' });
             } else if (action === 'cancelRequest') {
                 await updateDoc(currentUserRef, { friendRequestsSent: arrayRemove(targetUserId) });
-                await updateDoc(targetUserRef, { friendRequestsReceived: arrayRemove(currentUser.uid) });
+                await updateDoc(targetUserRef, { friendRequestsReceived: arrayRemove(authUser.uid) });
                 toast({ title: 'Request Canceled' });
             }
         } catch(e: any) {
@@ -102,6 +103,13 @@ export default function FriendsPage() {
             toast({ title: 'Error', description: e.message || "Something went wrong.", variant: "destructive" });
         }
     };
+
+    // Keep currentUser synced with AppShell or direct Firestore listener
+    useEffect(() => {
+        if (shellCurrentUser) {
+            setCurrentUser(shellCurrentUser);
+        }
+    }, [shellCurrentUser]);
 
     // Real-time listener for user profile
     useEffect(() => {
@@ -113,17 +121,17 @@ export default function FriendsPage() {
 
         const unsub = onSnapshot(doc(db, 'users', authUser.uid), (docSnap) => {
             if (docSnap.exists()) {
-                const userData = { id: docSnap.id, ...docSnap.data() } as User;
+                const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User;
                 setCurrentUser(userData);
             }
         });
         return () => unsub();
     }, [authUser, authLoading, router]);
 
-    // Real-time listener for all users for instantaneous continuous search
+    // Real-time listener for all users for continuous search
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
-            const userList = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as User));
+            const userList = snapshot.docs.map(docSnap => ({ id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User));
             setAllUsersList(userList);
         }, (err) => {
             console.warn("Realtime users fetch warning:", err);
@@ -131,52 +139,69 @@ export default function FriendsPage() {
         return () => unsub();
     }, []);
 
-    // Derive full user list pool from available state for instant 0ms load
+    // Derive full user list pool from all available sources
     const userPool = useMemo(() => {
-        return allUsersList.length > 0 ? allUsersList : shellUsers;
-    }, [allUsersList, shellUsers]);
+        const map = new Map<string, User>();
+        // Add shellUsers
+        (shellUsers || []).forEach(u => map.set(u.uid, u));
+        // Add usersCache entries
+        if (usersCache) {
+            usersCache.forEach((u, id) => map.set(id, u));
+        }
+        // Add allUsersList
+        (allUsersList || []).forEach(u => map.set(u.uid, u));
+        // Add extraUsersMap
+        extraUsersMap.forEach((u, id) => map.set(id, u));
+
+        return Array.from(map.values());
+    }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
+
+    const activeUser = currentUser || shellCurrentUser;
 
     // Derive friends, pending requests, and sent requests synchronously
     const friends = useMemo(() => {
-        if (!currentUser?.friends || currentUser.friends.length === 0) return [];
-        const set = new Set(currentUser.friends);
+        if (!activeUser?.friends || activeUser.friends.length === 0) return [];
+        const set = new Set(activeUser.friends);
         return userPool.filter(u => set.has(u.uid));
-    }, [currentUser?.friends, userPool]);
+    }, [activeUser?.friends, userPool]);
 
     const requests = useMemo(() => {
-        if (!currentUser?.friendRequestsReceived || currentUser.friendRequestsReceived.length === 0) return [];
-        const set = new Set(currentUser.friendRequestsReceived);
+        if (!activeUser?.friendRequestsReceived || activeUser.friendRequestsReceived.length === 0) return [];
+        const set = new Set(activeUser.friendRequestsReceived);
         return userPool.filter(u => set.has(u.uid));
-    }, [currentUser?.friendRequestsReceived, userPool]);
+    }, [activeUser?.friendRequestsReceived, userPool]);
 
     const sentRequests = useMemo(() => {
-        if (!currentUser?.friendRequestsSent || currentUser.friendRequestsSent.length === 0) return [];
-        const set = new Set(currentUser.friendRequestsSent);
+        if (!activeUser?.friendRequestsSent || activeUser.friendRequestsSent.length === 0) return [];
+        const set = new Set(activeUser.friendRequestsSent);
         return userPool.filter(u => set.has(u.uid));
-    }, [currentUser?.friendRequestsSent, userPool]);
+    }, [activeUser?.friendRequestsSent, userPool]);
 
-    // Non-blocking background fetch for any missing user IDs not yet in memory
+    // Fetch individual missing user documents directly by doc ID if not in memory
     useEffect(() => {
-        if (!currentUser) return;
+        if (!activeUser) return;
 
-        const missingIds = [
-            ...(currentUser.friends || []),
-            ...(currentUser.friendRequestsReceived || []),
-            ...(currentUser.friendRequestsSent || [])
-        ].filter(id => !userPool.some(u => u.uid === id));
+        const neededIds = [
+            ...(activeUser.friends || []),
+            ...(activeUser.friendRequestsReceived || []),
+            ...(activeUser.friendRequestsSent || [])
+        ];
 
-        if (missingIds.length > 0) {
-            const q = query(collection(db, 'users'), where('uid', 'in', missingIds.slice(0, 10)));
-            getDocs(q).then(snapshot => {
-                const fetched = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as User));
-                setAllUsersList(prev => {
-                    const existing = new Set(prev.map(p => p.uid));
-                    const newUsers = fetched.filter(f => !existing.has(f.uid));
-                    return newUsers.length > 0 ? [...prev, ...newUsers] : prev;
-                });
-            }).catch(err => console.warn('Secondary users fetch error:', err));
-        }
-    }, [currentUser, userPool]);
+        const missing = neededIds.filter(id => !userPool.some(u => u.uid === id));
+        if (missing.length === 0) return;
+
+        missing.forEach(async (id) => {
+            try {
+                const docSnap = await getDoc(doc(db, 'users', id));
+                if (docSnap.exists()) {
+                    const uData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User;
+                    setExtraUsersMap(prev => new Map(prev).set(id, uData));
+                }
+            } catch (err) {
+                console.error(`Failed to fetch user doc for ${id}:`, err);
+            }
+        });
+    }, [activeUser, userPool]);
 
     // Continuous real-time instant search calculation
     const searchResults = useMemo(() => {
@@ -194,7 +219,7 @@ export default function FriendsPage() {
         });
     }, [searchQuery, userPool, authUser?.uid]);
 
-    if (authLoading || (!currentUser && loading)) {
+    if (authLoading || (!authUser && !activeUser)) {
         return <FriendsPageSkeleton />;
     }
 
