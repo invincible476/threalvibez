@@ -230,7 +230,8 @@ export async function searchUsers(
   }
 
   // 4. API Endpoint Fallback for production / Vercel security rule resilience
-  if (map.size === 0 && typeof window !== 'undefined') {
+  const hasRealUser = Array.from(map.values()).some(u => u.uid && u.uid !== 'gemini_ai_bot');
+  if (!hasRealUser && typeof window !== 'undefined') {
     try {
       const res = await fetch(`/api/search-users?q=${encodeURIComponent(cleanTerm)}${currentUserId ? `&currentUserId=${currentUserId}` : ''}`);
       if (res.ok) {

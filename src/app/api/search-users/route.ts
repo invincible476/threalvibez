@@ -14,27 +14,57 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, users: [] });
     }
 
-    const map = new Map<string, any>();
     const usersRef = collection(db, 'users');
+    const normalizedTerm = cleanTerm.toLowerCase();
+    const titleTerm = cleanTerm
+      .split(/\s+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
 
-    // Fetch snapshot of users from Firestore server-side
+    const map = new Map<string, any>();
+
+    // 1. Fetch snapshot of users from Firestore server-side (0ms permission restrictions on server)
     try {
       const snap = await getDocs(query(usersRef, limit(500)));
-      snap.docs.forEach(docSnap => {
+      snap.docs.forEach((docSnap) => {
         const norm = normalizeUser(docSnap.data(), docSnap.id);
         if (matchesUserSearch(norm, cleanTerm, currentUserId)) {
           map.set(norm.uid, norm);
         }
       });
-    } catch (fsErr) {
-      console.warn('[API Search Users] Server snapshot notice:', fsErr);
+    } catch (snapErr) {
+      console.warn('[API Search Users] Server snapshot notice:', snapErr);
     }
 
-    const results = sortSearchResults(Array.from(map.values()), cleanTerm);
+    // 2. Targeted queries fallback if snapshot returned no matches
+    if (map.size === 0) {
+      const targetedQueries = [
+        getDocs(query(usersRef, where('email', '==', normalizedTerm), limit(20))),
+        getDocs(query(usersRef, where('username', '==', normalizedTerm), limit(20))),
+        getDocs(query(usersRef, where('name', '==', cleanTerm), limit(20))),
+        getDocs(query(usersRef, where('displayName', '==', cleanTerm), limit(20))),
+        getDocs(query(usersRef, where('name', '>=', titleTerm), where('name', '<=', titleTerm + '\uf8ff'), limit(20))),
+        getDocs(query(usersRef, where('name', '>=', normalizedTerm), where('name', '<=', normalizedTerm + '\uf8ff'), limit(20))),
+      ];
+
+      const results = await Promise.allSettled(targetedQueries);
+      results.forEach((res) => {
+        if (res.status === 'fulfilled' && res.value) {
+          res.value.docs.forEach((docSnap) => {
+            const norm = normalizeUser(docSnap.data(), docSnap.id);
+            if (matchesUserSearch(norm, cleanTerm, currentUserId)) {
+              map.set(norm.uid, norm);
+            }
+          });
+        }
+      });
+    }
+
+    const finalResults = sortSearchResults(Array.from(map.values()), cleanTerm);
 
     return NextResponse.json({
       success: true,
-      users: results,
+      users: finalResults,
     });
   } catch (error: any) {
     console.error('[API Search Users] Error:', error);
