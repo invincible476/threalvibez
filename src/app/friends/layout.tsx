@@ -12,14 +12,14 @@ export default function FriendsLayout({
 }) {
   const router = useRouter();
   return (
-    <div className="flex flex-col h-dvh w-full">
+    <div className="flex flex-col h-full h-[100dvh] w-full overflow-hidden min-h-0">
       <header className="flex items-center gap-3 border-b border-border/50 bg-card/80 backdrop-blur-xl p-2 sm:p-4 shrink-0 z-10">
         <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => router.back()}>
             <ArrowLeft className="h-6 w-6" />
         </Button>
         <h1 className="text-xl font-bold font-heading">Friends</h1>
       </header>
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto min-h-0 w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
         {children}
       </main>
     </div>

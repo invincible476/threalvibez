@@ -272,7 +272,7 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "flex min-h-screen flex-1 flex-col",
+        "flex h-full max-h-screen min-h-0 flex-1 flex-col overflow-hidden",
         'md:transition-[margin-left] md:duration-300 md:ease-in-out',
         'group-data-[sidebar-state=expanded]/sidebar-wrapper:md:ml-[var(--sidebar-width)]',
         'group-data-[sidebar-state=collapsed]/sidebar-wrapper:md:ml-[var(--sidebar-width-icon)]',

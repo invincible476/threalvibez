@@ -10,7 +10,7 @@ export default function StoriesLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col h-dvh w-full bg-background">
+    <div className="flex flex-col h-full h-[100dvh] w-full bg-background overflow-hidden min-h-0">
       <header className="flex items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl p-2 sm:p-4 shrink-0 z-10">
         <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="h-10 w-10" asChild>
@@ -21,7 +21,7 @@ export default function StoriesLayout({
             <h1 className="text-xl font-bold font-heading">Stories</h1>
         </div>
       </header>
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto min-h-0 w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
         {children}
       </main>
     </div>

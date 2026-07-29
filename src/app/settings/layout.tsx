@@ -48,14 +48,14 @@ function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
     const isRootSettings = pathname === '/settings';
 
     return (
-        <div className="flex flex-col h-full w-full">
+        <div className="flex flex-col h-full h-[100dvh] w-full overflow-hidden min-h-0">
             <header className="flex items-center gap-2 border-b border-border/50 bg-card/80 backdrop-blur-xl p-2 shrink-0 z-10">
                 <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" onClick={() => isRootSettings ? router.push('/') : router.back()}>
                     <ArrowLeft className="h-6 w-6" />
                 </Button>
                 <h1 className="text-lg font-semibold">{title}</h1>
             </header>
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 overflow-y-auto min-h-0 w-full p-2 sm:p-4" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {children}
             </main>
         </div>
@@ -87,7 +87,7 @@ export default function SettingsLayout({
 
   return (
     <SidebarProvider>
-        <div className="flex h-screen">
+        <div className="flex h-screen h-[100dvh] w-full overflow-hidden min-h-0">
             <Sidebar collapsible="icon" className="bg-background/70 backdrop-blur-xl border-r-white/5">
                 <SidebarHeader>
                     <SidebarTrigger />
@@ -167,8 +167,8 @@ export default function SettingsLayout({
                     </SidebarMenu>
                 </div>
             </Sidebar>
-            <SidebarInset>
-                <ScrollArea className="h-full">
+            <SidebarInset className="flex-1 h-full max-h-screen overflow-hidden min-h-0 flex flex-col">
+                <ScrollArea className="h-full w-full flex-1 min-h-0">
                     <main className="p-4 sm:p-8 lg:p-12 w-full">
                         {children}
                     </main>

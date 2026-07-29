@@ -1838,9 +1838,9 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
         onCreateStory: chatData.setPreviewStoryFile,
         usersCache: chatData.usersCache,
       }}>
-        <div className="relative">
+        <div className="relative h-full h-[100dvh] w-full overflow-hidden flex flex-col min-h-0">
           {!isAuthRoute && <AppBackground />}
-          <div className="relative z-10">
+          <div className="relative z-10 flex-1 h-full w-full overflow-hidden flex flex-col min-h-0">
             {children}
           </div>
         </div>

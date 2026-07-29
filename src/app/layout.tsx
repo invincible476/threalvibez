@@ -83,10 +83,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="h-full">
       <body
         className={cn(
-          'min-h-screen bg-background font-sans antialiased',
+          'h-full min-h-screen bg-background font-sans antialiased overflow-hidden',
           fontPoppins.variable,
           fontPtSans.variable
         )}
@@ -103,7 +103,7 @@ export default function RootLayout({
               <FriendsProvider>
                 <MobileProvider>
                   <AppShell>
-                    <main className="relative flex-1 z-10">{children}</main>
+                    <main className="relative flex-1 z-10 h-full w-full overflow-hidden flex flex-col min-h-0">{children}</main>
                   </AppShell>
                   <Toaster />
                 </MobileProvider>
