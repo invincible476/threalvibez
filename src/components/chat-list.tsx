@@ -53,7 +53,8 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
 
     if (!currentUser) return null;
 
-    const hasFriendRequests = currentUser.friendRequestsReceived && currentUser.friendRequestsReceived.length > 0;
+    const requestCount = currentUser.friendRequestsReceived?.length || 0;
+    const hasFriendRequests = requestCount > 0;
 
     const handleLogout = async () => {
         const deviceId = localStorage.getItem('deviceId');
@@ -90,17 +91,26 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
             <PopoverTrigger asChild>
                 <div className="group/user-menu relative flex w-full cursor-pointer items-center justify-between p-2 transition-colors hover:bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <UserAvatar user={currentUser} className="h-10 w-10" />
+                        <div className="relative shrink-0">
+                            <UserAvatar user={currentUser} className="h-10 w-10" />
+                            {hasFriendRequests && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-extrabold text-black ring-2 ring-background animate-pulse">
+                                    {requestCount > 9 ? '9+' : requestCount}
+                                </span>
+                            )}
+                        </div>
                         <div className="overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden flex-1">
                             <p className="font-semibold truncate">{currentUser.name}</p>
                             <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
                         </div>
                     </div>
-                     <div className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden relative">
-                        <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
-                         {hasFriendRequests && (
-                            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+                     <div className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden relative flex items-center gap-2">
+                        {hasFriendRequests && (
+                            <span className="flex h-5 px-2 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-black animate-pulse">
+                                {requestCount} request{requestCount > 1 ? 's' : ''}
+                            </span>
                         )}
+                        <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
                     </div>
                 </div>
             </PopoverTrigger>
@@ -113,28 +123,33 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
                 <div className="p-1 space-y-1">
                     <Button variant="ghost" className="w-full justify-start relative" asChild>
                         <Link href="/friends">
-                            <UserPlus />
+                            <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
                             <span>Friends</span>
                             {hasFriendRequests && (
-                                <span className="absolute right-2 h-2 w-2 rounded-full bg-green-500" />
+                                <span className="ml-auto flex h-5 px-2 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-black animate-pulse">
+                                    {requestCount}
+                                </span>
                             )}
                         </Link>
                     </Button>
                     <Button variant="ghost" className="w-full justify-start" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                        {theme === 'dark' ? <Sun /> : <Moon />}
+                        {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
                         <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                     </Button>
-                    <Button variant="ghost" className="w-full justify-start" asChild>
+                    <Button variant="ghost" className="w-full justify-start relative" asChild>
                         <Link href="/settings">
-                            <Settings />
+                            <Settings className="mr-2 h-4 w-4" />
                             <span>Settings</span>
+                            {hasFriendRequests && (
+                                <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            )}
                         </Link>
                     </Button>
                 </div>
                 <Separator />
                 <div className="p-1">
                      <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" onClick={handleLogout}>
-                        <LogOut />
+                        <LogOut className="mr-2 h-4 w-4" />
                         <span>Log Out</span>
                     </Button>
                 </div>

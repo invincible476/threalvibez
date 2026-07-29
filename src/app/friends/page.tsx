@@ -54,9 +54,6 @@ export default function FriendsPage() {
     const { allUsers: shellUsers, handleCreateChat } = useAppShell();
     
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [friends, setFriends] = useState<User[]>([]);
-    const [requests, setRequests] = useState<User[]>([]);
-    const [sentRequests, setSentRequests] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [allUsersList, setAllUsersList] = useState<User[]>([]);
 
@@ -134,45 +131,59 @@ export default function FriendsPage() {
         return () => unsub();
     }, []);
 
-    // Load friends, requests, and sent requests
+    // Derive full user list pool from available state for instant 0ms load
+    const userPool = useMemo(() => {
+        return allUsersList.length > 0 ? allUsersList : shellUsers;
+    }, [allUsersList, shellUsers]);
+
+    // Derive friends, pending requests, and sent requests synchronously
+    const friends = useMemo(() => {
+        if (!currentUser?.friends || currentUser.friends.length === 0) return [];
+        const set = new Set(currentUser.friends);
+        return userPool.filter(u => set.has(u.uid));
+    }, [currentUser?.friends, userPool]);
+
+    const requests = useMemo(() => {
+        if (!currentUser?.friendRequestsReceived || currentUser.friendRequestsReceived.length === 0) return [];
+        const set = new Set(currentUser.friendRequestsReceived);
+        return userPool.filter(u => set.has(u.uid));
+    }, [currentUser?.friendRequestsReceived, userPool]);
+
+    const sentRequests = useMemo(() => {
+        if (!currentUser?.friendRequestsSent || currentUser.friendRequestsSent.length === 0) return [];
+        const set = new Set(currentUser.friendRequestsSent);
+        return userPool.filter(u => set.has(u.uid));
+    }, [currentUser?.friendRequestsSent, userPool]);
+
+    // Non-blocking background fetch for any missing user IDs not yet in memory
     useEffect(() => {
         if (!currentUser) return;
-        
-        setLoading(true);
 
-        const fetchUsers = async (userIds: string[], setState: React.Dispatch<React.SetStateAction<User[]>>) => {
-            if (userIds.length === 0) {
-                setState([]);
-                return Promise.resolve();
-            }
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('uid', 'in', userIds));
-            const querySnapshot = await getDocs(q);
-            const userList = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as User));
-            setState(userList);
-        };
+        const missingIds = [
+            ...(currentUser.friends || []),
+            ...(currentUser.friendRequestsReceived || []),
+            ...(currentUser.friendRequestsSent || [])
+        ].filter(id => !userPool.some(u => u.uid === id));
 
-        const friendIds = currentUser.friends || [];
-        const requestIds = currentUser.friendRequestsReceived || [];
-        const sentRequestIds = currentUser.friendRequestsSent || [];
-
-        Promise.all([
-            fetchUsers(friendIds, setFriends),
-            fetchUsers(requestIds, setRequests),
-            fetchUsers(sentRequestIds, setSentRequests)
-        ]).finally(() => {
-            setLoading(false);
-        });
-    }, [currentUser]);
+        if (missingIds.length > 0) {
+            const q = query(collection(db, 'users'), where('uid', 'in', missingIds.slice(0, 10)));
+            getDocs(q).then(snapshot => {
+                const fetched = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as User));
+                setAllUsersList(prev => {
+                    const existing = new Set(prev.map(p => p.uid));
+                    const newUsers = fetched.filter(f => !existing.has(f.uid));
+                    return newUsers.length > 0 ? [...prev, ...newUsers] : prev;
+                });
+            }).catch(err => console.warn('Secondary users fetch error:', err));
+        }
+    }, [currentUser, userPool]);
 
     // Continuous real-time instant search calculation
     const searchResults = useMemo(() => {
         const term = searchQuery.trim().toLowerCase();
         if (!term) return [];
 
-        const pool = allUsersList.length > 0 ? allUsersList : shellUsers;
-
-        return pool.filter(u => {
+        return userPool.filter(u => {
             if (u.uid === authUser?.uid) return false;
 
             const nameStr = (u.name || '').toLowerCase();
@@ -181,9 +192,9 @@ export default function FriendsPage() {
 
             return nameStr.includes(term) || emailStr.includes(term) || usernameStr.includes(term);
         });
-    }, [searchQuery, allUsersList, shellUsers, authUser?.uid]);
+    }, [searchQuery, userPool, authUser?.uid]);
 
-    if (authLoading || loading) {
+    if (authLoading || (!currentUser && loading)) {
         return <FriendsPageSkeleton />;
     }
 
