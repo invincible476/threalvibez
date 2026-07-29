@@ -144,6 +144,8 @@ export const authService = {
       uid: user.uid,
       email: user.email ?? '',
       name,
+      displayName: name,
+      fullName: name,
       username,
       photoURL,
       status: 'online',
@@ -166,11 +168,15 @@ export const authService = {
         createdAt: serverTimestamp(),
       }, { merge: true });
     } else {
+      const existing = userDoc.data() || {};
       await setDoc(userDocRef, {
         id: user.uid,
         uid: user.uid,
-        name,
-        photoURL,
+        name: existing.name || name,
+        displayName: existing.displayName || existing.name || name,
+        fullName: existing.fullName || existing.name || name,
+        username: existing.username || username,
+        photoURL: photoURL || existing.photoURL || '',
         emailVerified: true,
         updatedAt: serverTimestamp(),
       }, { merge: true });

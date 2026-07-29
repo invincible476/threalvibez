@@ -197,9 +197,12 @@ export async function searchUsers(
       getDocs(query(usersRef, where('email', '==', lowerTerm), limit(10))),
       getDocs(query(usersRef, where('username', '==', lowerTerm), limit(10))),
       getDocs(query(usersRef, where('name', '==', cleanTerm), limit(10))),
+      getDocs(query(usersRef, where('displayName', '==', cleanTerm), limit(10))),
       getDocs(query(usersRef, where('email', '>=', lowerTerm), where('email', '<=', lowerTerm + '\uf8ff'), limit(15))),
       getDocs(query(usersRef, where('name', '>=', titleTerm), where('name', '<=', titleTerm + '\uf8ff'), limit(15))),
       getDocs(query(usersRef, where('name', '>=', lowerTerm), where('name', '<=', lowerTerm + '\uf8ff'), limit(15))),
+      getDocs(query(usersRef, where('displayName', '>=', titleTerm), where('displayName', '<=', titleTerm + '\uf8ff'), limit(15))),
+      getDocs(query(usersRef, where('displayName', '>=', lowerTerm), where('displayName', '<=', lowerTerm + '\uf8ff'), limit(15))),
     ];
 
     const fetchPromise = Promise.allSettled(targetedQueries);
