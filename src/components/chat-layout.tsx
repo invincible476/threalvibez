@@ -10,7 +10,7 @@ export function ChatLayout() {
   const { isMobileView } = useMobileDesign();
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={true}>
       {isMobileView ? <MobileChatLayout /> : <DesktopChatLayout />}
     </SidebarProvider>
   );

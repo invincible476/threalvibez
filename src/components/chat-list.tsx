@@ -116,12 +116,12 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
                                 </span>
                             )}
                         </div>
-                        <div className="overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden flex-1">
-                            <p className="font-semibold truncate">{activeUser.name}</p>
-                            <p className="text-sm text-muted-foreground truncate">{activeUser.email}</p>
+                        <div className="overflow-hidden flex-1">
+                            <p className="font-semibold truncate text-sm">{activeUser.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{activeUser.email}</p>
                         </div>
                     </div>
-                     <div className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden relative flex items-center gap-2">
+                     <div className="relative flex items-center gap-2 shrink-0">
                         {hasFriendRequests && (
                             <span className="flex h-5 px-2 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-black animate-pulse">
                                 {requestCount} request{requestCount > 1 ? 's' : ''}
