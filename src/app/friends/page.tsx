@@ -10,12 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, X, UserX, UserPlus, Search, MessageSquare, Ban } from 'lucide-react';
+import { Check, X, UserX, UserPlus, Search, MessageSquare, Ban, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useAppShell } from '@/components/app-shell';
-import { normalizeUser, matchesUserSearch, fetchMissingUsers } from '@/lib/user-service';
+import { normalizeUser, matchesUserSearch, searchUsers, fetchMissingUsers } from '@/lib/user-service';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -58,10 +58,12 @@ export default function FriendsPage() {
     const [allUsersList, setAllUsersList] = useState<User[]>([]);
     const [extraUsersMap, setExtraUsersMap] = useState<Map<string, User>>(new Map());
 
-    // Search query state (0ms instant continuous filter)
+    // Search query & remote fetch states
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [remoteResults, setRemoteResults] = useState<User[]>([]);
 
-    // Sync currentUser with AppShell or direct Firestore listener
+    // Sync currentUser with AppShell
     useEffect(() => {
         if (shellCurrentUser) {
             setCurrentUser(normalizeUser(shellCurrentUser));
@@ -84,18 +86,18 @@ export default function FriendsPage() {
         return () => unsub();
     }, [authUser, authLoading, router]);
 
-    // Single background real-time listener for all users for 0ms continuous search
+    // Background real-time listener for user snapshot
     useEffect(() => {
         const unsub = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
             const userList = snapshot.docs.map(docSnap => normalizeUser(docSnap.data(), docSnap.id));
             setAllUsersList(userList);
         }, (err) => {
-            console.warn("Realtime users fetch warning:", err);
+            console.warn("Realtime users fetch notice:", err);
         });
         return () => unsub();
     }, []);
 
-    // Derive full user pool from all active sources
+    // Derive full user pool
     const userPool = useMemo(() => {
         const map = new Map<string, User>();
 
@@ -113,7 +115,7 @@ export default function FriendsPage() {
         return Array.from(map.values());
     }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
 
-    // Keep userPoolRef updated to avoid circular dependencies
+    // Ref to access current userPool in async search without triggering re-render loops
     const userPoolRef = useRef<User[]>(userPool);
     useEffect(() => {
         userPoolRef.current = userPool;
@@ -163,13 +165,53 @@ export default function FriendsPage() {
         });
     }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent]);
 
-    // 0ms Instant Live Search Filter (No debounces, no spinners, no flickering!)
+    // Debounced remote search effect (depends ONLY on searchQuery and authUser.uid)
+    useEffect(() => {
+        const clean = searchQuery.trim().replace(/^@/, '');
+        if (!clean) {
+            setRemoteResults([]);
+            setIsSearching(false);
+            return;
+        }
+
+        setIsSearching(true);
+        const timer = setTimeout(async () => {
+            try {
+                const results = await searchUsers(clean, userPoolRef.current, authUser?.uid);
+                setRemoteResults(results);
+            } catch (err) {
+                console.warn("Remote search notice:", err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 150);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, authUser?.uid]);
+
+    // Combine local pool matches AND remote query results safely
     const searchResults = useMemo(() => {
-        const clean = searchQuery.trim();
+        const clean = searchQuery.trim().replace(/^@/, '');
         if (!clean) return [];
 
-        return userPool.filter(u => matchesUserSearch(u, clean, authUser?.uid));
-    }, [searchQuery, userPool, authUser?.uid]);
+        const map = new Map<string, User>();
+
+        // 1. Instant local matches from pool
+        userPool.forEach(u => {
+            if (matchesUserSearch(u, clean, authUser?.uid)) {
+                map.set(u.uid, u);
+            }
+        });
+
+        // 2. Direct remote query matches (essential for Vercel when local pool is limited)
+        remoteResults.forEach(u => {
+            if (matchesUserSearch(u, clean, authUser?.uid)) {
+                map.set(u.uid, u);
+            }
+        });
+
+        return Array.from(map.values());
+    }, [searchQuery, userPool, remoteResults, authUser?.uid]);
 
     // Optimistic friend action handler
     const handleFriendAction = async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
@@ -284,8 +326,11 @@ export default function FriendsPage() {
                                 spellCheck={false}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 h-11 text-base bg-background/50"
+                                className="pl-10 pr-10 h-11 text-base bg-background/50"
                             />
+                            {isSearching && (
+                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-primary" />
+                            )}
                         </div>
 
                         {/* Instant Live Search Results */}
@@ -349,7 +394,7 @@ export default function FriendsPage() {
                                     })
                                 ) : (
                                     <p className="text-center text-muted-foreground py-6">
-                                        No users found matching "{searchQuery}".
+                                        {isSearching ? 'Searching registered users...' : `No users found matching "${searchQuery}".`}
                                     </p>
                                 )}
                             </div>
