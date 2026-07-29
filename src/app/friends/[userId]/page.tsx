@@ -93,9 +93,19 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
   const isBlocked = currentUserProfile?.blockedUsers?.includes(profileUser.uid);
   const isCurrentUser = authUser?.uid === profileUser.uid;
 
-  const handleStartChat = () => {
+  const [startingChat, setStartingChat] = useState(false);
+
+  const handleStartChat = async () => {
     if (profileUser) {
-      handleCreateChat(profileUser);
+      try {
+        setStartingChat(true);
+        await handleCreateChat(profileUser);
+        router.push('/');
+      } catch (err) {
+        console.error("Error starting chat:", err);
+      } finally {
+        setStartingChat(false);
+      }
     }
   };
 
@@ -119,9 +129,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
           <div className="flex gap-2 flex-wrap">
             {!isCurrentUser && (
               <>
-                <Button onClick={handleStartChat}>
+                <Button onClick={handleStartChat} disabled={startingChat}>
                   <MessageSquare className="mr-2 h-4 w-4" />
-                  Message
+                  {startingChat ? 'Opening Chat...' : 'Message'}
                 </Button>
                 
                 {!isFriend && !hasSentRequest && !hasReceivedRequest && !isBlocked && (

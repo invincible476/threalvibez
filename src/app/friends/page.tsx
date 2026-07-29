@@ -62,6 +62,19 @@ export default function FriendsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [remoteResults, setRemoteResults] = useState<User[]>([]);
+    const [startingChatUserId, setStartingChatUserId] = useState<string | null>(null);
+
+    const handleMessageUser = async (targetUser: User) => {
+        try {
+            setStartingChatUserId(targetUser.uid);
+            await handleCreateChat(targetUser);
+            router.push('/');
+        } catch (err) {
+            console.error("Error starting chat:", err);
+        } finally {
+            setStartingChatUserId(null);
+        }
+    };
 
     // Sync currentUser with AppShell
     useEffect(() => {
@@ -380,8 +393,12 @@ export default function FriendsPage() {
 
                                                 <div className="flex items-center gap-2">
                                                     {isFriend && (
-                                                        <Button size="sm" variant="secondary" onClick={() => handleCreateChat(user)}>
-                                                            <MessageSquare className="mr-1.5 h-4 w-4" />
+                                                        <Button size="sm" variant="secondary" disabled={startingChatUserId === user.uid} onClick={() => handleMessageUser(user)}>
+                                                            {startingChatUserId === user.uid ? (
+                                                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <MessageSquare className="mr-1.5 h-4 w-4" />
+                                                            )}
                                                             Message
                                                         </Button>
                                                     )}
@@ -453,8 +470,12 @@ export default function FriendsPage() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Button size="sm" variant="outline" onClick={() => handleCreateChat(friend)}>
-                                                    <MessageSquare className="mr-1.5 h-4 w-4" />
+                                                <Button size="sm" variant="outline" disabled={startingChatUserId === friend.uid} onClick={() => handleMessageUser(friend)}>
+                                                    {startingChatUserId === friend.uid ? (
+                                                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <MessageSquare className="mr-1.5 h-4 w-4" />
+                                                    )}
                                                     Message
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleFriendAction(friend.uid, 'removeFriend')}>

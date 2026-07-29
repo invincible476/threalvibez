@@ -171,7 +171,11 @@ export async function uploadToCloudinaryXHR(
   }
 }
 
+import { usePathname, useRouter } from 'next/navigation';
+
 function useChatData() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { user: authUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { setAppBackground, setUseCustomBackground } = useAppearance();
@@ -420,6 +424,10 @@ useEffect(() => {
 
   // Message fetching logic
   const handleChatSelect = useCallback(async (chatId: string) => {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      router.push('/');
+    }
+
     if (messagesUnsubscribe.current) {
         messagesUnsubscribe.current();
     }
@@ -1165,6 +1173,9 @@ useEffect(() => {
     if (!querySnapshot.empty) {
       const existingConvoDoc = querySnapshot.docs[0];
       handleChatSelect(existingConvoDoc.id);
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        router.push('/');
+      }
       return existingConvoDoc.id;
     } else {
       try {
@@ -1176,13 +1187,16 @@ useEffect(() => {
           lastRead: {}
         });
         setNewlyCreatedChatId(newConvoRef.id);
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          router.push('/');
+        }
         return newConvoRef.id;
       } catch (error) {
         console.error("Error creating new chat:", error);
         return Promise.reject(error);
       }
     }
-  }, [currentUser, handleChatSelect, conversations]);
+  }, [currentUser, handleChatSelect, router]);
   
   const handleCreateGroupChat = useCallback(async (groupName: string, selectedUsers: User[]) => {
     if (!currentUser) return;
@@ -1803,8 +1817,6 @@ function AppBackground() {
       return null;
   }
 }
-
-import { usePathname } from 'next/navigation';
 
 export function AppShell({ children }: { children: React.ReactNode }): JSX.Element {
   const pathname = usePathname();
