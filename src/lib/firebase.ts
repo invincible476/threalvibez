@@ -2,27 +2,17 @@ import { getStorage } from 'firebase/storage';
 import { setDoc } from 'firebase/firestore';
 import { firebaseApp, firebaseAuth } from './firebase-init';
 
+import { setPersistence, browserLocalPersistence } from 'firebase/auth';
+
 // Export initialized auth
 export const auth = firebaseAuth;
 export const app = firebaseApp;
 
-// Log initialization status
-console.log('Firebase initialization status:', {
-  appInitialized: !!app,
-  authInitialized: !!auth
-});
-
-// Configure auth for Replit domains
+// Ensure local persistence is active on client side for seamless page refreshes
 if (typeof window !== 'undefined') {
-  const currentDomain = window.location.hostname;
-  console.log('Current domain:', currentDomain);
-  console.log('Current origin:', window.location.origin);
-
-  // Add current domain to authorized domains for development
-  if (currentDomain.includes('.replit.dev') || currentDomain.includes('.repl.co')) {
-    // Replit domains are automatically handled by Firebase
-    console.log('Running on Replit domain, auth should work automatically');
-  }
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('[Firebase Auth] Persistence configuration notice:', err);
+  });
 }
 
 // Initialize Firestore with offline persistence

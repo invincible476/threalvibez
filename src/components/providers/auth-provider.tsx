@@ -128,20 +128,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Early return if we can't determine auth state yet
-      if (auth.currentUser === null && !user && !authLoading) {
-        console.log('Auth state undetermined, redirecting to login');
-        if (!isAuthRoute) {
-          lastRedirectTime.current = now;
-          navigationInProgress.current = true;
-          router.replace('/login');
-          setTimeout(() => { navigationInProgress.current = false; }, 100);
-        }
-        return;
-      }
-
       // Handle authentication routes
       if (user && isAuthRoute && pathname !== '/verify-email') {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sessionUser', user.uid);
+          localStorage.setItem('lastLogin', Date.now().toString());
+        }
         lastRedirectTime.current = now;
         navigationInProgress.current = true;
         router.replace('/');
@@ -149,7 +141,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (user && !isAuthRoute) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sessionUser', user.uid);
+          localStorage.setItem('lastLogin', Date.now().toString());
+        }
+      }
+
       if (!user && !isAuthRoute) {
+        // Allow Firebase Auth a grace period to restore session from IndexedDB/localStorage
+        const hasSavedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('sessionUser'));
+        if (hasSavedSession) {
+          return;
+        }
+
         lastRedirectTime.current = now;
         navigationInProgress.current = true;
         router.replace('/login');
