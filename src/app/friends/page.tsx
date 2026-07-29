@@ -126,20 +126,38 @@ export default function FriendsPage() {
     // Derive friends, pending requests, and sent requests
     const friends = useMemo(() => {
         if (!activeUser?.friends || activeUser.friends.length === 0) return [];
-        const set = new Set(activeUser.friends);
-        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
+        const poolMap = new Map<string, User>();
+        userPool.forEach(u => {
+            if (u.uid) poolMap.set(u.uid, u);
+            if (u.id) poolMap.set(u.id, u);
+        });
+        return activeUser.friends.map(id => {
+            return poolMap.get(id) || normalizeUser({ id, uid: id, name: 'Loading...', email: '' });
+        });
     }, [activeUser?.friends, userPool]);
 
     const requests = useMemo(() => {
         if (!activeUser?.friendRequestsReceived || activeUser.friendRequestsReceived.length === 0) return [];
-        const set = new Set(activeUser.friendRequestsReceived);
-        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
+        const poolMap = new Map<string, User>();
+        userPool.forEach(u => {
+            if (u.uid) poolMap.set(u.uid, u);
+            if (u.id) poolMap.set(u.id, u);
+        });
+        return activeUser.friendRequestsReceived.map(id => {
+            return poolMap.get(id) || normalizeUser({ id, uid: id, name: 'Friend Request', email: 'Loading user details...' });
+        });
     }, [activeUser?.friendRequestsReceived, userPool]);
 
     const sentRequests = useMemo(() => {
         if (!activeUser?.friendRequestsSent || activeUser.friendRequestsSent.length === 0) return [];
-        const set = new Set(activeUser.friendRequestsSent);
-        return userPool.filter(u => set.has(u.uid) || set.has(u.id));
+        const poolMap = new Map<string, User>();
+        userPool.forEach(u => {
+            if (u.uid) poolMap.set(u.uid, u);
+            if (u.id) poolMap.set(u.id, u);
+        });
+        return activeUser.friendRequestsSent.map(id => {
+            return poolMap.get(id) || normalizeUser({ id, uid: id, name: 'Sent Request', email: 'Loading user details...' });
+        });
     }, [activeUser?.friendRequestsSent, userPool]);
 
     // Fetch missing user documents for friends/requests

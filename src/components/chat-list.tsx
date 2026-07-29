@@ -45,31 +45,48 @@ const itemVariants = {
     exit: { opacity: 0, x: -20 },
 };
 
+import { useMobileDesign } from './providers/mobile-provider';
+
 function UserProfileMenu({ currentUser }: { currentUser?: User }) {
-    const { signOut } = useAuth();
+    const { signOut, user: authUser } = useAuth();
     const router = useRouter();
     const { theme, setTheme } = useTheme();
     const { toast } = useToast();
 
-    if (!currentUser) return null;
+    // Fallback to authUser if currentUser from Firestore doc isn't loaded yet
+    const activeUser: User | null = currentUser || (authUser ? {
+        id: authUser.uid,
+        uid: authUser.uid,
+        name: authUser.displayName || (authUser.email ? authUser.email.split('@')[0] : 'User'),
+        email: authUser.email || '',
+        photoURL: authUser.photoURL || '',
+        status: 'online' as const,
+        about: '',
+        friends: [],
+        friendRequestsSent: [],
+        friendRequestsReceived: [],
+        blockedUsers: [],
+    } : null);
 
-    const requestCount = currentUser.friendRequestsReceived?.length || 0;
+    if (!activeUser) return null;
+
+    const requestCount = activeUser.friendRequestsReceived?.length || 0;
     const hasFriendRequests = requestCount > 0;
 
     const handleLogout = async () => {
         const deviceId = localStorage.getItem('deviceId');
-        if (deviceId && currentUser) {
+        if (deviceId && activeUser) {
             try {
                 // Delete the per-device document from the devices subcollection
-                const deviceDocRef = doc(db, 'users', currentUser.uid, 'devices', deviceId);
+                const deviceDocRef = doc(db, 'users', activeUser.uid, 'devices', deviceId);
                 await deleteDoc(deviceDocRef);
 
                 // Recalculate remaining device docs to determine online/offline
-                const devicesCol = collection(db, 'users', currentUser.uid, 'devices');
+                const devicesCol = collection(db, 'users', activeUser.uid, 'devices');
                 const snapshots = await getDocs(devicesCol);
                 const remaining = snapshots.docs.length;
 
-                const userDocRef = doc(db, 'users', currentUser.uid);
+                const userDocRef = doc(db, 'users', activeUser.uid);
                 await updateDoc(userDocRef, {
                     status: remaining > 0 ? 'online' : 'offline',
                 });
@@ -92,7 +109,7 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
                 <div className="group/user-menu relative flex w-full cursor-pointer items-center justify-between p-2 transition-colors hover:bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="relative shrink-0">
-                            <UserAvatar user={currentUser} className="h-10 w-10" />
+                            <UserAvatar user={activeUser} className="h-10 w-10" />
                             {hasFriendRequests && (
                                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-extrabold text-black ring-2 ring-background animate-pulse">
                                     {requestCount > 9 ? '9+' : requestCount}
@@ -100,8 +117,8 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
                             )}
                         </div>
                         <div className="overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden flex-1">
-                            <p className="font-semibold truncate">{currentUser.name}</p>
-                            <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
+                            <p className="font-semibold truncate">{activeUser.name}</p>
+                            <p className="text-sm text-muted-foreground truncate">{activeUser.email}</p>
                         </div>
                     </div>
                      <div className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden relative flex items-center gap-2">
@@ -116,8 +133,8 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
             </PopoverTrigger>
             <PopoverContent className="w-64 p-2 rounded-xl shadow-lg border backdrop-blur-xl bg-background/80 mb-2" side="top" align="start">
                 <div className="p-2">
-                    <p className="font-semibold truncate">{currentUser.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{currentUser.email}</p>
+                    <p className="font-semibold truncate">{activeUser.name}</p>
+                    <p className="text-sm text-muted-foreground truncate">{activeUser.email}</p>
                 </div>
                 <Separator />
                 <div className="p-1 space-y-1">
@@ -178,6 +195,7 @@ export function ChatList() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { keyboardOpen } = useMobileKeyboardHeight();
   const { isWeatherVisible } = useAppearance();
+  const { isMobileView } = useMobileDesign();
 
   const filteredConversations = useMemo(() => {
     const blockedUserIds = currentUser?.blockedUsers || [];
@@ -404,7 +422,7 @@ export function ChatList() {
         </div>
       </ScrollArea>
 
-    <div className={cn("flex-none p-2 border-t border-border/50 transition-all duration-200", (keyboardOpen || isSearchFocused) && "hidden")}>
+    <div className={cn("flex-none p-2 border-t border-border/50 transition-all duration-200", (isMobileView && (keyboardOpen || isSearchFocused)) && "hidden")}>
       <UserProfileMenu currentUser={currentUser} />
     </div>
     </div>

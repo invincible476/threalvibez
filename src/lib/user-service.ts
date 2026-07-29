@@ -262,7 +262,7 @@ export async function fetchMissingUsers(
 ): Promise<User[]> {
   const existingIds = new Set(
     knownUsersPool
-      .filter(Boolean)
+      .filter(u => u && u.name && u.name !== 'Loading...' && u.name !== 'Loading request...')
       .map(u => u.uid || u.id)
       .filter(Boolean)
   );

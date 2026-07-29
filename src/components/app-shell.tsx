@@ -251,7 +251,12 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-    if (!authUser || authLoading) return;
+    if (authLoading) return;
+
+    if (!authUser) {
+      setCurrentUser(undefined);
+      return;
+    }
 
     // Immediately supply a fallback user state from authUser so profile UI renders instantly
     const fallbackUser: User = {
@@ -268,7 +273,7 @@ useEffect(() => {
       blockedUsers: [],
     };
 
-    setCurrentUser(prev => prev || fallbackUser);
+    setCurrentUser(prev => (prev && prev.uid === authUser.uid ? prev : fallbackUser));
     updateUserInCache(fallbackUser);
     
     const userDocRef = doc(db, 'users', authUser.uid);
@@ -286,6 +291,7 @@ useEffect(() => {
             }
         } else {
             console.warn('[AppShell] User document missing in Firestore. Self-healing user document...');
+            setCurrentUser(prev => (prev && prev.uid === authUser.uid ? prev : fallbackUser));
             try {
               await authService.ensureUserDocument(authUser);
             } catch (err) {
