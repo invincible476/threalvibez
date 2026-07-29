@@ -132,9 +132,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
                 )}
 
                 {hasSentRequest && (
-                  <Button variant="outline" disabled>
-                    <UserCheck className="mr-2 h-4 w-4" />
-                    Request Sent
+                  <Button variant="outline" onClick={() => handleFriendAction(profileUser.uid, 'cancelRequest')}>
+                    <UserX className="mr-2 h-4 w-4" />
+                    Cancel Request
                   </Button>
                 )}
 

@@ -31,6 +31,7 @@ import { GridBackground } from './grid-background';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileGalaxyBackground } from './mobile-galaxy-background';
 import { useTheme } from 'next-themes';
+import { normalizeUser } from '@/lib/user-service';
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -296,11 +297,7 @@ useEffect(() => {
     // Limit users query to prevent fetching entire database into memory
     const usersQuery = query(collection(db, 'users'), limit(500));
     const unsubscribeAllUsers = onSnapshot(usersQuery, (snapshot) => {
-      const usersData = snapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        const targetId = data.uid || data.id || docSnap.id;
-        return { ...data, id: targetId, uid: targetId } as User;
-      });
+      const usersData = snapshot.docs.map(docSnap => normalizeUser(docSnap.data(), docSnap.id));
       setUsersCache(prevCache => {
         const newCache = new Map(prevCache);
         usersData.forEach(user => {
@@ -1362,14 +1359,15 @@ useEffect(() => {
           }
           
           const finalReactions = reactions.filter(r => r.count > 0);
-          transaction.update(messageRef, { reactions: finalReactions });
         });
       } catch (error) {
         console.error("Error reacting to message", error);
         setMessages(messages);
       }
     }
-  }, [selectedChat, currentUser, messages]);  const handleFriendAction = useCallback(async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend') => {
+  }, [selectedChat, currentUser, messages]);
+
+  const handleFriendAction = useCallback(async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
     if (!currentUser || !targetUserId) return;
     const currentUserRef = doc(db, 'users', currentUser.uid);
     const targetUserRef = doc(db, 'users', targetUserId);
@@ -1397,6 +1395,10 @@ useEffect(() => {
           await setDoc(currentUserRef, { friends: arrayRemove(targetUserId) }, { merge: true });
           await setDoc(targetUserRef, { friends: arrayRemove(currentUser.uid) }, { merge: true });
           toast({ title: 'Friend Removed' });
+      } else if (action === 'cancelRequest') {
+          await setDoc(currentUserRef, { friendRequestsSent: arrayRemove(targetUserId) }, { merge: true });
+          await setDoc(targetUserRef, { friendRequestsReceived: arrayRemove(currentUser.uid) }, { merge: true });
+          toast({ title: 'Request Canceled', description: 'Your friend request has been canceled.' });
       }
     } catch (error: any) {
         console.error("Error with friend action:", error);
@@ -1714,7 +1716,7 @@ useEffect(() => {
     handleStoryReply,
     handleMuteToggle,
     handleClearChat,
-  }
+  };
 }
 
 interface AppShellContextType {
@@ -1752,7 +1754,7 @@ interface AppShellContextType {
   handleBack: () => void;
   handleConversationAction: (conversationId: string, action: 'toggleFavorite' | 'archive' | 'unarchive') => Promise<void>;
   handleTyping: (isTyping: boolean) => Promise<void>;
-  handleFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend') => Promise<void>;
+  handleFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => Promise<void>;
   handleBlockUser: (targetUserId: string, isBlocked: boolean) => Promise<void>;
   handleCreateStoryFromFile: (file: File, caption: string) => Promise<void>;
   handleStoryReply: (story: Story, message: string) => Promise<void>;

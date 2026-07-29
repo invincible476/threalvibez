@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, limit } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, query, limit, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, X, UserX, UserPlus, Search, UserCheck, MessageSquare, Ban } from 'lucide-react';
+import { Check, X, UserX, UserPlus, Search, MessageSquare, Ban, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useAppShell } from '@/components/app-shell';
+import { normalizeUser, matchesUserSearch, searchUsers, fetchMissingUsers } from '@/lib/user-service';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -53,13 +54,16 @@ export default function FriendsPage() {
     const { toast } = useToast();
     const { currentUser: shellCurrentUser, allUsers: shellUsers, usersCache, handleCreateChat } = useAppShell();
     
-    const [currentUser, setCurrentUser] = useState<User | null>(shellCurrentUser || null);
+    const [currentUser, setCurrentUser] = useState<User | null>(shellCurrentUser ? normalizeUser(shellCurrentUser) : null);
     const [allUsersList, setAllUsersList] = useState<User[]>([]);
     const [extraUsersMap, setExtraUsersMap] = useState<Map<string, User>>(new Map());
 
-    // Continuous search query
+    // Search state
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [remoteResults, setRemoteResults] = useState<User[]>([]);
 
+    // Optimistic friend action handler
     const handleFriendAction = async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
         const activeUser = authUser && (currentUser || shellCurrentUser);
         if (!authUser || !activeUser) {
@@ -71,6 +75,36 @@ export default function FriendsPage() {
             toast({ title: 'Error', description: 'Invalid target user.', variant: 'destructive' });
             return;
         }
+
+        // Optimistic UI update
+        setCurrentUser(prev => {
+            if (!prev) return prev;
+            const updated = { ...prev };
+            const friends = new Set(updated.friends || []);
+            const sent = new Set(updated.friendRequestsSent || []);
+            const received = new Set(updated.friendRequestsReceived || []);
+
+            if (action === 'sendRequest') {
+                sent.add(targetUserId);
+            } else if (action === 'acceptRequest') {
+                friends.add(targetUserId);
+                received.delete(targetUserId);
+                sent.delete(targetUserId);
+            } else if (action === 'declineRequest') {
+                received.delete(targetUserId);
+            } else if (action === 'removeFriend') {
+                friends.delete(targetUserId);
+            } else if (action === 'cancelRequest') {
+                sent.delete(targetUserId);
+            }
+
+            return {
+                ...updated,
+                friends: Array.from(friends),
+                friendRequestsSent: Array.from(sent),
+                friendRequestsReceived: Array.from(received),
+            };
+        });
 
         const currentUserRef = doc(db, 'users', authUser.uid);
         const targetUserRef = doc(db, 'users', targetUserId);
@@ -112,11 +146,11 @@ export default function FriendsPage() {
     // Keep currentUser synced with AppShell or direct Firestore listener
     useEffect(() => {
         if (shellCurrentUser) {
-            setCurrentUser(shellCurrentUser);
+            setCurrentUser(normalizeUser(shellCurrentUser));
         }
     }, [shellCurrentUser]);
 
-    // Real-time listener for user profile
+    // Real-time listener for current user profile
     useEffect(() => {
         if (!authLoading && !authUser) {
             router.push('/login');
@@ -126,36 +160,16 @@ export default function FriendsPage() {
 
         const unsub = onSnapshot(doc(db, 'users', authUser.uid), (docSnap) => {
             if (docSnap.exists()) {
-                const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User;
-                setCurrentUser(userData);
+                setCurrentUser(normalizeUser(docSnap.data(), docSnap.id));
             }
         });
         return () => unsub();
     }, [authUser, authLoading, router]);
 
-    // Real-time listener for all users for continuous search
+    // Real-time listener for all users (up to 500)
     useEffect(() => {
-        const fetchInitial = async () => {
-            try {
-                const snap = await getDocs(query(collection(db, 'users'), limit(500)));
-                const userList = snap.docs.map(docSnap => {
-                    const uData = docSnap.data();
-                    const targetId = uData.uid || uData.id || docSnap.id;
-                    return { ...uData, id: targetId, uid: targetId } as User;
-                });
-                setAllUsersList(userList);
-            } catch (err) {
-                console.warn("Initial users fetch warning:", err);
-            }
-        };
-        fetchInitial();
-
         const unsub = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
-            const userList = snapshot.docs.map(docSnap => {
-                const uData = docSnap.data();
-                const targetId = uData.uid || uData.id || docSnap.id;
-                return { ...uData, id: targetId, uid: targetId } as User;
-            });
+            const userList = snapshot.docs.map(docSnap => normalizeUser(docSnap.data(), docSnap.id));
             setAllUsersList(userList);
         }, (err) => {
             console.warn("Realtime users fetch warning:", err);
@@ -163,42 +177,27 @@ export default function FriendsPage() {
         return () => unsub();
     }, []);
 
-    // Derive full user list pool from all available sources with normalized keys
+    // Derive full user pool from all sources
     const userPool = useMemo(() => {
         const map = new Map<string, User>();
 
-        const addUserToMap = (u: any) => {
+        const add = (u: any) => {
             if (!u) return;
-            const targetId = u.uid || u.id;
-            if (targetId) {
-                map.set(targetId, {
-                    ...u,
-                    id: targetId,
-                    uid: targetId,
-                    name: u.name || u.displayName || u.fullName || (u.email ? u.email.split('@')[0] : 'User'),
-                    username: u.username || u.handle || '',
-                    email: u.email || ''
-                });
-            }
+            const norm = normalizeUser(u);
+            if (norm.uid) map.set(norm.uid, norm);
         };
 
-        // Add shellUsers
-        (shellUsers || []).forEach(addUserToMap);
-        // Add usersCache entries
-        if (usersCache) {
-            usersCache.forEach((u, id) => addUserToMap({ ...u, id: u.id || u.uid || id }));
-        }
-        // Add allUsersList
-        (allUsersList || []).forEach(addUserToMap);
-        // Add extraUsersMap
-        extraUsersMap.forEach((u, id) => addUserToMap({ ...u, id: u.id || u.uid || id }));
+        (shellUsers || []).forEach(add);
+        if (usersCache) usersCache.forEach(add);
+        (allUsersList || []).forEach(add);
+        extraUsersMap.forEach(add);
 
         return Array.from(map.values());
     }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
 
-    const activeUser = currentUser || shellCurrentUser;
+    const activeUser = currentUser || (shellCurrentUser ? normalizeUser(shellCurrentUser) : null);
 
-    // Derive friends, pending requests, and sent requests synchronously
+    // Derive friends, pending requests, and sent requests
     const friends = useMemo(() => {
         if (!activeUser?.friends || activeUser.friends.length === 0) return [];
         const set = new Set(activeUser.friends);
@@ -217,7 +216,7 @@ export default function FriendsPage() {
         return userPool.filter(u => set.has(u.uid) || set.has(u.id));
     }, [activeUser?.friendRequestsSent, userPool]);
 
-    // Fetch individual missing user documents directly by doc ID if not in memory
+    // Automatically fetch missing user documents for friends/requests
     useEffect(() => {
         if (!activeUser) return;
 
@@ -225,99 +224,74 @@ export default function FriendsPage() {
             ...(activeUser.friends || []),
             ...(activeUser.friendRequestsReceived || []),
             ...(activeUser.friendRequestsSent || [])
-        ];
+        ].filter(Boolean);
 
-        const missing = neededIds.filter(id => id && !userPool.some(u => u.uid === id || u.id === id));
-        if (missing.length === 0) return;
+        if (neededIds.length === 0) return;
 
-        missing.forEach(async (id) => {
-            try {
-                const docSnap = await getDoc(doc(db, 'users', id));
-                if (docSnap.exists()) {
-                    const uData = docSnap.data();
-                    const targetId = uData.uid || uData.id || docSnap.id;
-                    const u = { ...uData, id: targetId, uid: targetId } as User;
-                    setExtraUsersMap(prev => new Map(prev).set(targetId, u));
-                }
-            } catch (err) {
-                console.error(`Failed to fetch user doc for ${id}:`, err);
+        fetchMissingUsers(neededIds, userPool).then(missingUsers => {
+            if (missingUsers.length > 0) {
+                setExtraUsersMap(prev => {
+                    const next = new Map(prev);
+                    missingUsers.forEach(u => next.set(u.uid, u));
+                    return next;
+                });
             }
         });
-    }, [activeUser, userPool]);
+    }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent, userPool]);
 
-    // Debounced direct Firestore search fallback for users not yet in memory
+    // Debounced remote search
     useEffect(() => {
-        const rawTerm = searchQuery.trim();
-        const cleanTerm = rawTerm.replace(/^@/, '');
-        if (!cleanTerm || cleanTerm.length < 2) return;
+        const clean = searchQuery.trim().replace(/^@/, '');
+        if (!clean) {
+            setRemoteResults([]);
+            setIsSearching(false);
+            return;
+        }
 
+        setIsSearching(true);
         const timer = setTimeout(async () => {
             try {
-                const lower = cleanTerm.toLowerCase();
-                const wordTokens = cleanTerm.split(/\s+/).filter(Boolean);
-                const capitalizedTokens = wordTokens.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-
-                const usersRef = collection(db, 'users');
-
-                const queries = [
-                    getDocs(query(usersRef, where('email', '==', cleanTerm))),
-                    getDocs(query(usersRef, where('email', '==', lower))),
-                    getDocs(query(usersRef, where('username', '==', lower))),
-                    getDocs(query(usersRef, limit(500)))
-                ];
-
-                wordTokens.forEach(t => {
-                    const l = t.toLowerCase();
-                    const c = t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-                    queries.push(getDocs(query(usersRef, where('name', '>=', c), where('name', '<=', c + '\uf8ff'))));
-                    queries.push(getDocs(query(usersRef, where('name', '>=', l), where('name', '<=', l + '\uf8ff'))));
+                const results = await searchUsers(clean, userPool, authUser?.uid);
+                setRemoteResults(results);
+                // Also cache found users in extraUsersMap
+                setExtraUsersMap(prev => {
+                    const next = new Map(prev);
+                    results.forEach(u => next.set(u.uid, u));
+                    return next;
                 });
-
-                const snapshots = await Promise.all(queries);
-                const fetchedDocs = snapshots.flatMap(s => s.docs);
-
-                if (fetchedDocs.length > 0) {
-                    setExtraUsersMap(prev => {
-                        const next = new Map(prev);
-                        fetchedDocs.forEach(d => {
-                            const uData = d.data();
-                            const targetId = uData.uid || uData.id || d.id;
-                            const u = { ...uData, id: targetId, uid: targetId } as User;
-                            next.set(targetId, u);
-                        });
-                        return next;
-                    });
-                }
             } catch (err) {
-                console.warn('Firestore live search query error:', err);
+                console.error("Search error:", err);
+            } finally {
+                setIsSearching(false);
             }
         }, 200);
 
         return () => clearTimeout(timer);
-    }, [searchQuery]);
-
-    // Continuous real-time instant search calculation
-    const searchResults = useMemo(() => {
-        const rawTerm = searchQuery.trim().toLowerCase();
-        const cleanTerm = rawTerm.replace(/^@/, '');
-        if (!cleanTerm) return [];
-
-        const tokens = cleanTerm.split(/\s+/).filter(Boolean);
-
-        return userPool.filter(u => {
-            if (u.uid === authUser?.uid || u.id === authUser?.uid) return false;
-
-            const nameStr = (u.name || (u as any).displayName || (u as any).fullName || '').toLowerCase();
-            const emailStr = (u.email || '').toLowerCase();
-            const usernameStr = (u.username || (u as any).handle || '').toLowerCase();
-            const emailPrefix = emailStr.split('@')[0] || '';
-
-            const fullMatch = nameStr.includes(cleanTerm) || emailStr.includes(cleanTerm) || usernameStr.includes(cleanTerm) || emailPrefix.includes(cleanTerm);
-            if (fullMatch) return true;
-
-            return tokens.every(t => nameStr.includes(t) || emailStr.includes(t) || usernameStr.includes(t));
-        });
     }, [searchQuery, userPool, authUser?.uid]);
+
+    // Combine local pool matches and remote results
+    const searchResults = useMemo(() => {
+        const clean = searchQuery.trim().replace(/^@/, '');
+        if (!clean) return [];
+
+        const map = new Map<string, User>();
+
+        // 1. Local instant matches
+        userPool.forEach(u => {
+            if (matchesUserSearch(u, clean, authUser?.uid)) {
+                map.set(u.uid, u);
+            }
+        });
+
+        // 2. Remote search matches
+        remoteResults.forEach(u => {
+            if (matchesUserSearch(u, clean, authUser?.uid)) {
+                map.set(u.uid, u);
+            }
+        });
+
+        return Array.from(map.values());
+    }, [searchQuery, userPool, remoteResults, authUser?.uid]);
 
     if (authLoading || (!authUser && !activeUser)) {
         return <FriendsPageSkeleton />;
@@ -338,7 +312,7 @@ export default function FriendsPage() {
                             Find & Add Friends
                         </CardTitle>
                         <CardDescription>
-                            Type any letter or name to search registered users in real time.
+                            Type any letter, name, username, or email to search registered users in real time.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -353,8 +327,11 @@ export default function FriendsPage() {
                                 spellCheck={false}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 h-11 text-base bg-background/50"
+                                className="pl-10 pr-10 h-11 text-base bg-background/50"
                             />
+                            {isSearching && (
+                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-primary" />
+                            )}
                         </div>
 
                         {/* Instant Live Search Results */}
@@ -362,9 +339,9 @@ export default function FriendsPage() {
                             <div className="mt-4 space-y-2 border-t pt-4">
                                 {searchResults.length > 0 ? (
                                     searchResults.map(user => {
-                                        const isFriend = currentUser?.friends?.includes(user.uid);
-                                        const hasSent = currentUser?.friendRequestsSent?.includes(user.uid);
-                                        const hasReceived = currentUser?.friendRequestsReceived?.includes(user.uid);
+                                        const isFriend = activeUser?.friends?.includes(user.uid);
+                                        const hasSent = activeUser?.friendRequestsSent?.includes(user.uid);
+                                        const hasReceived = activeUser?.friendRequestsReceived?.includes(user.uid);
 
                                         return (
                                             <div 
@@ -418,7 +395,7 @@ export default function FriendsPage() {
                                     })
                                 ) : (
                                     <p className="text-center text-muted-foreground py-6">
-                                        No users found matching "{searchQuery}".
+                                        {isSearching ? 'Searching users...' : `No users found matching "${searchQuery}".`}
                                     </p>
                                 )}
                             </div>

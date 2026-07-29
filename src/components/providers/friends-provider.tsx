@@ -11,7 +11,7 @@ import type { User } from '@/lib/types';
 interface FriendsContextType {
     friends: User[];
     friendRequests: User[];
-    handleFriendAction: (targetUserId: string, action: 'acceptRequest' | 'declineRequest' | 'removeFriend') => Promise<void>;
+    handleFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => Promise<void>;
 }
 
 const FriendsContext = createContext<FriendsContextType | undefined>(undefined);
@@ -25,7 +25,7 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
   // Note: This provider does not fetch user data directly. It relies on the user object passed to it.
   // The FriendsPage will be responsible for fetching the full user objects.
   
-  const handleFriendAction = useCallback(async (targetUserId: string, action: 'acceptRequest' | 'declineRequest' | 'removeFriend') => {
+  const handleFriendAction = useCallback(async (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
     if (!authUser || !targetUserId) {
         toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
         return;
@@ -35,7 +35,11 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
     const targetUserRef = doc(db, 'users', targetUserId);
     
     try {
-        if (action === 'acceptRequest') {
+        if (action === 'sendRequest') {
+            await setDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) }, { merge: true });
+            await setDoc(targetUserRef, { friendRequestsReceived: arrayUnion(authUser.uid) }, { merge: true });
+            toast({ title: 'Friend Request Sent', description: 'Your friend request has been sent successfully.' });
+        } else if (action === 'acceptRequest') {
             await setDoc(currentUserRef, { 
                 friends: arrayUnion(targetUserId),
                 friendRequestsReceived: arrayRemove(targetUserId)
@@ -53,6 +57,10 @@ export function FriendsProvider({ children }: { children: ReactNode }) {
             await setDoc(currentUserRef, { friends: arrayRemove(targetUserId) }, { merge: true });
             await setDoc(targetUserRef, { friends: arrayRemove(authUser.uid) }, { merge: true });
             toast({ title: 'Friend Removed' });
+        } else if (action === 'cancelRequest') {
+            await setDoc(currentUserRef, { friendRequestsSent: arrayRemove(targetUserId) }, { merge: true });
+            await setDoc(targetUserRef, { friendRequestsReceived: arrayRemove(authUser.uid) }, { merge: true });
+            toast({ title: 'Request Canceled' });
         }
     } catch(e: any) {
         console.error("Error handling friend action:", e);

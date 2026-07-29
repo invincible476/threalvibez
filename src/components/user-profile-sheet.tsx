@@ -22,7 +22,7 @@ interface UserProfileSheetProps {
   chatId: string;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend') => void;
+  onFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => void;
   onBlockUser: (targetUserId: string, isBlocked: boolean) => void;
   onMuteToggle: (conversationId: string) => void;
 }
@@ -48,7 +48,7 @@ export function UserProfileSheet({
   const isBlocked = currentUser?.blockedUsers?.includes(user.uid);
   const isMuted = currentUser?.mutedConversations?.includes(chatId);
 
-  const handleFriendAction = (action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend') => {
+  const handleFriendAction = (action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => {
     onFriendAction(user.uid, action);
   }
   
@@ -72,8 +72,8 @@ export function UserProfileSheet({
     }
     if (hasSentRequest) {
         return (
-             <Button variant="outline" disabled className="w-full justify-start">
-                <UserPlus className="mr-3 h-5 w-5"/> Request Sent
+             <Button variant="outline" className="w-full justify-start" onClick={() => handleFriendAction('cancelRequest')}>
+                <Ban className="mr-3 h-5 w-5"/> Cancel Request
             </Button>
         )
     }
