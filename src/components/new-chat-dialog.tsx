@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,11 @@ export function NewChatDialog({ users, onCreateChat, onCreateGroupChat, children
       .filter(u => u.uid !== currentUser?.uid && !(currentUser?.blockedUsers || []).includes(u.uid));
   }, [users, currentUser]);
 
+  const availableUsersRef = useRef<User[]>(availableUsers);
+  useEffect(() => {
+    availableUsersRef.current = availableUsers;
+  }, [availableUsers]);
+
   // Debounced remote search
   useEffect(() => {
     const clean = searchTerm.trim().replace(/^@/, '');
@@ -57,17 +62,17 @@ export function NewChatDialog({ users, onCreateChat, onCreateGroupChat, children
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await searchUsers(clean, availableUsers, currentUser?.uid);
+        const results = await searchUsers(clean, availableUsersRef.current, currentUser?.uid);
         setRemoteResults(results);
       } catch (error) {
         console.error("Error searching users in dialog:", error);
       } finally {
         setIsSearching(false);
       }
-    }, 200);
+    }, 150);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, availableUsers, currentUser?.uid]);
+  }, [searchTerm, currentUser?.uid]);
 
   // Combine local matches and remote search results
   const displayedUsers = useMemo(() => {

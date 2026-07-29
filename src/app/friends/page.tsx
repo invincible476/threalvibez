@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { doc, setDoc, onSnapshot, collection, query, limit, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, query, limit, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -143,7 +143,7 @@ export default function FriendsPage() {
         }
     };
 
-    // Keep currentUser synced with AppShell or direct Firestore listener
+    // Sync currentUser with AppShell or direct Firestore listener
     useEffect(() => {
         if (shellCurrentUser) {
             setCurrentUser(normalizeUser(shellCurrentUser));
@@ -195,6 +195,12 @@ export default function FriendsPage() {
         return Array.from(map.values());
     }, [shellUsers, usersCache, allUsersList, extraUsersMap]);
 
+    // Keep userPoolRef updated to avoid circular dependencies in useEffect
+    const userPoolRef = useRef<User[]>(userPool);
+    useEffect(() => {
+        userPoolRef.current = userPool;
+    }, [userPool]);
+
     const activeUser = currentUser || (shellCurrentUser ? normalizeUser(shellCurrentUser) : null);
 
     // Derive friends, pending requests, and sent requests
@@ -228,7 +234,7 @@ export default function FriendsPage() {
 
         if (neededIds.length === 0) return;
 
-        fetchMissingUsers(neededIds, userPool).then(missingUsers => {
+        fetchMissingUsers(neededIds, userPoolRef.current).then(missingUsers => {
             if (missingUsers.length > 0) {
                 setExtraUsersMap(prev => {
                     const next = new Map(prev);
@@ -237,9 +243,9 @@ export default function FriendsPage() {
                 });
             }
         });
-    }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent, userPool]);
+    }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent]);
 
-    // Debounced remote search
+    // Fast debounced remote search (only triggered by searchQuery changes!)
     useEffect(() => {
         const clean = searchQuery.trim().replace(/^@/, '');
         if (!clean) {
@@ -251,32 +257,26 @@ export default function FriendsPage() {
         setIsSearching(true);
         const timer = setTimeout(async () => {
             try {
-                const results = await searchUsers(clean, userPool, authUser?.uid);
+                const results = await searchUsers(clean, userPoolRef.current, authUser?.uid);
                 setRemoteResults(results);
-                // Also cache found users in extraUsersMap
-                setExtraUsersMap(prev => {
-                    const next = new Map(prev);
-                    results.forEach(u => next.set(u.uid, u));
-                    return next;
-                });
             } catch (err) {
                 console.error("Search error:", err);
             } finally {
                 setIsSearching(false);
             }
-        }, 200);
+        }, 150);
 
         return () => clearTimeout(timer);
-    }, [searchQuery, userPool, authUser?.uid]);
+    }, [searchQuery, authUser?.uid]);
 
-    // Combine local pool matches and remote results
+    // Combine local pool matches and remote results synchronously (0ms latency!)
     const searchResults = useMemo(() => {
         const clean = searchQuery.trim().replace(/^@/, '');
         if (!clean) return [];
 
         const map = new Map<string, User>();
 
-        // 1. Local instant matches
+        // 1. Local instant matches from pool
         userPool.forEach(u => {
             if (matchesUserSearch(u, clean, authUser?.uid)) {
                 map.set(u.uid, u);

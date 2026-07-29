@@ -89,9 +89,12 @@ export function matchesUserSearch(user: User, searchTerm: string, currentUserId?
   );
 }
 
+// Lightweight cache for remote search results to prevent duplicate network calls
+const searchCache = new Map<string, User[]>();
+
 /**
- * High-performance, resilient multi-stage user search.
- * Searches in-memory pool instantly and queries Firestore across multiple fields with fallback.
+ * Fast, resilient user search.
+ * Instant local matching + lightweight targeted Firestore remote search.
  */
 export async function searchUsers(
   searchTerm: string,
@@ -110,7 +113,7 @@ export async function searchUsers(
 
   const map = new Map<string, User>();
 
-  // 1. Add matching users from known local pool
+  // 1. Add matching users from local pool immediately (0ms)
   knownUsersPool.forEach(u => {
     const normalized = normalizeUser(u);
     if (matchesUserSearch(normalized, cleanTerm, currentUserId)) {
@@ -118,44 +121,56 @@ export async function searchUsers(
     }
   });
 
-  // 2. Query Firestore with Promise.allSettled so no single query error breaks search
-  try {
-    const usersRef = collection(db, 'users');
-    const queries = [
-      // Exact email & username matches
-      getDocs(query(usersRef, where('email', '==', cleanTerm), limit(20))),
-      getDocs(query(usersRef, where('email', '==', lowerTerm), limit(20))),
-      getDocs(query(usersRef, where('username', '==', lowerTerm), limit(20))),
-      // Prefix range queries for email and username
-      getDocs(query(usersRef, where('email', '>=', lowerTerm), where('email', '<=', lowerTerm + '\uf8ff'), limit(30))),
-      getDocs(query(usersRef, where('username', '>=', lowerTerm), where('username', '<=', lowerTerm + '\uf8ff'), limit(30))),
-      // Name range queries
-      getDocs(query(usersRef, where('name', '>=', titleTerm), where('name', '<=', titleTerm + '\uf8ff'), limit(30))),
-      getDocs(query(usersRef, where('name', '>=', lowerTerm), where('name', '<=', lowerTerm + '\uf8ff'), limit(30))),
-      getDocs(query(usersRef, where('name', '>=', cleanTerm), where('name', '<=', cleanTerm + '\uf8ff'), limit(30))),
-      // General recent users snapshot fallback
-      getDocs(query(usersRef, limit(500))),
-    ];
-
-    const results = await Promise.allSettled(queries);
-
-    results.forEach(res => {
-      if (res.status === 'fulfilled' && res.value) {
-        res.value.docs.forEach(docSnap => {
-          const normalized = normalizeUser(docSnap.data(), docSnap.id);
-          if (matchesUserSearch(normalized, cleanTerm, currentUserId)) {
-            map.set(normalized.uid, normalized);
-          }
-        });
+  // 2. Check search cache
+  if (searchCache.has(lowerTerm)) {
+    const cached = searchCache.get(lowerTerm) || [];
+    cached.forEach(u => {
+      if (matchesUserSearch(u, cleanTerm, currentUserId)) {
+        map.set(u.uid, u);
       }
     });
+    return Array.from(map.values());
+  }
+
+  // 3. Fast targeted Firestore queries with 1500ms timeout
+  try {
+    const usersRef = collection(db, 'users');
+
+    const targetedQueries = [
+      getDocs(query(usersRef, where('email', '==', lowerTerm), limit(15))),
+      getDocs(query(usersRef, where('username', '==', lowerTerm), limit(15))),
+      getDocs(query(usersRef, where('name', '==', cleanTerm), limit(15))),
+      getDocs(query(usersRef, where('email', '>=', lowerTerm), where('email', '<=', lowerTerm + '\uf8ff'), limit(25))),
+      getDocs(query(usersRef, where('name', '>=', titleTerm), where('name', '<=', titleTerm + '\uf8ff'), limit(25))),
+      getDocs(query(usersRef, where('name', '>=', lowerTerm), where('name', '<=', lowerTerm + '\uf8ff'), limit(25))),
+    ];
+
+    const fetchPromise = Promise.allSettled(targetedQueries);
+    const timeoutPromise = new Promise<null>(resolve => setTimeout(() => resolve(null), 1500));
+
+    const result = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (Array.isArray(result)) {
+      const fetched: User[] = [];
+      result.forEach(res => {
+        if (res.status === 'fulfilled' && res.value) {
+          res.value.docs.forEach(docSnap => {
+            const normalized = normalizeUser(docSnap.data(), docSnap.id);
+            fetched.push(normalized);
+            if (matchesUserSearch(normalized, cleanTerm, currentUserId)) {
+              map.set(normalized.uid, normalized);
+            }
+          });
+        }
+      });
+      searchCache.set(lowerTerm, fetched);
+    }
   } catch (err) {
-    console.warn('Firestore user search error:', err);
+    console.warn('Firestore targeted search notice:', err);
   }
 
   const merged = Array.from(map.values());
 
-  // Rank results by relevance: exact match first, prefix match second, general match third
   return merged.sort((a, b) => {
     const aEmail = (a.email || '').toLowerCase();
     const bEmail = (b.email || '').toLowerCase();
@@ -164,15 +179,12 @@ export async function searchUsers(
     const aName = (a.name || '').toLowerCase();
     const bName = (b.name || '').toLowerCase();
 
-    // Exact email match
     if (aEmail === lowerTerm && bEmail !== lowerTerm) return -1;
     if (bEmail === lowerTerm && aEmail !== lowerTerm) return 1;
 
-    // Exact username match
     if (aUser === lowerTerm && bUser !== lowerTerm) return -1;
     if (bUser === lowerTerm && aUser !== lowerTerm) return 1;
 
-    // Starts with term
     const aStartsWith = aName.startsWith(lowerTerm) || aEmail.startsWith(lowerTerm) || aUser.startsWith(lowerTerm);
     const bStartsWith = bName.startsWith(lowerTerm) || bEmail.startsWith(lowerTerm) || bUser.startsWith(lowerTerm);
     if (aStartsWith && !bStartsWith) return -1;
