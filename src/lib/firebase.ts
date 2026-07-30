@@ -15,21 +15,18 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Initialize Firestore with offline persistence
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentSingleTabManager, Firestore } from 'firebase/firestore';
+// Initialize Firestore with modern persistent cache settings
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, Firestore } from 'firebase/firestore';
 
-// Initialize Firestore only if it hasn't been initialized yet
 let db: Firestore;
 try {
-  // Try to get existing Firestore instance
-  db = getFirestore(app);
-} catch (e) {
-  // If no instance exists, initialize with modern persistent cache settings
   db = initializeFirestore(app, {
     localCache: persistentLocalCache({
-      tabManager: persistentSingleTabManager({ forceOwnership: true })
+      tabManager: persistentMultipleTabManager()
     })
   });
+} catch (e) {
+  db = getFirestore(app);
 }
 
 // Handle user online presence

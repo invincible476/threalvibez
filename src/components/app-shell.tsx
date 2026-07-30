@@ -548,27 +548,42 @@ useEffect(() => {
     }
 
     // Subscribe to messages in real-time ordered by timestamp asc
-    const newMessagesQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
+    const newMessagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
 
     messagesUnsubscribe.current = onSnapshot(newMessagesQuery, (snapshot) => {
         const docs = snapshot.docs;
 
         if (docs.length > 0) {
-            setFirstMessageDoc(docs[docs.length - 1]);
-            setHasMoreMessages(docs.length === PAGE_SIZE);
+            setFirstMessageDoc(docs[0]);
+            setHasMoreMessages(docs.length >= PAGE_SIZE);
         } else {
             setHasMoreMessages(false);
         }
         setIsLoadingMore(false);
 
+        const getMillis = (ts: any): number => {
+            if (!ts) return 0;
+            if (typeof ts.toMillis === 'function') return ts.toMillis();
+            if (ts instanceof Date) return ts.getTime();
+            if (typeof ts === 'number') return ts;
+            if (typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+            if (typeof ts === 'string') {
+              const parsed = new Date(ts).getTime();
+              return isNaN(parsed) ? 0 : parsed;
+            }
+            return 0;
+        };
+
         const serverMessages: Message[] = docs.map(d => {
             const data = d.data();
-            const rawTs = data.timestamp;
+            const rawTs = data.timestamp || data.createdAt;
             let parsedTimestamp: Date;
             if (rawTs?.toDate && typeof rawTs.toDate === 'function') {
                 parsedTimestamp = rawTs.toDate();
             } else if (rawTs instanceof Date) {
                 parsedTimestamp = rawTs;
+            } else if (typeof rawTs === 'number') {
+                parsedTimestamp = new Date(rawTs);
             } else {
                 parsedTimestamp = new Date();
             }
@@ -579,7 +594,10 @@ useEffect(() => {
                 status: d.metadata.hasPendingWrites ? 'sending' : 'sent',
                 timestamp: parsedTimestamp,
             } as Message;
-        }).reverse();
+        });
+
+        // Ensure chronological order even if pending writes have null serverTimestamp initially
+        serverMessages.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
 
         setMessages(prev => {
             const serverIds = new Set(serverMessages.map(m => m.id));
@@ -591,7 +609,9 @@ useEffect(() => {
                 (!m.clientTempId || !serverClientTempIds.has(m.clientTempId))
             );
 
-            return [...serverMessages, ...unsentOptimisticMsgs];
+            const combined = [...serverMessages, ...unsentOptimisticMsgs];
+            combined.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
+            return combined;
         });
     }, (error) => {
         console.error("Error fetching messages snapshot:", error);
