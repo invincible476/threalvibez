@@ -1,6 +1,6 @@
 
 'use client';
-import { useEffect, useRef, memo, Fragment, forwardRef, UIEvent, useState, useLayoutEffect } from 'react';
+import { useEffect, useRef, memo, Fragment, forwardRef, UIEvent, useState, useLayoutEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from './ui/scroll-area';
 import { Timestamp } from 'firebase/firestore';
@@ -57,7 +57,7 @@ function formatDateSeparator(date: Date): string {
 }
 
 
-export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
+export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
     messages,
     currentUser,
     usersCache,
@@ -79,10 +79,10 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
     const [scrollAnchor, setScrollAnchor] = useState<{ top: number; height: number } | null>(null);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    const visibleMessages = messages.filter(message => {
+    const visibleMessages = useMemo(() => messages.filter(message => {
         const blockedUsers = currentUser?.blockedUsers || [];
         return !blockedUsers.includes(message.senderId);
-    });
+    }), [messages, currentUser?.blockedUsers]);
 
     useEffect(() => {
         if (chatId !== prevChatId.current) {
@@ -220,5 +220,5 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
             </motion.div>
         </ScrollArea>
     );
-});
+}));
 MessageList.displayName = 'MessageList';

@@ -4,7 +4,7 @@ import '../styles/glass-theme.css';
 import type { MessageReaction } from '@/lib/types';
 import {
   addDoc, arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query,
-  runTransaction, serverTimestamp, Timestamp, updateDoc, where, writeBatch, limit, startAfter, setDoc, deleteField,
+  runTransaction, serverTimestamp, Timestamp, updateDoc, where, writeBatch, limit, limitToLast, startAfter, setDoc, deleteField,
   DocumentData, DocumentSnapshot
 } from 'firebase/firestore';
 import { usePresence } from '@/hooks/use-presence';
@@ -223,11 +223,6 @@ function useChatData() {
   const [previewStoryFile, setPreviewStoryFile] = useState<File | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
-// DEBUG LOGGING
-useEffect(() => {
-  console.log('[AppShell] selectedChat:', selectedChat);
-  console.log('[AppShell] messages:', messages);
-}, [selectedChat, messages]);
   const [firstMessageDoc, setFirstMessageDoc] = useState<any>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -436,12 +431,21 @@ useEffect(() => {
       });
 
       const convos = await Promise.all(convosPromises);
-      convos.sort((a, b) => (b.lastMessage?.timestamp?.toMillis() || 0) - (a.lastMessage?.timestamp?.toMillis() || 0));
+      // Safe sort that handles both Firestore Timestamps and JS Dates
+      const safeGetMillis = (ts: any): number => {
+        if (!ts) return 0;
+        if (typeof ts.toMillis === 'function') return ts.toMillis();
+        if (ts instanceof Date) return ts.getTime();
+        if (typeof ts === 'number') return ts;
+        if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+        return 0;
+      };
+      convos.sort((a, b) => safeGetMillis(b.lastMessage?.timestamp) - safeGetMillis(a.lastMessage?.timestamp));
       setConversations(convos);
     });
 
     return () => unsubscribeConversations();
-  }, [authUser?.uid, getParticipantDetails]);
+  }, [authUser?.uid, getParticipantDetails, updateUserInCache]);
 
   // Sync usersCache updates dynamically into conversations (upgrades fallback names/avatars as profile data arrives)
   useEffect(() => {
@@ -469,6 +473,26 @@ useEffect(() => {
       });
     });
   }, [usersCache, authUser?.uid]);
+
+  // Keep selectedChat in sync with conversations updates so typing, lastRead, etc. are never stale
+  useEffect(() => {
+    if (!selectedChat || selectedChat.id === AI_USER_ID) return;
+    const updated = conversations.find(c => c.id === selectedChat.id);
+    if (updated) {
+      // Only update if data actually changed to avoid infinite loops
+      const changed =
+        updated.name !== selectedChat.name ||
+        updated.avatar !== selectedChat.avatar ||
+        updated.lastMessage?.text !== selectedChat.lastMessage?.text ||
+        JSON.stringify(updated.typing) !== JSON.stringify(selectedChat.typing) ||
+        JSON.stringify(updated.lastRead) !== JSON.stringify(selectedChat.lastRead) ||
+        updated.isFavorite !== selectedChat.isFavorite ||
+        updated.isArchived !== selectedChat.isArchived;
+      if (changed) {
+        setSelectedChat(updated);
+      }
+    }
+  }, [conversations, selectedChat]);
   
   useEffect(() => {
     if (newlyCreatedChatId) {
@@ -502,9 +526,15 @@ useEffect(() => {
     };
   }, []);
 
+  // Ref for conversations to avoid recreating handleChatSelect on every conversation update
+  const conversationsRef = useRef<Conversation[]>(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   // Message fetching logic
   const handleChatSelect = useCallback(async (chatId: string) => {
+    const conversations = conversationsRef.current;
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
       router.push('/');
     }
@@ -547,8 +577,9 @@ useEffect(() => {
         }).catch(console.error);
     }
 
-    // Subscribe to messages in real-time ordered by timestamp asc
-    const newMessagesQuery = query(messagesRef, orderBy('timestamp', 'asc'));
+    // Subscribe to the latest PAGE_SIZE messages in real-time
+    // Using limitToLast with asc order gives us the most recent messages in chronological order
+    const newMessagesQuery = query(messagesRef, orderBy('timestamp', 'asc'), limitToLast(PAGE_SIZE));
 
     messagesUnsubscribe.current = onSnapshot(newMessagesQuery, (snapshot) => {
         const docs = snapshot.docs;
@@ -618,7 +649,7 @@ useEffect(() => {
         setIsLoadingMore(false);
     });
 
-  }, [conversations, aiConversation, authUser, selectedChat?.id]);
+  }, [aiConversation, authUser, selectedChat?.id]);
   
   const loadMoreMessages = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages || !selectedChat || !firstMessageDoc) return;

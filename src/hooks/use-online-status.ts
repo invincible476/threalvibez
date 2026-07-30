@@ -4,9 +4,9 @@ import { db } from '@/lib/firebase';
 import type { User } from '@/lib/types';
 
 // Thresholds for different states
-const DEVICE_STALENESS_THRESHOLD = 15 * 1000; // 15 seconds for very aggressive staleness detection
-const OFFLINE_THRESHOLD = 30 * 1000; // 30 seconds of inactivity = offline
-const CLEANUP_INTERVAL = 15 * 1000; // Check for stale devices every 15 seconds
+const DEVICE_STALENESS_THRESHOLD = 45 * 1000; // 45 seconds for staleness detection
+const OFFLINE_THRESHOLD = 90 * 1000; // 90 seconds of inactivity = offline
+const CLEANUP_INTERVAL = 60 * 1000; // Check for stale devices every 60 seconds
 
 export function useOnlineStatus(user: User | undefined | null) {
   const cleanupIntervalRef = useRef<NodeJS.Timeout>();
@@ -183,11 +183,12 @@ export function useOnlineStatus(user: User | undefined | null) {
     // Set up periodic cleanup
     cleanupIntervalRef.current = setInterval(cleanupAndUpdateStatus, CLEANUP_INTERVAL);
     
-    // Watch devices collection for real-time changes
+    // Watch devices collection for real-time changes (debounced to avoid rapid-fire cleanup)
+    let debounceTimer: NodeJS.Timeout | null = null;
     const unsubscribe = onSnapshot(query(devicesRef), snapshot => {
-      // Only trigger cleanup if there are changes
       if (!snapshot.empty) {
-        cleanupAndUpdateStatus();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(cleanupAndUpdateStatus, 5000);
       }
     });
 
@@ -195,6 +196,7 @@ export function useOnlineStatus(user: User | undefined | null) {
       if (cleanupIntervalRef.current) {
         clearInterval(cleanupIntervalRef.current);
       }
+      if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribe();
     };
   }, [user?.uid]);

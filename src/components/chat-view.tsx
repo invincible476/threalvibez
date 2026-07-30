@@ -171,12 +171,13 @@ const ChatViewComponent = ({
     if (!chat || !currentUser) {
       return;
     }
-    const newMessagesAdded = messages.length > prevMessagesLength.current;
+    const newCount = messages.length - prevMessagesLength.current;
+    const newMessagesAdded = newCount > 0;
 
     if (newMessagesAdded && isAtBottom) {
         scrollToBottom();
     } else if (newMessagesAdded && !isAtBottom) {
-        setNewMessagesCount(prev => prev + 1);
+        setNewMessagesCount(prev => prev + newCount);
     }
     
     prevMessagesLength.current = messages.length;
@@ -321,15 +322,6 @@ const ChatViewComponent = ({
   }
   
   // Chat type flags are now declared at the top of the component
-  
-  // Debug logging for voice chat state
-  console.log('Voice Chat State:', {
-    isVoiceConnected,
-    isAIChat,
-    chatType: chat.type,
-    userId: currentUser.uid,
-    chatId: chat.id
-  });
 
   const participantForProfile = isAIChat ? usersCache.get(AI_USER_ID) : otherParticipant;
 
