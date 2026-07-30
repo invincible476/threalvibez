@@ -484,8 +484,10 @@ useEffect(() => {
       router.push('/');
     }
 
+    // Clean up previous message listener immediately to prevent duplicate/stale listeners
     if (messagesUnsubscribe.current) {
         messagesUnsubscribe.current();
+        messagesUnsubscribe.current = undefined;
     }
 
     // Reset AI typing state when switching chats
@@ -512,55 +514,66 @@ useEffect(() => {
     setIsLoadingMore(true);
 
     const messagesRef = collection(db, 'conversations', chat.id, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
-    const snapshot = await getDocs(q);
-
-    const initialMsgs = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Message)).reverse();
-    setMessages(initialMsgs);
-
-    const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-    setFirstMessageDoc(lastDoc);
-    setHasMoreMessages(snapshot.docs.length === PAGE_SIZE);
-    setIsLoadingMore(false);
     
     if (chat && authUser) {
         const chatRef = doc(db, 'conversations', chat.id);
-        await updateDoc(chatRef, {
+        updateDoc(chatRef, {
             [`lastRead.${authUser.uid}`]: serverTimestamp()
-        });
+        }).catch(console.error);
     }
 
-    // Subscribe to new messages
-    const lastVisibleMessage = initialMsgs[initialMsgs.length - 1];
-    const newMessagesQuery = lastVisibleMessage?.timestamp
-        ? query(messagesRef, orderBy('timestamp', 'asc'), startAfter(lastVisibleMessage.timestamp))
-        : query(messagesRef, orderBy('timestamp', 'asc'));
+    // Subscribe to messages in real-time ordered by timestamp asc
+    const newMessagesQuery = query(messagesRef, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
 
     messagesUnsubscribe.current = onSnapshot(newMessagesQuery, (snapshot) => {
-        const newMsgs: Message[] = [];
-        snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') {
-                newMsgs.push({ ...change.doc.data(), id: change.doc.id } as Message);
-            }
-        });
+        const docs = snapshot.docs;
 
-        if (newMsgs.length > 0) {
-            setMessages(prev => {
-                const newMessagesMap = new Map(newMsgs.map(m => [m.clientTempId || m.id, m]));
-                const updatedMessages = prev.map(m => {
-                    const serverVersion = newMessagesMap.get(m.clientTempId!);
-                    if (serverVersion) {
-                        newMessagesMap.delete(m.clientTempId!);
-                        return serverVersion; // Replace optimistic with server version
-                    }
-                    return m;
-                });
-                return [...updatedMessages, ...Array.from(newMessagesMap.values())];
-            });
+        if (docs.length > 0) {
+            setFirstMessageDoc(docs[docs.length - 1]);
+            setHasMoreMessages(docs.length === PAGE_SIZE);
+        } else {
+            setHasMoreMessages(false);
         }
+        setIsLoadingMore(false);
+
+        const serverMessages: Message[] = docs.map(d => {
+            const data = d.data();
+            const rawTs = data.timestamp;
+            let parsedTimestamp: Date;
+            if (rawTs?.toDate && typeof rawTs.toDate === 'function') {
+                parsedTimestamp = rawTs.toDate();
+            } else if (rawTs instanceof Date) {
+                parsedTimestamp = rawTs;
+            } else {
+                parsedTimestamp = new Date();
+            }
+
+            return {
+                ...data,
+                id: d.id,
+                status: d.metadata.hasPendingWrites ? 'sending' : 'sent',
+                timestamp: parsedTimestamp,
+            } as Message;
+        }).reverse();
+
+        setMessages(prev => {
+            const serverIds = new Set(serverMessages.map(m => m.id));
+            const serverClientTempIds = new Set(serverMessages.map(m => m.clientTempId).filter(Boolean));
+
+            const unsentOptimisticMsgs = prev.filter(m => 
+                (m.status === 'sending' || m.status === 'error') &&
+                !serverIds.has(m.id) &&
+                (!m.clientTempId || !serverClientTempIds.has(m.clientTempId))
+            );
+
+            return [...serverMessages, ...unsentOptimisticMsgs];
+        });
+    }, (error) => {
+        console.error("Error fetching messages snapshot:", error);
+        setIsLoadingMore(false);
     });
 
-  }, [conversations, aiConversation, authUser]);
+  }, [conversations, aiConversation, authUser, selectedChat?.id]);
   
   const loadMoreMessages = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages || !selectedChat || !firstMessageDoc) return;
@@ -578,12 +591,35 @@ useEffect(() => {
             return;
         }
 
-        const olderMsgs = snapshot.docs.map(d => ({...d.data(), id: d.id} as Message)).reverse();
+        const olderMsgs = snapshot.docs.map(d => {
+            const data = d.data();
+            const rawTs = data.timestamp;
+            let parsedTimestamp: Date;
+            if (rawTs?.toDate && typeof rawTs.toDate === 'function') {
+                parsedTimestamp = rawTs.toDate();
+            } else if (rawTs instanceof Date) {
+                parsedTimestamp = rawTs;
+            } else {
+                parsedTimestamp = new Date();
+            }
+
+            return {
+                ...data,
+                id: d.id,
+                status: d.metadata.hasPendingWrites ? 'sending' : 'sent',
+                timestamp: parsedTimestamp,
+            } as Message;
+        }).reverse();
+
         const newFirstDoc = snapshot.docs[snapshot.docs.length - 1];
         setFirstMessageDoc(newFirstDoc);
         setHasMoreMessages(snapshot.docs.length === PAGE_SIZE);
 
-        setMessages(prev => [...olderMsgs, ...prev]);
+        setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const uniqueOlder = olderMsgs.filter(m => !existingIds.has(m.id));
+            return [...uniqueOlder, ...prev];
+        });
 
     } catch (error) {
       console.error("Error loading more messages:", error);
@@ -662,16 +698,19 @@ useEffect(() => {
 
       const chatRef = doc(db, 'conversations', chatId);
 
-      await Promise.all([
-        setDoc(newMessageRef, messageData),
-        updateDoc(chatRef, {
-          lastMessage: {
-            text: messageText,
-            senderId: senderId,
-            timestamp: serverTimestamp(),
-          },
-        })
-      ]);
+      // Execute writes non-blocking so local optimistic write updates instantly without stalling on network RTT
+      setDoc(newMessageRef, messageData).catch(error => {
+        console.error('Error sending message setDoc:', error);
+        setMessages(prev => prev.map(m => m.clientTempId === tempId ? { ...m, status: 'error' } : m));
+      });
+
+      updateDoc(chatRef, {
+        lastMessage: {
+          text: messageText,
+          senderId: senderId,
+          timestamp: serverTimestamp(),
+        },
+      }).catch(console.error);
       
       return tempId;
     } catch (error) {
@@ -687,7 +726,6 @@ useEffect(() => {
   const handleSendBase64File = useCallback(async (chatId: any, senderId: any, base64Data: any, fileType: any, fileName: any, caption: any) => {
     if (!base64Data || !currentUser) return Promise.reject("No data or user");
     if (fileType.startsWith('video/')) {
-        // Prevent regressions: videos must not be stored as base64
         toast({ title: "Error", description: "Video uploads must use Cloudinary. Do not send base64 for videos.", variant: "destructive"});
         return Promise.reject('Video uploads must use Cloudinary. Do not send base64 for videos.');
     }
@@ -703,7 +741,7 @@ useEffect(() => {
         timestamp: new Date(),
         status: 'sending',
         file: {
-            url: base64Data, // Use data URL for optimistic preview
+            url: base64Data,
             type: fileType,
             name: fileName
         }
@@ -726,7 +764,11 @@ useEffect(() => {
     try {
         const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
         const newMessageRef = doc(messageCollectionRef);
-        await setDoc(newMessageRef, messageData);
+        
+        setDoc(newMessageRef, messageData).catch(error => {
+            console.error('Error sending base64 setDoc:', error);
+            setMessages(prev => prev.map(m => m.clientTempId === tempId ? {...m, status: 'error'} : m));
+        });
         
         let lastMessageText = caption ? caption : 'Sent a file';
         if (fileType.startsWith('image/')) {
@@ -737,13 +779,15 @@ useEffect(() => {
              lastMessageText = caption || 'Sent a video';
         }
         
-        await updateDoc(doc(db, 'conversations', chatId), {
+        updateDoc(doc(db, 'conversations', chatId), {
             lastMessage: {
                 text: lastMessageText,
                 senderId: senderId,
                 timestamp: serverTimestamp(),
             },
-        });
+        }).catch(console.error);
+
+        return tempId;
     } catch (error) {
         console.error('Error sending base64 file:', error);
         setMessages(prev => prev.map(m => m.clientTempId === tempId ? {...m, status: 'error'} : m));
@@ -1843,7 +1887,7 @@ interface AppShellContextType {
   handleChatSelect: (chatId: string) => Promise<void>;
   activeSendMessage: (messageText: string, replyTo?: Message['replyTo']) => Promise<string>;
   activeSendFile: (file: File, message: string) => Promise<string>;
-  activeSendBase64File: (base64: string, fileType: string, fileName: string, caption: string) => Promise<void>;
+  activeSendBase64File: (base64: string, fileType: string, fileName: string, caption: string) => Promise<string | undefined>;
   handleMessageAction: (messageId: string, action: 'react' | 'delete', data?: unknown) => Promise<void>;
   cancelUpload: (messageId: string) => void;
   handleCreateChat: (targetUser: User) => Promise<string>;
