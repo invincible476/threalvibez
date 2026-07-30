@@ -330,6 +330,11 @@ useEffect(() => {
     usersCacheRef.current = usersCache;
   }, [usersCache]);
 
+  const selectedChatRef = useRef<Conversation | undefined>(selectedChat);
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
+
   const getParticipantDetails = useCallback((participantIds: string[]): User[] => {
     return participantIds.map(id => usersCacheRef.current.get(id)).filter(Boolean) as User[];
   }, []);
@@ -392,11 +397,31 @@ useEffect(() => {
           }
           
           let unreadCount = 0;
-          const lastReadTimestamp = data.lastRead?.[authUser.uid];
-          if (data.lastMessage && lastReadTimestamp && data.lastMessage.timestamp > lastReadTimestamp) {
-              unreadCount = data.lastMessage.senderId !== authUser.uid ? 1 : 0;
-          } else if (data.lastMessage && !lastReadTimestamp && data.lastMessage.senderId !== authUser.uid) {
-              unreadCount = 1;
+          const isCurrentActiveChat = docSnap.id === selectedChatRef.current?.id;
+          
+          if (isCurrentActiveChat) {
+              unreadCount = 0;
+          } else if (data.lastMessage && data.lastMessage.senderId !== authUser.uid) {
+              const lastReadTimestamp = data.lastRead?.[authUser.uid];
+              const getMillis = (ts: any): number => {
+                if (!ts) return 0;
+                if (typeof ts.toMillis === 'function') return ts.toMillis();
+                if (ts instanceof Date) return ts.getTime();
+                if (typeof ts === 'number') return ts;
+                if (typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+                if (typeof ts === 'string') {
+                  const parsed = new Date(ts).getTime();
+                  return isNaN(parsed) ? 0 : parsed;
+                }
+                return 0;
+              };
+
+              const lastMsgTime = getMillis(data.lastMessage.timestamp);
+              const lastReadTime = getMillis(lastReadTimestamp);
+
+              if (lastReadTime === 0 || lastMsgTime > lastReadTime) {
+                  unreadCount = 1;
+              }
           }
 
           return {

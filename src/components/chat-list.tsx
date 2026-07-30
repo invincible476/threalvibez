@@ -222,7 +222,7 @@ export function ChatList() {
 
   const favoriteChats = useMemo(() => activeChats.filter(c => c.isFavorite), [activeChats]);
   const unreadChats = useMemo(() => activeChats.filter(c => c.unreadCount && c.unreadCount > 0 && !c.isFavorite && c.id !== selectedChat?.id), [activeChats, selectedChat?.id]);
-  const regularChats = useMemo(() => activeChats.filter(c => !c.isFavorite && (!c.unreadCount || c.unreadCount === 0)), [activeChats]);
+  const regularChats = useMemo(() => activeChats.filter(c => !c.isFavorite && (!c.unreadCount || c.unreadCount === 0 || c.id === selectedChat?.id)), [activeChats, selectedChat?.id]);
 
   const usersForNewChat = allUsers.filter(u => u.uid !== currentUser?.uid && !(currentUser?.blockedUsers || []).includes(u.uid));
 
