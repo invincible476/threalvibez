@@ -3,6 +3,7 @@
 import { ChatView } from './chat-view';
 import { useAppShell } from './app-shell';
 import { ChatList } from './chat-list';
+import { ErrorBoundary } from './error-boundary';
 import React from 'react';
 import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
 
@@ -29,7 +30,9 @@ export function MobileChatLayout() {
       {/* Only render one main view at a time */}
       {!selectedChat ? (
         <div className="flex-1 min-h-0">
-          <ChatList />
+          <ErrorBoundary label="ChatList">
+            <ChatList />
+          </ErrorBoundary>
         </div>
       ) : (
         <div className="flex-1 min-h-0">

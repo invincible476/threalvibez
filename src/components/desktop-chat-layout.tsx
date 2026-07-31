@@ -5,6 +5,7 @@ import { ChatView } from './chat-view';
 import { useAppShell } from './app-shell';
 import { Sidebar, SidebarInset } from './ui/sidebar';
 import { useAppearance } from './providers/appearance-provider';
+import { ErrorBoundary } from './error-boundary';
 import React from 'react';
 
 export function DesktopChatLayout() {
@@ -33,7 +34,9 @@ export function DesktopChatLayout() {
         className="backdrop-blur-xl border-r border-border/20 w-[22rem] max-w-[22rem] min-w-0 flex-shrink-0 flex-grow-0 overflow-x-hidden h-full min-h-0"
         style={desktopSidebarStyle}
       >
-        <ChatList />
+        <ErrorBoundary label="ChatList">
+          <ChatList />
+        </ErrorBoundary>
       </Sidebar>
       <SidebarInset>
         <ChatView

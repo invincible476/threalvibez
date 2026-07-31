@@ -23,7 +23,16 @@ export function StoriesTray({
     onViewStory, 
     onCreateStory,
 }: StoriesTrayProps) {
-    const getMillis = (t: any) => (t && typeof t.toMillis === 'function' ? t.toMillis() : new Date(t).getTime());
+    const getMillis = (t: any): number => {
+      if (!t) return 0;
+      if (typeof t.toMillis === 'function') { try { return t.toMillis(); } catch { return 0; } }
+      if (typeof t.toDate === 'function') { try { return t.toDate().getTime(); } catch { return 0; } }
+      if (t instanceof Date) return isNaN(t.getTime()) ? 0 : t.getTime();
+      if (typeof t === 'number') return isNaN(t) ? 0 : t;
+      if (typeof t.seconds === 'number') return t.seconds * 1000;
+      if (typeof t === 'string') { const p = new Date(t).getTime(); return isNaN(p) ? 0 : p; }
+      return 0;
+    };
 
     const storiesByUser = useMemo(() => {
         const userStoryMap = new Map<string, Story[]>();

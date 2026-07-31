@@ -159,7 +159,7 @@ const ChatViewComponent = ({
   
   const otherParticipant = useMemo(() => {
     if (!chat || !currentUser || chat.type !== 'private') return undefined;
-    const otherId = chat.participants.find(p => p !== currentUser.uid);
+    const otherId = chat.participants?.find(p => p !== currentUser.uid);
     return usersCache.get(otherId || '');
   }, [chat, currentUser, usersCache]);
 
@@ -331,7 +331,7 @@ const ChatViewComponent = ({
     }
     if (isAIChat) return 'Online';
     if (chat?.type === 'group') {
-      const uniqueParticipants = new Set(chat.participants);
+      const uniqueParticipants = new Set(chat.participants ?? []);
       return `${uniqueParticipants.size} members`;
     }
     return otherParticipant?.status;

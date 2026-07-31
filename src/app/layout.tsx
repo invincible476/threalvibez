@@ -12,6 +12,7 @@ import './mobile.css';
 import { FriendsProvider } from '@/components/providers/friends-provider';
 import { AppShell } from '@/components/app-shell';
 import { validateEnvironmentOnStartup } from '@/lib/environment-validation';
+import { GlobalErrorCapture } from '@/components/global-error-capture';
 
 const fontPoppins = Poppins({
   subsets: ['latin'],
@@ -102,6 +103,7 @@ export default function RootLayout({
             <AppearanceProvider>
               <FriendsProvider>
                 <MobileProvider>
+                  <GlobalErrorCapture />
                   <AppShell>
                     <main className="relative flex-1 z-10 h-full w-full overflow-hidden flex flex-col min-h-0">{children}</main>
                   </AppShell>

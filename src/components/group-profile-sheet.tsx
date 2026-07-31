@@ -49,7 +49,7 @@ export function GroupProfileSheet({
   const [newAvatarDataUrl, setNewAvatarDataUrl] = useState<string | null>(null);
 
 
-  const allParticipants = chat.participants.map(p => usersCache.get(p)).filter(Boolean) as User[];
+  const allParticipants = (chat.participants ?? []).map(p => usersCache.get(p)).filter(Boolean) as User[];
   const uniqueParticipantIds = new Set<string>();
   const participants = allParticipants.filter(p => {
     if (uniqueParticipantIds.has(p.uid)) {

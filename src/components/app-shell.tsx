@@ -483,7 +483,7 @@ function useChatData() {
       if (!prev || prev.length === 0) return prev;
       return prev.map(convo => {
         if (convo.type !== 'private') return convo;
-        const otherId = convo.participants.find(p => p !== authUser?.uid);
+        const otherId = convo.participants?.find(p => p !== authUser?.uid);
         if (!otherId) return convo;
         const cachedUser = usersCache.get(otherId);
         if (!cachedUser) return convo;
@@ -497,7 +497,7 @@ function useChatData() {
           ...convo,
           name: newName,
           avatar: newAvatar,
-          participantsDetails: convo.participants.map(id => usersCache.get(id) || convo.participantsDetails?.find(p => p.uid === id)).filter(Boolean) as User[],
+          participantsDetails: (convo.participants ?? []).map(id => usersCache.get(id) || convo.participantsDetails?.find(p => p.uid === id)).filter(Boolean) as User[],
         };
       });
     });
@@ -1959,7 +1959,7 @@ function useChatData() {
     setViewingStory(null); // Close the viewer
 
     let chatId: string;
-    const existingConvo = conversations.find(c => c.type === 'private' && c.participants.includes(storyOwnerId));
+    const existingConvo = conversations.find(c => c.type === 'private' && c.participants?.includes(storyOwnerId));
     
     if(existingConvo) {
       chatId = existingConvo.id;
