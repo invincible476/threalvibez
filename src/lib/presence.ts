@@ -4,8 +4,10 @@ import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, increment, runTrans
 const HEARTBEAT_INTERVAL = 30 * 1000; // 30 seconds
 
 export async function setupPresence(userId: string) {
-  // Generate a unique device ID
-  const deviceId = crypto.randomUUID();
+  // Generate a unique device ID safely (crypto.randomUUID requires secure context in some browsers)
+  const deviceId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   
   // Get references to the user and device documents
   const userRef = doc(db, 'users', userId);
