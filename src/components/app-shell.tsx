@@ -887,17 +887,6 @@ function useChatData() {
     if (!messageText.trim() || !currentUser) return Promise.reject("Cannot send empty message");
   
     const tempId = uuidv4();
-    const optimisticMessage: Message = {
-        id: tempId,
-        clientTempId: tempId,
-        senderId: currentUser.uid,
-        text: messageText,
-        timestamp: new Date(),
-        status: 'sending',
-        ...(replyTo && { replyTo })
-    };
-
-    setMessages(prev => [...prev, optimisticMessage]);
 
     try {
       const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
