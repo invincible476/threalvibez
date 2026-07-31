@@ -169,10 +169,9 @@ class Logger {
   private writeToServerFile(entry: LogEntry) {
     try {
       // Dynamic import fs to prevent issues in edge/browser runtimes
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const path = require('path');
+      // Use eval('require') to bypass Webpack analysis during client bundling
+      const fs = eval('require')('fs');
+      const path = eval('require')('path');
 
       const logsDir = path.join(process.cwd(), 'logs');
       if (!fs.existsSync(logsDir)) {
