@@ -1491,25 +1491,41 @@ function useChatData() {
     }
   }, [currentUser, handleChatSelect, router]);
   
-  const handleCreateGroupChat = useCallback(async (groupName: string, selectedUsers: User[]) => {
-    if (!currentUser) return;
+  const handleCreateGroupChat = useCallback(async (groupName: string, selectedUsers: User[]): Promise<string> => {
+    if (!currentUser) return Promise.reject("No current user");
   
-    const participantUids = [currentUser.uid, ...selectedUsers.map(u => u.uid)].sort();
+    const participantUids = Array.from(
+      new Set([currentUser.uid, ...selectedUsers.map(u => u.uid || u.id).filter(Boolean)])
+    );
+
+    const creatorName = currentUser.name || (currentUser as any).displayName || 'Someone';
+    const trimmedName = groupName.trim();
   
     const newConvoData = {
       type: 'group',
-      name: groupName,
+      name: trimmedName,
       participants: participantUids,
+      adminIds: [currentUser.uid],
       createdBy: currentUser.uid,
       createdAt: serverTimestamp(),
-      lastMessage: null,
+      updatedAt: serverTimestamp(),
       avatar: null,
-      lastRead: {}
+      lastRead: {},
+      lastMessage: {
+        text: `${creatorName} created the group "${trimmedName}"`,
+        senderId: 'system',
+        createdAt: serverTimestamp()
+      }
     };
   
     const newConvoRef = await addDoc(collection(db, 'conversations'), newConvoData);
     setNewlyCreatedChatId(newConvoRef.id);
-  }, [currentUser]);
+    handleChatSelect(newConvoRef.id);
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      router.push('/');
+    }
+    return newConvoRef.id;
+  }, [currentUser, handleChatSelect, router]);
 
   const handleConversationAction = useCallback(async (
     conversationId: string,
@@ -2092,7 +2108,7 @@ interface AppShellContextType {
   handleMessageAction: (messageId: string, action: 'react' | 'delete', data?: unknown) => Promise<void>;
   cancelUpload: (messageId: string) => void;
   handleCreateChat: (targetUser: User) => Promise<string>;
-  handleCreateGroupChat: (groupName: string, selectedUsers: User[]) => Promise<void>;
+  handleCreateGroupChat: (groupName: string, selectedUsers: User[]) => Promise<string>;
   handleBack: () => void;
   handleConversationAction: (conversationId: string, action: 'toggleFavorite' | 'archive' | 'unarchive') => Promise<void>;
   handleTyping: (isTyping: boolean) => Promise<void>;

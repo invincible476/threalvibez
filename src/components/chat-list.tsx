@@ -9,7 +9,7 @@ import type { Conversation, User } from '@/lib/types';
 import { UserAvatar } from './user-avatar';
 import { cn, safeGetMillis, safeFormatTimestamp } from '@/lib/utils';
 import { VibezLogo } from './vibez-logo';
-import { NewChatDialog } from './new-chat-dialog';
+import { CreateGroupModal } from './create-group-modal';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -183,9 +183,6 @@ export function ChatList() {
     aiConversation,
     selectedChat,
     handleChatSelect,
-    allUsers,
-    handleCreateChat,
-    handleCreateGroupChat,
     currentUser,
     handleConversationAction,
     handleFriendAction,
@@ -224,8 +221,6 @@ export function ChatList() {
   const unreadChats = useMemo(() => activeChats.filter(c => c.unreadCount && c.unreadCount > 0 && !c.isFavorite && c.id !== selectedChat?.id), [activeChats, selectedChat?.id]);
   const regularChats = useMemo(() => activeChats.filter(c => !c.isFavorite && (!c.unreadCount || c.unreadCount === 0 || c.id === selectedChat?.id)), [activeChats, selectedChat?.id]);
 
-  const usersForNewChat = allUsers.filter(u => u.uid !== currentUser?.uid && !(currentUser?.blockedUsers || []).includes(u.uid));
-
   const shouldShowAiChat = useMemo(() => {
     return aiConversation.name?.toLowerCase().includes(searchTerm.toLowerCase());
   }, [aiConversation, searchTerm]);
@@ -238,17 +233,12 @@ export function ChatList() {
          <div className="flex-1 flex justify-center group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
             {isWeatherVisible && <WeatherWidget />}
          </div>
-         <NewChatDialog 
-            users={usersForNewChat}
-            onCreateChat={handleCreateChat}
-            onCreateGroupChat={handleCreateGroupChat}
-            currentUser={currentUser}
-         >
+         <CreateGroupModal>
             <Button variant="ghost" size="icon">
                 <Plus className="h-5 w-5" />
-                <span className="sr-only">New Chat</span>
+                <span className="sr-only">Create Group</span>
             </Button>
-         </NewChatDialog>
+         </CreateGroupModal>
        </div>
 
     <div className="flex-none px-4 py-2 border-b border-border/50">
