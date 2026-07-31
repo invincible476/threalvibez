@@ -221,48 +221,47 @@ const ChatViewComponent = ({
   };
 
 
-  const handleSendMessageWithReply = async (messageText: string) => {
+  const handleSendMessageWithReply = (messageText: string) => {
     if (!messageText.trim() || !chat) return;
     
-    try {
-        // Send the user's message
-        const messageReply = replyToMessage?.replyTo || (replyToMessage ? {
-            messageId: replyToMessage.id,
-            messageText: replyToMessage.text || (replyToMessage.file ? 'Attachment' : ''),
-            messageSender: usersCache.get(replyToMessage.senderId)?.name || 'Unknown User'
-        } : undefined);
-        await activeSendMessage(messageText, messageReply);
-        setReplyToMessage(null); // Clear reply state after sending
+    // Build reply context and clear reply state immediately for instant UI feedback
+    const messageReply = replyToMessage?.replyTo || (replyToMessage ? {
+        messageId: replyToMessage.id,
+        messageText: replyToMessage.text || (replyToMessage.file ? 'Attachment' : ''),
+        messageSender: usersCache.get(replyToMessage.senderId)?.name || 'Unknown User'
+    } : undefined);
+    setReplyToMessage(null);
 
-        // Check if the message mentions @gemini and process it
-        if (messageText.includes('@gemini')) {
-            try {
-                const aiResponse = await geminiService.processMessage({
-                    id: crypto.randomUUID(),
-                    senderId: currentUser?.uid || '',
-                    text: messageText,
-                    timestamp: new Date(),
-                    status: 'sent'
-                }, chat.id);
-                
-                if (aiResponse) {
-                    // AI responses are handled directly by AppShell's AI conversation flow
-                    await activeSendMessage(aiResponse);
-                }
-            } catch (error) {
-                toast({
-                    title: 'AI Response Error',
-                    description: 'Could not get a response from Gemini. Please try again.',
-                    variant: 'destructive',
-                });
-            }
-        }
-    } catch (e) {
+    // Dispatch message optimistically using client-side Firebase SDK addDoc
+    activeSendMessage(messageText, messageReply).catch((e) => {
+      console.error('Error sending message:', e);
       toast({
           title: 'Error Sending Message',
           description: 'Could not send your message. Please try again.',
           variant: 'destructive',
       });
+    });
+
+    // Check if the message mentions @gemini and process it
+    if (messageText.includes('@gemini')) {
+        geminiService.processMessage({
+            id: crypto.randomUUID(),
+            senderId: currentUser?.uid || '',
+            text: messageText,
+            timestamp: new Date(),
+            status: 'sent'
+        }, chat.id).then((aiResponse) => {
+            if (aiResponse) {
+                activeSendMessage(aiResponse);
+            }
+        }).catch((error) => {
+            console.error('AI error:', error);
+            toast({
+                title: 'AI Response Error',
+                description: 'Could not get a response from Gemini. Please try again.',
+                variant: 'destructive',
+            });
+        });
     }
   };
 

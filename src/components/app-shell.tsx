@@ -837,7 +837,6 @@ function useChatData() {
 
     try {
       const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
-      const newMessageRef = doc(messageCollectionRef);
       const messageData = {
         senderId: senderId,
         text: messageText,
@@ -848,9 +847,9 @@ function useChatData() {
 
       const chatRef = doc(db, 'conversations', chatId);
 
-      // Execute writes non-blocking so local optimistic write updates instantly without stalling on network RTT
-      setDoc(newMessageRef, messageData).catch(error => {
-        console.error('Error sending message setDoc:', error);
+      // Execute writes non-blocking using addDoc directly so local optimistic write updates instantly without stalling on network RTT
+      addDoc(messageCollectionRef, messageData).catch(error => {
+        console.error('Error sending message addDoc:', error);
         setMessages(prev => prev.map(m => m.clientTempId === tempId ? { ...m, status: 'error' } : m));
       });
 
@@ -913,10 +912,9 @@ function useChatData() {
 
     try {
         const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
-        const newMessageRef = doc(messageCollectionRef);
         
-        setDoc(newMessageRef, messageData).catch(error => {
-            console.error('Error sending base64 setDoc:', error);
+        addDoc(messageCollectionRef, messageData).catch(error => {
+            console.error('Error sending base64 addDoc:', error);
             setMessages(prev => prev.map(m => m.clientTempId === tempId ? {...m, status: 'error'} : m));
         });
         
