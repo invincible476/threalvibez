@@ -4,6 +4,7 @@ import { Conversation, User } from '@/lib/types';
 import { useAppearance } from '@/components/providers/appearance-provider';
 import { createToneAudio } from '@/lib/sound';
 import { safeGetMillis } from '@/lib/utils';
+import { safeShowNotification } from '@/lib/notification-utils';
 
 interface UseNotificationsProps {
   conversations: Conversation[];
@@ -64,27 +65,18 @@ export function useNotifications({
     
     playSound();
 
-    if (
-      typeof window === 'undefined' ||
-      !('Notification' in window) ||
-      Notification.permission !== 'granted'
-    ) {
-      return;
-    }
-
     const title = `New message from ${sender?.name || 'User'}`;
     const options = {
       body: messageText || '',
       icon: sender?.photoURL || '/icons/icon-192x192.png',
       tag: `vibez-message-${conversationId}`,
       renotify: true,
-    } as NotificationOptions;
-    
-    try {
-      new Notification(title, options);
-    } catch (e) {
-      console.warn('Direct Notification constructor unavailable or failed on mobile browser:', e);
-    }
+    } as any as NotificationOptions;
+
+    // Use the mobile-safe dispatcher — routes through ServiceWorkerRegistration on mobile
+    // (avoids the Illegal constructor TypeError on Android Chrome / iOS WebViews)
+    // and falls back to the Notification constructor on desktop. All errors are silently caught.
+    safeShowNotification(title, options).catch(() => {});
 
   }, [playSound, currentUser, activeChatId]);
 
