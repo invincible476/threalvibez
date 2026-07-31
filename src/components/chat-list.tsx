@@ -203,7 +203,7 @@ export function ChatList() {
     const term = searchTerm.trim().toLowerCase();
 
     return conversations.filter(convo => {
-      const isBlocked = convo.type === 'private' && convo.participants.some(p => blockedUserIds.includes(p) && p !== currentUser?.uid);
+      const isBlocked = convo.type === 'private' && (convo.participants?.some(p => blockedUserIds.includes(p) && p !== currentUser?.uid) ?? false);
       if (isBlocked) return false;
       if (!term) return true;
 

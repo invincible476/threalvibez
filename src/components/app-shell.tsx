@@ -343,13 +343,23 @@ function useChatData() {
       where('participants', 'array-contains', authUser.uid)
     );
 
+    // Cancellation token: each new snapshot callback gets a unique generation
+    // counter so that a stale in-flight Promise.all cannot overwrite fresher state.
+    let currentGen = 0;
+
     const unsubscribeConversations = onSnapshot(conversationsQuery, async (snapshot) => {
+      const gen = ++currentGen;
+
       const allParticipantIds = Array.from(
         new Set(snapshot.docs.flatMap(d => (d.data().participants || [])))
       );
       
       const knownUsers = Array.from(usersCacheRef.current.values());
       const missing = await fetchMissingUsers(allParticipantIds, knownUsers);
+
+      // Bail out if a newer snapshot arrived while we were awaiting fetchMissingUsers
+      if (gen !== currentGen) return;
+
       if (missing.length > 0) {
         missing.forEach(u => updateUserInCache(u));
       }
@@ -412,7 +422,9 @@ function useChatData() {
                 return 0;
               };
 
-              const lastMsgTime = getMillis(data.lastMessage.timestamp);
+              // lastMessage.timestamp may be null during a pending write (serverTimestamp sentinel);
+              // safeGetMillis returns 0 in that case so the sort/comparison is still safe.
+              const lastMsgTime = getMillis(data.lastMessage?.timestamp ?? null);
               const lastReadTime = getMillis(lastReadTimestamp);
 
               if (lastReadTime === 0 || lastMsgTime > lastReadTime) {
@@ -428,10 +440,23 @@ function useChatData() {
               participantsDetails,
               unreadCount,
               otherParticipantLastRead,
+              // Ensure lastMessage always has a safe shape even when the Firestore
+              // pending write has a null serverTimestamp sentinel.
+              lastMessage: data.lastMessage
+                ? {
+                    text: data.lastMessage.text ?? '',
+                    senderId: data.lastMessage.senderId ?? '',
+                    timestamp: data.lastMessage.timestamp ?? null,
+                  }
+                : undefined,
           } as Conversation;
       });
 
       const convos = await Promise.all(convosPromises);
+
+      // Bail out again if superseded while awaiting convosPromises
+      if (gen !== currentGen) return;
+
       // Safe sort that handles both Firestore Timestamps and JS Dates
       const safeGetMillis = (ts: any): number => {
         if (!ts) return 0;
@@ -445,7 +470,10 @@ function useChatData() {
       setConversations(convos);
     });
 
-    return () => unsubscribeConversations();
+    return () => {
+      currentGen = Infinity; // Invalidate all pending async callbacks on cleanup
+      unsubscribeConversations();
+    };
   }, [authUser?.uid, getParticipantDetails, updateUserInCache]);
 
   // Sync usersCache updates dynamically into conversations (upgrades fallback names/avatars as profile data arrives)
@@ -824,7 +852,22 @@ function useChatData() {
         
         const stories = snapshot.docs
           .map(d => ({id: d.id, ...d.data()} as Story))
-          .filter(story => (story.createdAt as Timestamp).toDate() > twentyFourHoursAgo);
+          .filter(story => {
+            // story.createdAt may be null/undefined while a pending serverTimestamp
+            // write is in flight. Guard against calling .toDate() on non-Timestamp values.
+            const createdAt = story.createdAt;
+            if (!createdAt) return false;
+            try {
+              const date = typeof (createdAt as any).toDate === 'function'
+                ? (createdAt as Timestamp).toDate()
+                : createdAt instanceof Date
+                  ? createdAt
+                  : new Date(createdAt as any);
+              return !isNaN(date.getTime()) && date > twentyFourHoursAgo;
+            } catch {
+              return false;
+            }
+          });
         
         setStories(stories);
     }, error => {
