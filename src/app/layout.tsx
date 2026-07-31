@@ -1,4 +1,3 @@
-
 import type { Metadata, Viewport } from 'next';
 import { ThemeProvider } from '../components/providers/theme-provider';
 import './globals.css';
@@ -13,6 +12,7 @@ import { FriendsProvider } from '@/components/providers/friends-provider';
 import { AppShell } from '@/components/app-shell';
 import { validateEnvironmentOnStartup } from '@/lib/environment-validation';
 import { GlobalErrorCapture } from '@/components/global-error-capture';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 const fontPoppins = Poppins({
   subsets: ['latin'],
@@ -92,29 +92,29 @@ export default function RootLayout({
           fontPtSans.variable
         )}
       >
-
-        <AuthProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <AppearanceProvider>
-              <FriendsProvider>
-                <MobileProvider>
-                  <GlobalErrorCapture />
-                  <AppShell>
-                    <main className="relative flex-1 z-10 h-full w-full overflow-hidden flex flex-col min-h-0">{children}</main>
-                  </AppShell>
-                  <Toaster />
-                </MobileProvider>
-              </FriendsProvider>
-            </AppearanceProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <GlobalErrorCapture />
+        <ErrorBoundary label="RootLayout">
+          <AuthProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <AppearanceProvider>
+                <FriendsProvider>
+                  <MobileProvider>
+                    <AppShell>
+                      <main className="relative flex-1 z-10 h-full w-full overflow-hidden flex flex-col min-h-0">{children}</main>
+                    </AppShell>
+                    <Toaster />
+                  </MobileProvider>
+                </FriendsProvider>
+              </AppearanceProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
 }
-

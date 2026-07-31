@@ -42,6 +42,27 @@ interface AppearanceContextType {
 
 const AppearanceContext = createContext<AppearanceContextType | undefined>(undefined);
 
+function safeGet(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem(key);
+    }
+  } catch (e) {
+    console.warn(`Storage get error for key "${key}":`, e);
+  }
+  return null;
+}
+
+function safeSet(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(key, value);
+    }
+  } catch (e) {
+    console.warn(`Storage set error for key "${key}":`, e);
+  }
+}
+
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const { theme } = useTheme();
   const [accentColor, setAccentColorState] = useState('');
@@ -69,25 +90,25 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const isAmoled = appBackground === 'black';
 
   useEffect(() => {
-    const savedAccent = localStorage.getItem('accentColor') || '283 51% 53%';
-    const savedGradientFrom = localStorage.getItem('gradientFrom') || '330 85% 60%';
-    const savedGradientTo = localStorage.getItem('gradientTo') || '210 90% 55%';
-    const savedChatBg = localStorage.getItem('chatBackground') || 'https://picsum.photos/seed/bg-default/600/1000';
+    const savedAccent = safeGet('accentColor') || '283 51% 53%';
+    const savedGradientFrom = safeGet('gradientFrom') || '330 85% 60%';
+    const savedGradientTo = safeGet('gradientTo') || '210 90% 55%';
+    const savedChatBg = safeGet('chatBackground') || 'https://picsum.photos/seed/bg-default/600/1000';
     
     // Default appBackground to 'black' (True Black)
-    const savedAppBg = localStorage.getItem('appBackground') || 'black';
-    const savedUseCustomBg = localStorage.getItem('useCustomBackground') !== 'false';
-    const savedSound = localStorage.getItem('notificationSound') || 'default';
-    const savedMuted = localStorage.getItem('areNotificationsMuted') === 'true';
+    const savedAppBg = safeGet('appBackground') || 'black';
+    const savedUseCustomBg = safeGet('useCustomBackground') !== 'false';
+    const savedSound = safeGet('notificationSound') || 'default';
+    const savedMuted = safeGet('areNotificationsMuted') === 'true';
     
-    const savedWeatherVisible = localStorage.getItem('isWeatherVisible') !== 'false';
-    const savedWeatherLocation = localStorage.getItem('weatherLocation') || '';
-    const savedWeatherUnit = (localStorage.getItem('weatherUnit') as WeatherUnit) || 'Celsius';
-    const savedChatListOpacity = localStorage.getItem('chatListOpacity');
+    const savedWeatherVisible = safeGet('isWeatherVisible') !== 'false';
+    const savedWeatherLocation = safeGet('weatherLocation') || '';
+    const savedWeatherUnit = (safeGet('weatherUnit') as WeatherUnit) || 'Celsius';
+    const savedChatListOpacity = safeGet('chatListOpacity');
 
-    const savedGlassEnabled = localStorage.getItem('glass-enabled') !== 'false';
-    const savedGlassBlur = localStorage.getItem('glass-blur');
-    const savedGlassOpacity = localStorage.getItem('glass-opacity');
+    const savedGlassEnabled = safeGet('glass-enabled') !== 'false';
+    const savedGlassBlur = safeGet('glass-blur');
+    const savedGlassOpacity = safeGet('glass-opacity');
 
     setAccentColorState(savedAccent);
     setGradientFromState(savedGradientFrom);
@@ -108,134 +129,151 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     if (savedGlassOpacity) setGlassOpacityState(parseInt(savedGlassOpacity, 10));
 
     // Apply CSS variables to root
-    const root = document.documentElement;
-    root.style.setProperty('--primary', savedAccent);
-    root.style.setProperty('--gradient-from', savedGradientFrom);
-    root.style.setProperty('--gradient-to', savedGradientTo);
+    try {
+      const root = document.documentElement;
+      root.style.setProperty('--primary', savedAccent);
+      root.style.setProperty('--gradient-from', savedGradientFrom);
+      root.style.setProperty('--gradient-to', savedGradientTo);
 
-    root.style.setProperty('--glass-blur', `${savedGlassEnabled ? (savedGlassBlur ? parseInt(savedGlassBlur, 10) : 12) : 0}px`);
-    root.style.setProperty('--glass-opacity', `${(savedGlassOpacity ? parseInt(savedGlassOpacity, 10) : 70) / 100}`);
+      root.style.setProperty('--glass-blur', `${savedGlassEnabled ? (savedGlassBlur ? parseInt(savedGlassBlur, 10) : 12) : 0}px`);
+      root.style.setProperty('--glass-opacity', `${(savedGlassOpacity ? parseInt(savedGlassOpacity, 10) : 70) / 100}`);
+    } catch (e) {
+      console.warn('Error setting root CSS variables:', e);
+    }
   }, []);
 
   // Single pure effect synchronizing body background colors with appBackground
   useEffect(() => {
-    const root = document.documentElement;
-    const isLightMode = theme === 'light';
+    try {
+      const root = document.documentElement;
+      const isLightMode = theme === 'light';
 
-    if (isLightMode) {
-      // Light Mode background
-      root.style.backgroundColor = 'hsl(280, 60%, 97%)';
-      document.body.style.backgroundColor = 'hsl(280, 60%, 97%)';
-      document.body.classList.remove('amoled');
-    } else if (appBackground === 'black') {
-      // Pure True Black Mode
-      root.style.backgroundColor = '#000000';
-      document.body.style.backgroundColor = '#000000';
-      document.body.classList.add('amoled');
-    } else if (appBackground === 'galaxy') {
-      // Galaxy Stars Mode: Transparent body so canvas is visible
-      root.style.backgroundColor = '#0c0a1e';
-      document.body.style.backgroundColor = 'transparent';
-      document.body.classList.remove('amoled');
-    } else {
-      root.style.backgroundColor = 'hsl(275, 22%, 11%)';
-      document.body.style.backgroundColor = 'hsl(275, 22%, 11%)';
-      document.body.classList.remove('amoled');
+      if (isLightMode) {
+        root.style.backgroundColor = 'hsl(280, 60%, 97%)';
+        document.body.style.backgroundColor = 'hsl(280, 60%, 97%)';
+        document.body.classList.remove('amoled');
+      } else if (appBackground === 'black') {
+        root.style.backgroundColor = '#000000';
+        document.body.style.backgroundColor = '#000000';
+        document.body.classList.add('amoled');
+      } else if (appBackground === 'galaxy') {
+        root.style.backgroundColor = '#0c0a1e';
+        document.body.style.backgroundColor = 'transparent';
+        document.body.classList.remove('amoled');
+      } else {
+        root.style.backgroundColor = 'hsl(275, 22%, 11%)';
+        document.body.style.backgroundColor = 'hsl(275, 22%, 11%)';
+        document.body.classList.remove('amoled');
+      }
+    } catch (e) {
+      console.warn('Error setting background colors:', e);
     }
   }, [theme, appBackground]);
 
   const setAccentColor = (color: string) => {
     setAccentColorState(color);
-    localStorage.setItem('accentColor', color);
-    document.documentElement.style.setProperty('--primary', color);
+    safeSet('accentColor', color);
+    try {
+      document.documentElement.style.setProperty('--primary', color);
+    } catch (e) {}
   };
   
   const setGradientFrom = (color: string) => {
     setGradientFromState(color);
-    localStorage.setItem('gradientFrom', color);
-    document.documentElement.style.setProperty('--gradient-from', color);
+    safeSet('gradientFrom', color);
+    try {
+      document.documentElement.style.setProperty('--gradient-from', color);
+    } catch (e) {}
   };
 
   const setGradientTo = (color: string) => {
     setGradientToState(color);
-    localStorage.setItem('gradientTo', color);
-    document.documentElement.style.setProperty('--gradient-to', color);
+    safeSet('gradientTo', color);
+    try {
+      document.documentElement.style.setProperty('--gradient-to', color);
+    } catch (e) {}
   };
 
   const setChatBackground = (background: string) => {
     setChatBackgroundState(background);
-    localStorage.setItem('chatBackground', background);
+    safeSet('chatBackground', background);
   };
   
   const setAppBackground = (background: string) => {
     setAppBackgroundState(background);
-    localStorage.setItem('appBackground', background);
-    localStorage.setItem('isAmoled', String(background === 'black'));
+    safeSet('appBackground', background);
+    safeSet('isAmoled', String(background === 'black'));
   };
 
   const setUseCustomBackground = (use: boolean) => {
     setUseCustomBackgroundState(use);
-    localStorage.setItem('useCustomBackground', String(use));
+    safeSet('useCustomBackground', String(use));
   };
 
   const setIsAmoled = (enabled: boolean) => {
     const nextBg = enabled ? 'black' : 'galaxy';
     setAppBackgroundState(nextBg);
-    localStorage.setItem('appBackground', nextBg);
-    localStorage.setItem('isAmoled', String(enabled));
+    safeSet('appBackground', nextBg);
+    safeSet('isAmoled', String(enabled));
   };
 
   const setNotificationSound = (soundUrl: string) => {
     setNotificationSoundState(soundUrl);
-    localStorage.setItem('notificationSound', soundUrl);
+    safeSet('notificationSound', soundUrl);
   };
 
   const setAreNotificationsMuted = (muted: boolean) => {
     setAreNotificationsMutedState(muted);
-    localStorage.setItem('areNotificationsMuted', String(muted));
+    safeSet('areNotificationsMuted', String(muted));
   };
 
   const setIsWeatherVisible = (visible: boolean) => {
     setIsWeatherVisibleState(visible);
-    localStorage.setItem('isWeatherVisible', String(visible));
+    safeSet('isWeatherVisible', String(visible));
   };
 
   const setWeatherLocation = (location: string) => {
     setWeatherLocationState(location);
-    localStorage.setItem('weatherLocation', location);
+    safeSet('weatherLocation', location);
   };
 
   const setWeatherUnit = (unit: WeatherUnit) => {
     setWeatherUnitState(unit);
-    localStorage.setItem('weatherUnit', unit);
+    safeSet('weatherUnit', unit);
   };
 
   const setChatListOpacity = (opacity: number) => {
     setChatListOpacityState(opacity);
-    localStorage.setItem('chatListOpacity', String(opacity));
+    safeSet('chatListOpacity', String(opacity));
   };
 
   const setIsGlassEnabled = (enabled: boolean) => {
     setIsGlassEnabledState(enabled);
-    localStorage.setItem('glass-enabled', String(enabled));
-    const root = document.documentElement;
-    root.style.setProperty('--glass-blur', `${enabled ? glassBlur : 0}px`);
+    safeSet('glass-enabled', String(enabled));
+    try {
+      const root = document.documentElement;
+      root.style.setProperty('--glass-blur', `${enabled ? glassBlur : 0}px`);
+    } catch (e) {}
   };
 
   const setGlassBlur = (blur: number) => {
     setGlassBlurState(blur);
-    localStorage.setItem('glass-blur', String(blur));
-    const root = document.documentElement;
-    if (isGlassEnabled) {
-      root.style.setProperty('--glass-blur', `${blur}px`);
-    }
+    safeSet('glass-blur', String(blur));
+    try {
+      const root = document.documentElement;
+      if (isGlassEnabled) {
+        root.style.setProperty('--glass-blur', `${blur}px`);
+      }
+    } catch (e) {}
   };
 
   const setGlassOpacity = (opacity: number) => {
     setGlassOpacityState(opacity);
-    localStorage.setItem('glass-opacity', String(opacity));
-    const root = document.documentElement;
-    root.style.setProperty('--glass-opacity', `${opacity / 100}`);
+    safeSet('glass-opacity', String(opacity));
+    try {
+      const root = document.documentElement;
+      root.style.setProperty('--glass-opacity', `${opacity / 100}`);
+    } catch (e) {}
   };
 
   return (
