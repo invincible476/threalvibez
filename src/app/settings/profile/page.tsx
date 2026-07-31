@@ -432,8 +432,7 @@ export default function ProfilePage() {
         }}
     >
        <motion.header variants={cardVariants}>
-        <h1 className="text-3xl font-bold font-heading">Profile</h1>
-        <p className="text-muted-foreground mt-1">Manage your public profile information.</p>
+        <p className="text-xs text-zinc-400 mb-4 max-w-md">Manage your public profile information.</p>
       </motion.header>
 
       <motion.div variants={cardVariants}>

@@ -269,8 +269,7 @@ export default function AccountPage() {
           }}
         >
             <motion.header variants={cardVariants}>
-                <h1 className="text-3xl font-bold font-heading">Account</h1>
-                <p className="text-muted-foreground mt-1">Manage your account settings and data.</p>
+                <p className="text-xs text-zinc-400 mb-4 max-w-md">Manage your account settings and data.</p>
             </motion.header>
 
              <motion.div variants={cardVariants}>

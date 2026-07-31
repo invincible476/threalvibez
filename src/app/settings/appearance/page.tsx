@@ -108,8 +108,7 @@ export default function AppearancePage() {
             }}
         >
              <motion.header variants={cardVariants}>
-                <h1 className="text-3xl font-bold font-heading">Appearance</h1>
-                <p className="text-muted-foreground mt-1">Customize your themes, background styles, and frosted glass controls.</p>
+                <p className="text-xs text-zinc-400 mb-4 max-w-md">Customize your themes, background styles, and frosted glass controls.</p>
             </motion.header>
 
             {/* Background Style Toggle */}
@@ -147,9 +146,9 @@ export default function AppearancePage() {
                                         )}>
                                             <Icon className="h-6 w-6" />
                                         </div>
-                                        <div className="overflow-hidden">
+                                        <div className="flex-1 min-w-0 overflow-hidden pr-2">
                                             <p className="font-semibold text-base truncate">{style.label}</p>
-                                            <p className="text-xs text-muted-foreground line-clamp-1">{style.description}</p>
+                                            <p className="text-xs text-muted-foreground break-words">{style.description}</p>
                                         </div>
                                     </Button>
                                 </motion.div>

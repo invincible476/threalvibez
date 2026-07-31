@@ -22,7 +22,6 @@ import { useAppearance } from './providers/appearance-provider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Separator } from './ui/separator';
 import { useTheme } from 'next-themes';
-import { GlassCard } from './ui/cards/GlassCard';
 import { doc, getDoc, updateDoc, arrayRemove, collection, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -241,7 +240,7 @@ export function ChatList() {
          </CreateGroupModal>
        </div>
 
-    <div className="flex-none px-4 py-2 border-b border-border/50">
+    <div className="flex-none px-3 py-2 border-b border-border/50">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -251,7 +250,7 @@ export function ChatList() {
             autoCorrect="off"
             autoCapitalize="none"
             spellCheck={false}
-            className="pl-10 bg-background/50 group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
+            className="pl-10 border-none bg-zinc-900/80 rounded-xl text-sm py-2.5 group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -263,10 +262,10 @@ export function ChatList() {
              </Button>
            </div>
         </div>
-         <div className="mt-2 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
-            <Button asChild variant="outline" className="w-full justify-start">
+         <div className="mt-1.5 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
+            <Button asChild variant="ghost" className="w-full justify-start text-sm h-9 px-3 text-muted-foreground hover:text-foreground">
                 <Link href="/stories">
-                    <GalleryHorizontal className="mr-2 h-5 w-5" />
+                    <GalleryHorizontal className="mr-2 h-4 w-4" />
                     Stories
                 </Link>
             </Button>
@@ -274,13 +273,13 @@ export function ChatList() {
       </div>
       
             <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
-                <div className="flex flex-col gap-1 p-2 w-full overflow-hidden">
-            <div className="space-y-4">
+                <div className="flex flex-col w-full overflow-hidden">
+            <div className="">
             {favoriteChats.length > 0 && (
                 <div>
-                <h2 className="text-xs font-semibold text-muted-foreground px-2 pt-2 pb-1 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Favorites</h2>
+                <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Favorites</h2>
                 <motion.ul 
-                    className="space-y-1"
+                    className=""
                     variants={listVariants}
                     initial="initial"
                     animate="animate"
@@ -303,9 +302,9 @@ export function ChatList() {
             )}
             {unreadChats.length > 0 && (
                 <div>
-                <h2 className="text-xs font-semibold text-muted-foreground px-2 pt-2 pb-1 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Unread</h2>
+                <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Unread</h2>
                 <motion.ul 
-                    className="space-y-1"
+                    className=""
                     variants={listVariants}
                     initial="initial"
                     animate="animate"
@@ -327,9 +326,9 @@ export function ChatList() {
                 </div>
             )}
                 <div>
-                <h2 className="text-xs font-semibold text-muted-foreground px-2 pt-2 pb-1 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Chats</h2>
+                <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Chats</h2>
                 <motion.ul 
-                    className="space-y-1"
+                    className=""
                     variants={listVariants}
                     initial="initial"
                     animate="animate"
@@ -373,7 +372,7 @@ export function ChatList() {
             
             {shouldShowAiChat && (
                 <div>
-                    <h2 className="text-xs font-semibold text-muted-foreground px-2 pt-2 pb-1 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">AI Assistant</h2>
+                    <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">AI Assistant</h2>
                     <ChatItem
                         conversation={aiConversation}
                         isSelected={selectedChat?.id === aiConversation.id}
@@ -387,15 +386,15 @@ export function ChatList() {
             )}
 
             {archivedChats.length > 0 && (
-                    <div className="px-2 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
+                    <div className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="archived" className="border-b-0">
-                            <AccordionTrigger className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:no-underline py-2">
+                            <AccordionTrigger className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider hover:no-underline py-2">
                                 Archived
                             </AccordionTrigger>
                             <AccordionContent>
                                 <motion.ul 
-                                    className="space-y-1"
+                                    className=""
                                     variants={listVariants}
                                     initial="initial"
                                     animate="animate"
@@ -488,48 +487,48 @@ const ChatItem = React.memo(
           layout
           className="list-none w-full max-w-full min-w-0 overflow-x-hidden"
       >
-              <GlassCard
-                  onClick={onSelect}
-                  className={cn(
-                      'relative group/chat-item flex w-full max-w-full min-w-0 items-center gap-3 p-3 text-left transition-all cursor-pointer overflow-x-hidden',
-                      isSelected ? 'bg-primary/20 border-primary/50' : 'hover:bg-muted/10'
-                  )}
-              >
+          <div
+              onClick={onSelect}
+              className={cn(
+                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3 px-4 text-left transition-all cursor-pointer overflow-x-hidden border-b border-zinc-800/40',
+                  isSelected ? 'bg-primary/15' : 'hover:bg-muted/10'
+              )}
+          >
           <UserAvatar 
               user={{
                   name: conversation.name || 'Unknown',
                   photoURL: conversation.avatar || '',
               }} 
               isFriend={isFriend}
-              className="h-12 w-12 flex-shrink-0"
+              className="h-10 w-10 flex-shrink-0"
           />
           <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
-              <div className="flex justify-between items-baseline min-w-0 max-w-full">
-                  <div className="flex items-center gap-2 min-w-0 max-w-full">
-                      <p className="font-semibold truncate flex-grow min-w-0 max-w-full overflow-hidden whitespace-nowrap">{conversation.name}</p>
-                      {conversation.isFavorite && !isAiChat && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                      {isAiChat && <Bot className="h-4 w-4 text-primary" />}
+              <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap">{conversation.name}</p>
+                      {conversation.isFavorite && !isAiChat && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 shrink-0" />}
+                      {isAiChat && <Bot className="h-3.5 w-3.5 text-primary shrink-0" />}
                   </div>
-                  <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground flex-shrink-0">{timestamp}</p>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                      <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
+                      {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
+                          <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                              {conversation.unreadCount}
+                          </span>
+                      ) : <span className="h-4" />}
                   </div>
               </div>
-              <div className="flex justify-between items-start gap-2 min-w-0 max-w-full">
-                      <p className="text-sm text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full chat-list-force-break">
+              <div className="flex items-center gap-2 min-w-0 max-w-full mt-0.5">
+                  <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full chat-list-force-break">
                       {text}
                   </p>
-                  {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground shrink-0">
-                          {conversation.unreadCount}
-                      </span>
-                  ) : null}
               </div>
           </div>
-          <div className="absolute right-1 top-1/2 -translate-y-1/2 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
+          <div className="shrink-0 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background/50 hover:backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
-                          <MoreHorizontal className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/chat-item:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <MoreHorizontal className="h-3.5 w-3.5" />
                       </Button>
                   </DropdownMenuTrigger>
                   {!isAiChat && (
@@ -545,7 +544,7 @@ const ChatItem = React.memo(
                   )}
               </DropdownMenu>
           </div>
-        </GlassCard>
+        </div>
       </motion.li>
     );
   },

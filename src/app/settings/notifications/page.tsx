@@ -71,8 +71,7 @@ export default function NotificationsPage() {
             }}
         >
              <motion.header variants={cardVariants}>
-                <h1 className="text-3xl font-bold font-heading">Notifications</h1>
-                <p className="text-muted-foreground mt-1">Manage how you get notified about new messages.</p>
+                <p className="text-xs text-zinc-400 mb-4 max-w-md">Manage how you get notified about new messages.</p>
             </motion.header>
 
             <motion.div variants={cardVariants}>
