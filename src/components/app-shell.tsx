@@ -678,46 +678,66 @@ function useChatData() {
     messagesUnsubscribe.current = onSnapshot(liveQuery, { includeMetadataChanges: true }, (snapshot) => {
         if (snapshot.empty) return;
 
-        const newMessages: Message[] = snapshot.docs.map(parseMessageDoc);
+        // Only process docs that actually changed — skip metadata-only events
+        // that only flip hasPendingWrites without any real content change.
+        const changes = snapshot.docChanges();
+        if (!changes.length) return;
+
+        const relevantChanges = changes.filter(c => c.type === 'added' || c.type === 'modified');
+        if (!relevantChanges.length) return;
 
         setMessages(prev => {
-            // Build lookup maps
             const prevById = new Map(prev.map(m => [m.id, m]));
             const prevByTempId = new Map(
                 prev.filter(m => m.clientTempId).map(m => [m.clientTempId!, m])
             );
 
             let changed = false;
+            // needsSort is only true when timestamps actually shift (pending→confirmed)
+            // or a genuinely new message arrives — avoids O(n log n) on status-only updates
+            let needsSort = false;
             const result = [...prev];
 
-            for (const incoming of newMessages) {
+            for (const change of relevantChanges) {
+                const incoming = parseMessageDoc(change.doc);
                 const existingById = prevById.get(incoming.id);
                 const existingByTempId = incoming.clientTempId ? prevByTempId.get(incoming.clientTempId) : undefined;
 
                 if (existingById) {
-                    // Update status / timestamp in-place if changed
-                    if (existingById.status !== incoming.status || existingById.timestamp !== incoming.timestamp) {
+                    // Update status / timestamp in-place only when something actually changed
+                    const statusChanged = existingById.status !== incoming.status;
+                    const tsMillisOld = getMillis(existingById.timestamp);
+                    const tsMillisNew = getMillis(incoming.timestamp);
+                    const tsChanged = tsMillisOld !== tsMillisNew && tsMillisNew > 0;
+                    if (statusChanged || tsChanged) {
                         const idx = result.indexOf(existingById);
-                        if (idx !== -1) { result[idx] = { ...existingById, ...incoming }; changed = true; }
+                        if (idx !== -1) {
+                            result[idx] = { ...existingById, ...incoming };
+                            changed = true;
+                            // Sort only needed when timestamp shifts (pending null → server value)
+                            if (tsChanged) needsSort = true;
+                        }
                     }
                 } else if (existingByTempId) {
-                    // Replace optimistic bubble (tempId match) with confirmed doc
+                    // Replace optimistic bubble with confirmed server doc
                     const idx = result.indexOf(existingByTempId);
                     if (idx !== -1) {
-                        result[idx] = { ...incoming, id: incoming.id };
+                        result[idx] = { ...incoming };
                         prevById.set(incoming.id, result[idx]);
                         changed = true;
+                        needsSort = true; // temp used new Date(), real doc has server ts
                     }
                 } else if (!seenInitialIds.has(incoming.id)) {
                     // Genuinely new message not in the initial batch
                     result.push(incoming);
                     seenInitialIds.add(incoming.id);
                     changed = true;
+                    needsSort = true;
                 }
             }
 
             if (!changed) return prev;
-            result.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
+            if (needsSort) result.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
             return result;
         });
     }, (error) => {

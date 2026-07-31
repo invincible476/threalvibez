@@ -113,7 +113,35 @@ const ChatViewComponent = ({
   const messageListRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [newMessagesCount, setNewMessagesCount] = useState(0);
-  const prevMessagesLength = useRef(messages.length);
+
+  // Local pending-message layer: bubbles appended here appear instantly on send,
+  // before app-shell's onSnapshot state cycle resolves the confirmed doc.
+  const [pendingMessages, setPendingMessages] = useState<MessageType[]>([]);
+
+  // Prune pending messages whose text already arrived in the confirmed messages prop.
+  // This prevents duplicates once onSnapshot delivers the real doc.
+  useEffect(() => {
+    if (!pendingMessages.length) return;
+    setPendingMessages(prev =>
+      prev.filter(pm => !messages.some(
+        m => m.clientTempId === pm.clientTempId ||
+             (m.text === pm.text && m.senderId === pm.senderId && m.status !== 'sending')
+      ))
+    );
+  }, [messages]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Merge confirmed messages (capped to last 50) with local pending bubbles.
+  // Pending bubbles always appear after all confirmed messages.
+  const displayMessages = React.useMemo(() => {
+    const confirmed = messages.length > 50 ? messages.slice(-50) : messages;
+    if (!pendingMessages.length) return confirmed;
+    // Filter out any pending messages already present by clientTempId
+    const confirmedTempIds = new Set(messages.map(m => m.clientTempId).filter(Boolean));
+    const stillPending = pendingMessages.filter(pm => !confirmedTempIds.has(pm.clientTempId));
+    return [...confirmed, ...stillPending];
+  }, [messages, pendingMessages]);
+
+  const prevMessagesLength = useRef(displayMessages.length);
 
   const {
     usersCache,
@@ -171,7 +199,7 @@ const ChatViewComponent = ({
     if (!chat || !currentUser) {
       return;
     }
-    const newCount = messages.length - prevMessagesLength.current;
+    const newCount = displayMessages.length - prevMessagesLength.current;
     const newMessagesAdded = newCount > 0;
 
     if (newMessagesAdded && isAtBottom) {
@@ -180,8 +208,8 @@ const ChatViewComponent = ({
         setNewMessagesCount(prev => prev + newCount);
     }
     
-    prevMessagesLength.current = messages.length;
-}, [messages, isAtBottom, chat, currentUser]);
+    prevMessagesLength.current = displayMessages.length;
+}, [displayMessages, isAtBottom, chat, currentUser]);
   
   const handleFileSelect = async (file: File) => {
     const isImage = file.type.startsWith("image/");
@@ -222,7 +250,7 @@ const ChatViewComponent = ({
 
 
   const handleSendMessageWithReply = (messageText: string) => {
-    if (!messageText.trim() || !chat) return;
+    if (!messageText.trim() || !chat || !currentUser) return;
     
     // Build reply context and clear reply state immediately for instant UI feedback
     const messageReply = replyToMessage?.replyTo || (replyToMessage ? {
@@ -232,9 +260,26 @@ const ChatViewComponent = ({
     } : undefined);
     setReplyToMessage(null);
 
-    // Dispatch message optimistically using client-side Firebase SDK addDoc
+    // ── Instant local bubble ────────────────────────────────────────────────────
+    // Append a temp message to local pendingMessages NOW, before any network call.
+    // This gives zero-lag visual feedback independent of app-shell's state cycle.
+    const tempId = `temp-${Date.now()}`;
+    const tempMsg: MessageType = {
+      id: tempId,
+      clientTempId: tempId,
+      senderId: currentUser.uid,
+      text: messageText,
+      timestamp: new Date(),
+      status: 'sending',
+      ...(messageReply && { replyTo: messageReply }),
+    };
+    setPendingMessages(prev => [...prev, tempMsg]);
+
+    // Fire addDoc in the background — do NOT await before updating UI
     activeSendMessage(messageText, messageReply).catch((e) => {
       console.error('Error sending message:', e);
+      // Remove the failed pending bubble
+      setPendingMessages(prev => prev.filter(m => m.clientTempId !== tempId));
       toast({
           title: 'Error Sending Message',
           description: 'Could not send your message. Please try again.',
@@ -246,7 +291,7 @@ const ChatViewComponent = ({
     if (messageText.includes('@gemini')) {
         geminiService.processMessage({
             id: crypto.randomUUID(),
-            senderId: currentUser?.uid || '',
+            senderId: currentUser.uid,
             text: messageText,
             timestamp: new Date(),
             status: 'sent'
@@ -507,7 +552,7 @@ const ChatViewComponent = ({
           </div>
         )}
       <MessageList 
-        messages={messages}
+        messages={displayMessages}
         currentUser={currentUser}
         usersCache={usersCache}
         uploadProgress={uploadProgress}
