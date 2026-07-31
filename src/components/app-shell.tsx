@@ -555,6 +555,8 @@ function useChatData() {
     if (!chat) {
         setSelectedChat(undefined);
         setMessages([]);
+        setFirstMessageDoc(null);
+        setHasMoreMessages(false);
         return;
     }
 
@@ -562,13 +564,18 @@ function useChatData() {
         setSelectedChat(aiConversation);
         setMessages(aiConversation.messages || []);
         setHasMoreMessages(false);
+        setFirstMessageDoc(null);
         return;
     }
     
     setSelectedChat(chat);
+    // Reset pagination state for new chat
+    setFirstMessageDoc(null);
+    setHasMoreMessages(false);
+    setMessages([]);
     setIsLoadingMore(true);
 
-    const messagesRef = collection(db, 'conversations', chat.id, 'messages');
+    const messagesColRef = collection(db, 'conversations', chat.id, 'messages');
     
     if (chat && authUser) {
         const chatRef = doc(db, 'conversations', chat.id);
@@ -577,76 +584,121 @@ function useChatData() {
         }).catch(console.error);
     }
 
-    // Subscribe to the latest PAGE_SIZE messages in real-time
-    // Using limitToLast with asc order gives us the most recent messages in chronological order
-    const newMessagesQuery = query(messagesRef, orderBy('timestamp', 'asc'), limitToLast(PAGE_SIZE));
+    // Shared timestamp parser used by both phases
+    const getMillis = (ts: any): number => {
+        if (!ts) return 0;
+        if (typeof ts.toMillis === 'function') return ts.toMillis();
+        if (ts instanceof Date) return ts.getTime();
+        if (typeof ts === 'number') return ts;
+        if (typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+        if (typeof ts === 'string') {
+          const parsed = new Date(ts).getTime();
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+    };
 
-    messagesUnsubscribe.current = onSnapshot(newMessagesQuery, (snapshot) => {
-        const docs = snapshot.docs;
+    const parseMessageDoc = (d: any): Message => {
+        const data = d.data();
+        const rawTs = data.timestamp || data.createdAt;
+        let parsedTimestamp: Date;
+        if (rawTs?.toDate && typeof rawTs.toDate === 'function') {
+            parsedTimestamp = rawTs.toDate();
+        } else if (rawTs instanceof Date) {
+            parsedTimestamp = rawTs;
+        } else if (typeof rawTs === 'number') {
+            parsedTimestamp = new Date(rawTs);
+        } else {
+            parsedTimestamp = new Date();
+        }
+        return {
+            ...data,
+            id: d.id,
+            status: d.metadata.hasPendingWrites ? 'sending' : 'sent',
+            timestamp: parsedTimestamp,
+        } as Message;
+    };
 
-        if (docs.length > 0) {
-            setFirstMessageDoc(docs[0]);
-            setHasMoreMessages(docs.length >= PAGE_SIZE);
+    // ─── PHASE 1: One-shot initial load ───────────────────────────────────────
+    // Fetch the latest PAGE_SIZE messages using a one-shot getDocs query.
+    // This avoids the limitToLast + null-serverTimestamp exclusion bug on the
+    // receiver's client: getDocs resolves from cache/server without the query
+    // boundary constraints that caused receivers to miss pending-write messages.
+    let newestTimestamp: Date = new Date(0);
+    let oldestCursorDoc: any = null;
+
+    try {
+        const initialQuery = query(messagesColRef, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
+        const initialSnapshot = await getDocs(initialQuery);
+
+        if (!initialSnapshot.empty) {
+            // Reverse so messages are in chronological (asc) order
+            const initialMessages: Message[] = initialSnapshot.docs.map(parseMessageDoc).reverse();
+            initialMessages.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
+
+            // The oldest doc (after reversing) is the pagination cursor for "Load More"
+            oldestCursorDoc = initialSnapshot.docs[initialSnapshot.docs.length - 1];
+            // The newest message timestamp is the floor for the live listener
+            const newestMsg = initialMessages[initialMessages.length - 1];
+            if (newestMsg?.timestamp instanceof Date) {
+                newestTimestamp = newestMsg.timestamp;
+            }
+
+            setFirstMessageDoc(oldestCursorDoc);
+            setHasMoreMessages(initialSnapshot.docs.length >= PAGE_SIZE);
+            setMessages(initialMessages);
         } else {
             setHasMoreMessages(false);
         }
+    } catch (err) {
+        console.error('Error loading initial messages:', err);
+    } finally {
         setIsLoadingMore(false);
+    }
 
-        const getMillis = (ts: any): number => {
-            if (!ts) return 0;
-            if (typeof ts.toMillis === 'function') return ts.toMillis();
-            if (ts instanceof Date) return ts.getTime();
-            if (typeof ts === 'number') return ts;
-            if (typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
-            if (typeof ts === 'string') {
-              const parsed = new Date(ts).getTime();
-              return isNaN(parsed) ? 0 : parsed;
-            }
-            return 0;
-        };
+    // ─── PHASE 2: Live listener for new messages only ─────────────────────────
+    // Listen ONLY for messages arriving after the initial batch by using a
+    // where('timestamp', '>', newestTimestamp) floor. This avoids re-fetching
+    // the full history window on every snapshot and prevents null-timestamp
+    // exclusion: serverTimestamp() resolves on the server before a document
+    // satisfies the '>' predicate, so the receiver always sees the committed
+    // value — eliminating the 500ms–2s latency window.
+    const liveQuery = query(
+        messagesColRef,
+        orderBy('timestamp', 'asc'),
+        where('timestamp', '>', newestTimestamp)
+    );
 
-        const serverMessages: Message[] = docs.map(d => {
-            const data = d.data();
-            const rawTs = data.timestamp || data.createdAt;
-            let parsedTimestamp: Date;
-            if (rawTs?.toDate && typeof rawTs.toDate === 'function') {
-                parsedTimestamp = rawTs.toDate();
-            } else if (rawTs instanceof Date) {
-                parsedTimestamp = rawTs;
-            } else if (typeof rawTs === 'number') {
-                parsedTimestamp = new Date(rawTs);
-            } else {
-                parsedTimestamp = new Date();
-            }
+    messagesUnsubscribe.current = onSnapshot(liveQuery, (snapshot) => {
+        if (snapshot.empty) return;
 
-            return {
-                ...data,
-                id: d.id,
-                status: d.metadata.hasPendingWrites ? 'sending' : 'sent',
-                timestamp: parsedTimestamp,
-            } as Message;
-        });
-
-        // Ensure chronological order even if pending writes have null serverTimestamp initially
-        serverMessages.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
+        const newMessages: Message[] = snapshot.docs.map(parseMessageDoc);
+        newMessages.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
 
         setMessages(prev => {
-            const serverIds = new Set(serverMessages.map(m => m.id));
-            const serverClientTempIds = new Set(serverMessages.map(m => m.clientTempId).filter(Boolean));
+            const existingIds = new Set(prev.map(m => m.id));
+            const existingClientTempIds = new Set(prev.map(m => m.clientTempId).filter(Boolean));
 
-            const unsentOptimisticMsgs = prev.filter(m => 
-                (m.status === 'sending' || m.status === 'error') &&
-                !serverIds.has(m.id) &&
-                (!m.clientTempId || !serverClientTempIds.has(m.clientTempId))
+            // Deduplicate incoming messages against what's already in state
+            const deduped = newMessages.filter(m =>
+                !existingIds.has(m.id) &&
+                (!m.clientTempId || !existingClientTempIds.has(m.clientTempId))
             );
 
-            const combined = [...serverMessages, ...unsentOptimisticMsgs];
+            if (deduped.length === 0) {
+                // Only status updates (hasPendingWrites transitions) — update in place
+                return prev.map(m => {
+                    const updated = newMessages.find(nm => nm.id === m.id || (m.clientTempId && nm.clientTempId === m.clientTempId));
+                    return updated ? { ...m, ...updated } : m;
+                });
+            }
+
+            const combined = [...prev, ...deduped];
             combined.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
             return combined;
         });
     }, (error) => {
-        console.error("Error fetching messages snapshot:", error);
-        setIsLoadingMore(false);
+        console.error('Error in live messages listener:', error);
     });
 
   }, [aiConversation, authUser, selectedChat?.id]);

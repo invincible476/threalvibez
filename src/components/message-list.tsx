@@ -38,6 +38,7 @@ interface MessageListProps {
     onLoadMore: () => Promise<void>;
     hasMore: boolean;
     isLoadingMore: boolean;
+    isLoadingMessages: boolean;
     chatId: string;
 }
 
@@ -57,7 +58,7 @@ function formatDateSeparator(date: Date): string {
 }
 
 
-export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
+export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({ 
     messages,
     currentUser,
     usersCache,
@@ -70,6 +71,7 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
     onLoadMore,
     hasMore,
     isLoadingMore,
+    isLoadingMessages,
     chatId,
 }, ref) => {
     
@@ -198,6 +200,18 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
                             </Fragment>
                         );
                 })
+                ) : isLoadingMessages ? (
+                <div className="flex flex-col gap-4 px-2">
+                    {[...Array(6)].map((_, i) => (
+                        <div key={i} className={`flex items-end gap-2 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
+                            <div className="h-8 w-8 rounded-full bg-muted animate-pulse flex-shrink-0" />
+                            <div
+                                className="h-10 rounded-2xl bg-muted animate-pulse"
+                                style={{ width: `${40 + (i * 13) % 35}%` }}
+                            />
+                        </div>
+                    ))}
+                </div>
                 ) : (
                 <div className="flex justify-center items-center h-full">
                     <div className="text-center p-4 rounded-lg bg-background/50">

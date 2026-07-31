@@ -520,6 +520,7 @@ const ChatViewComponent = ({
         onLoadMore={loadMoreMessages}
         hasMore={hasMoreMessages}
         isLoadingMore={isLoadingMore}
+        isLoadingMessages={isLoadingMore}
         ref={messageListRef}
         chatId={chat.id}
       />
