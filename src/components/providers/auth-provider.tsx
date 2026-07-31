@@ -1,7 +1,7 @@
 'use client';
 
 import { auth } from '@/lib/firebase';
-import { signOut as firebaseSignOut, Auth, getRedirectResult, User } from 'firebase/auth';
+import { signOut as firebaseSignOut, Auth, getRedirectResult, User, onIdTokenChanged } from 'firebase/auth';
 import React, { createContext, ReactNode, useEffect, useState, useRef } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { usePathname, useRouter } from 'next/navigation';
@@ -113,6 +113,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsProcessingRedirect(false);
         });
     }
+  }, []);
+
+  // ─── onIdTokenChanged: keep session alive past 60-minute token expiry ──────
+  // Firebase silently refreshes ID tokens every ~55 minutes, but that event
+  // fires onIdTokenChanged — NOT onAuthStateChanged. react-firebase-hooks'
+  // useAuthState only listens to onAuthStateChanged, so without this listener
+  // the provider would not react to token refreshes and could treat the user
+  // as signed out after the first hour. By subscribing here we force a
+  // re-render with the refreshed user object, keeping the session alive
+  // indefinitely while the tab remains open.
+  useEffect(() => {
+    const unsubscribeToken = onIdTokenChanged(auth, (updatedUser) => {
+      if (updatedUser) {
+        // Refresh session markers so the redirect guard never expires them
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastLogin', Date.now().toString());
+          localStorage.setItem('sessionUser', updatedUser.uid);
+        }
+      }
+    });
+    return () => unsubscribeToken();
   }, []);
 
   useEffect(() => {

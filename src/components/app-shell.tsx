@@ -624,12 +624,12 @@ function useChatData() {
     // This avoids the limitToLast + null-serverTimestamp exclusion bug on the
     // receiver's client: getDocs resolves from cache/server without the query
     // boundary constraints that caused receivers to miss pending-write messages.
-    let newestTimestamp: Date = new Date(0);
     let oldestCursorDoc: any = null;
+    let initialSnapshot: Awaited<ReturnType<typeof getDocs>> | null = null;
 
     try {
         const initialQuery = query(messagesColRef, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
-        const initialSnapshot = await getDocs(initialQuery);
+        initialSnapshot = await getDocs(initialQuery);
 
         if (!initialSnapshot.empty) {
             // Reverse so messages are in chronological (asc) order
@@ -638,11 +638,6 @@ function useChatData() {
 
             // The oldest doc (after reversing) is the pagination cursor for "Load More"
             oldestCursorDoc = initialSnapshot.docs[initialSnapshot.docs.length - 1];
-            // The newest message timestamp is the floor for the live listener
-            const newestMsg = initialMessages[initialMessages.length - 1];
-            if (newestMsg?.timestamp instanceof Date) {
-                newestTimestamp = newestMsg.timestamp;
-            }
 
             setFirstMessageDoc(oldestCursorDoc);
             setHasMoreMessages(initialSnapshot.docs.length >= PAGE_SIZE);
@@ -656,46 +651,73 @@ function useChatData() {
         setIsLoadingMore(false);
     }
 
-    // ─── PHASE 2: Live listener for new messages only ─────────────────────────
-    // Listen ONLY for messages arriving after the initial batch by using a
-    // where('timestamp', '>', newestTimestamp) floor. This avoids re-fetching
-    // the full history window on every snapshot and prevents null-timestamp
-    // exclusion: serverTimestamp() resolves on the server before a document
-    // satisfies the '>' predicate, so the receiver always sees the committed
-    // value — eliminating the 500ms–2s latency window.
+    // ─── PHASE 2: Live listener for new messages ──────────────────────────────
+    // We use limitToLast(PAGE_SIZE) WITHOUT a where-timestamp filter, and enable
+    // { includeMetadataChanges: true } so Firestore fires the callback the
+    // instant a local pending-write lands (hasPendingWrites = true), before the
+    // server round-trip resolves the serverTimestamp().
+    //
+    // Why NOT where('timestamp', '>', date):
+    //   Pending-write docs have a null timestamp locally, so they never satisfy
+    //   the '>' predicate and are invisible to the listener until the server
+    //   resolves the timestamp (~1-4 s RTT) — causing the visible 3-4 s delay.
+    //
+    // Deduplication strategy:
+    //   - Match by Firestore doc id (server-confirmed messages)
+    //   - Match by clientTempId to replace optimistic bubbles with confirmed ones
+    //   - Keep the initial batch's messages; only add genuinely new docs
+    const seenInitialIds = new Set(initialSnapshot ? initialSnapshot.docs.map(d => d.id) : []);
+
     const liveQuery = query(
         messagesColRef,
         orderBy('timestamp', 'asc'),
-        where('timestamp', '>', newestTimestamp)
+        limitToLast(PAGE_SIZE)
     );
 
-    messagesUnsubscribe.current = onSnapshot(liveQuery, (snapshot) => {
+    messagesUnsubscribe.current = onSnapshot(liveQuery, { includeMetadataChanges: true }, (snapshot) => {
         if (snapshot.empty) return;
 
         const newMessages: Message[] = snapshot.docs.map(parseMessageDoc);
-        newMessages.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
 
         setMessages(prev => {
-            const existingIds = new Set(prev.map(m => m.id));
-            const existingClientTempIds = new Set(prev.map(m => m.clientTempId).filter(Boolean));
-
-            // Deduplicate incoming messages against what's already in state
-            const deduped = newMessages.filter(m =>
-                !existingIds.has(m.id) &&
-                (!m.clientTempId || !existingClientTempIds.has(m.clientTempId))
+            // Build lookup maps
+            const prevById = new Map(prev.map(m => [m.id, m]));
+            const prevByTempId = new Map(
+                prev.filter(m => m.clientTempId).map(m => [m.clientTempId!, m])
             );
 
-            if (deduped.length === 0) {
-                // Only status updates (hasPendingWrites transitions) — update in place
-                return prev.map(m => {
-                    const updated = newMessages.find(nm => nm.id === m.id || (m.clientTempId && nm.clientTempId === m.clientTempId));
-                    return updated ? { ...m, ...updated } : m;
-                });
+            let changed = false;
+            const result = [...prev];
+
+            for (const incoming of newMessages) {
+                const existingById = prevById.get(incoming.id);
+                const existingByTempId = incoming.clientTempId ? prevByTempId.get(incoming.clientTempId) : undefined;
+
+                if (existingById) {
+                    // Update status / timestamp in-place if changed
+                    if (existingById.status !== incoming.status || existingById.timestamp !== incoming.timestamp) {
+                        const idx = result.indexOf(existingById);
+                        if (idx !== -1) { result[idx] = { ...existingById, ...incoming }; changed = true; }
+                    }
+                } else if (existingByTempId) {
+                    // Replace optimistic bubble (tempId match) with confirmed doc
+                    const idx = result.indexOf(existingByTempId);
+                    if (idx !== -1) {
+                        result[idx] = { ...incoming, id: incoming.id };
+                        prevById.set(incoming.id, result[idx]);
+                        changed = true;
+                    }
+                } else if (!seenInitialIds.has(incoming.id)) {
+                    // Genuinely new message not in the initial batch
+                    result.push(incoming);
+                    seenInitialIds.add(incoming.id);
+                    changed = true;
+                }
             }
 
-            const combined = [...prev, ...deduped];
-            combined.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
-            return combined;
+            if (!changed) return prev;
+            result.sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
+            return result;
         });
     }, (error) => {
         console.error('Error in live messages listener:', error);
