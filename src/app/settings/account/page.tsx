@@ -257,26 +257,26 @@ export default function AccountPage() {
 
     return (
         <motion.div 
-          className="space-y-8"
+          className="space-y-4 px-4 pt-4 pb-20"
           initial="initial"
           animate="animate"
           variants={{
             animate: {
               transition: {
-                staggerChildren: 0.1,
+                staggerChildren: 0.07,
               },
             },
           }}
         >
             <motion.header variants={cardVariants}>
-                <p className="text-xs text-zinc-400 mb-4 max-w-md">Manage your account settings and data.</p>
+                <p className="text-xs text-zinc-400 mb-2 max-w-md">Manage your account settings and data.</p>
             </motion.header>
 
              <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Security</CardTitle>
-                        <CardDescription>
+                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-100">Security</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">
                             Change your password and manage your account security.
                         </CardDescription>
                     </CardHeader>
@@ -298,10 +298,10 @@ export default function AccountPage() {
             </motion.div>
 
             <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Manage Data</CardTitle>
-                        <CardDescription>
+                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-100">Manage Data</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">
                             Export or import your account data. This allows you to take your information with you.
                         </CardDescription>
                     </CardHeader>
@@ -327,10 +327,10 @@ export default function AccountPage() {
             </motion.div>
 
             <motion.div variants={cardVariants}>
-                <Card className="border-destructive">
-                    <CardHeader>
-                        <CardTitle className="text-destructive">Delete Account</CardTitle>
-                        <CardDescription>
+                <Card className="border border-red-900/40 bg-red-950/20">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-red-400">Delete Account</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">
                             Permanently delete your account and all of your content. This action is not reversible.
                         </CardDescription>
                     </CardHeader>

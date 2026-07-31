@@ -43,33 +43,32 @@ export default function WeatherSettingsPage() {
 
   return (
     <motion.div
-      className="space-y-8"
+      className="space-y-4 px-4 pt-4 pb-20"
       initial="initial"
       animate="animate"
       variants={{
         animate: {
           transition: {
-            staggerChildren: 0.1,
+            staggerChildren: 0.07,
           },
         },
       }}
     >
       <motion.header variants={cardVariants}>
-        <h1 className="text-3xl font-bold font-heading">Weather</h1>
-        <p className="text-muted-foreground mt-1">Customize the weather widget shown in the sidebar.</p>
+        <p className="text-xs text-zinc-400 mb-2 max-w-md">Customize the weather widget shown in the sidebar.</p>
       </motion.header>
 
       <motion.div variants={cardVariants}>
-        <Card>
-            <CardHeader>
-                <CardTitle>Display</CardTitle>
-                <CardDescription>Control the visibility of the weather widget.</CardDescription>
+        <Card className="border border-zinc-800/50 bg-zinc-900/60">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-zinc-100">Display</CardTitle>
+                <CardDescription className="text-xs text-zinc-400">Control the visibility of the weather widget.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
-                    <Label htmlFor="show-weather-widget" className="flex flex-col space-y-1">
-                        <span>Show Weather Widget</span>
-                        <span className="font-normal leading-snug text-muted-foreground">
+            <CardContent className="pt-0">
+                <div className="flex items-center justify-between py-3 px-4">
+                    <Label htmlFor="show-weather-widget" className="flex flex-col space-y-0.5">
+                        <span className="text-sm font-medium text-zinc-100">Show Weather Widget</span>
+                        <span className="text-xs text-zinc-400">
                             Display the current weather in the chat list header.
                         </span>
                     </Label>
@@ -82,22 +81,23 @@ export default function WeatherSettingsPage() {
       {isWeatherVisible && (
         <>
             <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Location</CardTitle>
-                        <CardDescription>
+                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-100">Location</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">
                             Set the location for the weather forecast. Leave it blank to use your browser's location.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="px-4 pb-4">
                         <Input
                             placeholder="e.g., London, UK"
                             value={tempLocation}
                             onChange={(e) => setTempLocation(e.target.value)}
                             onBlur={handleLocationBlur}
                             onKeyDown={handleLocationKeyDown}
+                            className="border-zinc-700/50 bg-zinc-800/40"
                         />
-                         <p className="text-xs text-muted-foreground mt-2">
+                         <p className="text-xs text-zinc-400 mt-2">
                            Changes are saved when you press Enter or click outside the box.
                         </p>
                     </CardContent>
@@ -105,20 +105,20 @@ export default function WeatherSettingsPage() {
             </motion.div>
 
             <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Units</CardTitle>
-                        <CardDescription>Choose the unit for temperature.</CardDescription>
+                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-100">Units</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">Choose the unit for temperature.</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="px-4 pb-4">
                         <RadioGroup defaultValue={weatherUnit} onValueChange={(v) => setWeatherUnit(v as 'Celsius' | 'Fahrenheit')}>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 py-2">
                                 <RadioGroupItem value="Celsius" id="celsius" />
-                                <Label htmlFor="celsius">Celsius (°C)</Label>
+                                <Label htmlFor="celsius" className="text-sm text-zinc-100 cursor-pointer">Celsius (°C)</Label>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 py-2">
                                 <RadioGroupItem value="Fahrenheit" id="fahrenheit" />
-                                <Label htmlFor="fahrenheit">Fahrenheit (°F)</Label>
+                                <Label htmlFor="fahrenheit" className="text-sm text-zinc-100 cursor-pointer">Fahrenheit (°F)</Label>
                             </div>
                         </RadioGroup>
                     </CardContent>

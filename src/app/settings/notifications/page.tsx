@@ -59,26 +59,26 @@ export default function NotificationsPage() {
 
     return (
         <motion.div 
-            className="space-y-8"
+            className="space-y-4 px-4 pt-4 pb-20"
             initial="initial"
             animate="animate"
             variants={{
                 animate: {
                 transition: {
-                    staggerChildren: 0.1,
+                    staggerChildren: 0.07,
                 },
                 },
             }}
         >
              <motion.header variants={cardVariants}>
-                <p className="text-xs text-zinc-400 mb-4 max-w-md">Manage how you get notified about new messages.</p>
+                <p className="text-xs text-zinc-400 mb-2 max-w-md">Manage how you get notified about new messages.</p>
             </motion.header>
 
             <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Sounds</CardTitle>
-                        <CardDescription>Select a sound for new message notifications.</CardDescription>
+                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-100">Sounds</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">Select a sound for new message notifications.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">

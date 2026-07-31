@@ -45,27 +45,26 @@ export default function FeedbackPage() {
 
     return (
         <motion.div 
-          className="space-y-8"
+          className="space-y-4 px-4 pt-4 pb-20"
           initial="initial"
           animate="animate"
           variants={{
             animate: {
               transition: {
-                staggerChildren: 0.1,
+                staggerChildren: 0.07,
               },
             },
           }}
         >
             <motion.header variants={cardVariants}>
-                <h1 className="text-3xl font-bold font-heading">Feedback</h1>
-                <p className="text-muted-foreground mt-1">We'd love to hear your thoughts!</p>
+                <p className="text-xs text-zinc-400 mb-2 max-w-md">We'd love to hear your thoughts!</p>
             </motion.header>
 
             <motion.div variants={cardVariants}>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Send Your Feedback</CardTitle>
-                        <CardDescription>
+                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-100">Send Your Feedback</CardTitle>
+                        <CardDescription className="text-xs text-zinc-400">
                             Your feedback helps us improve Vibez. Please fill out the form below.
                         </CardDescription>
                     </CardHeader>

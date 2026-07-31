@@ -49,13 +49,13 @@ function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex flex-col h-full h-[100dvh] w-full overflow-hidden min-h-0">
-            <header className="flex items-center gap-2 border-b border-border/50 bg-card/80 backdrop-blur-xl p-2 shrink-0 z-10">
-                <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" onClick={() => isRootSettings ? router.push('/') : router.back()}>
-                    <ArrowLeft className="h-6 w-6" />
+            <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-zinc-800/40 bg-zinc-950/80 backdrop-blur-md px-4 py-3 shrink-0">
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => isRootSettings ? router.push('/') : router.back()}>
+                    <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <h1 className="text-lg font-semibold">{title}</h1>
+                <h1 className="text-base font-semibold text-zinc-100">{title}</h1>
             </header>
-            <main className="flex-1 overflow-y-auto min-h-0 w-full p-4 sm:p-6 pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <main className="flex-1 overflow-y-auto min-h-0 w-full pb-20" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {children}
             </main>
         </div>
@@ -168,7 +168,7 @@ export default function SettingsLayout({
                 </div>
             </Sidebar>
             <SidebarInset className="flex-1 h-full max-h-screen min-h-0 flex flex-col overflow-y-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <main className="p-4 sm:p-8 lg:p-12 w-full max-w-5xl mx-auto flex-1 min-h-0 pb-24">
+                <main className="p-4 sm:p-6 lg:p-8 w-full max-w-5xl mx-auto flex-1 min-h-0 pb-20">
                     {children}
                 </main>
             </SidebarInset>

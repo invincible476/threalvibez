@@ -61,33 +61,32 @@ export default function BackgroundsPage() {
 
   return (
     <motion.div
-      className="space-y-8"
+      className="space-y-4 px-4 pt-4 pb-20"
       initial="initial"
       animate="animate"
       variants={{
         animate: {
           transition: {
-            staggerChildren: 0.1,
+            staggerChildren: 0.07,
           },
         },
       }}
     >
       <motion.header variants={cardVariants}>
-        <h1 className="text-3xl font-bold font-heading">Backgrounds</h1>
-        <p className="text-muted-foreground mt-1">Customize the app's background to your liking.</p>
+        <p className="text-xs text-zinc-400 mb-2 max-w-md">Customize the app's background to your liking.</p>
       </motion.header>
 
       <motion.div variants={cardVariants}>
-        <Card>
-            <CardHeader>
-                <CardTitle>Master Switch</CardTitle>
-                <CardDescription>Enable or disable all custom backgrounds.</CardDescription>
+        <Card className="border border-zinc-800/50 bg-zinc-900/60">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-zinc-100">Master Switch</CardTitle>
+                <CardDescription className="text-xs text-zinc-400">Enable or disable all custom backgrounds.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
-                    <Label htmlFor="custom-bg-mode" className="flex flex-col space-y-1">
-                        <span>Use Custom Backgrounds</span>
-                        <span className="font-normal leading-snug text-muted-foreground">
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-zinc-800/40 border border-zinc-800/50">
+                    <Label htmlFor="custom-bg-mode" className="flex flex-col space-y-0.5">
+                        <span className="text-sm font-medium text-zinc-100">Use Custom Backgrounds</span>
+                        <span className="text-xs text-zinc-400">
                             When off, the app will use a solid black background.
                         </span>
                     </Label>
@@ -99,27 +98,27 @@ export default function BackgroundsPage() {
 
       {useCustomBackground && (
         <motion.div variants={cardVariants}>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Choose Your Background</CardTitle>
-                    <CardDescription>Select a background to apply across the app.</CardDescription>
+            <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-zinc-100">Choose Your Background</CardTitle>
+                    <CardDescription className="text-xs text-zinc-400">Select a background to apply across the app.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {backgrounds.map(bg => (
                         <div key={bg.id} className="relative" onClick={() => handleBackgroundSelect(bg.id)}>
                             <div className={cn(
-                                "w-full aspect-video rounded-lg cursor-pointer transition-all border-2",
-                                appBackground === bg.id ? "border-primary ring-2 ring-primary" : "border-border hover:border-primary/50"
+                                "w-full aspect-video rounded-lg cursor-pointer transition-all border",
+                                appBackground === bg.id ? "ring-1 ring-violet-500 border-violet-500/50" : "border-zinc-700/50 hover:border-zinc-600"
                             )}>
                                 <div className={`h-full w-full rounded-md bg-preview-${bg.id}`} />
                             </div>
-                            <div className="mt-2">
-                                <h3 className="font-semibold">{bg.name}</h3>
-                                <p className="text-sm text-muted-foreground">{bg.description}</p>
+                            <div className="mt-1.5">
+                                <h3 className="text-sm font-medium text-zinc-100">{bg.name}</h3>
+                                <p className="text-xs text-zinc-400">{bg.description}</p>
                             </div>
                             {appBackground === bg.id && (
-                                <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full h-6 w-6 flex items-center justify-center">
-                                    <Check className="h-4 w-4" />
+                                <div className="absolute top-2 right-2 bg-violet-500 text-white rounded-full h-5 w-5 flex items-center justify-center">
+                                    <Check className="h-3 w-3" />
                                 </div>
                             )}
                         </div>

@@ -420,26 +420,26 @@ export default function ProfilePage() {
 
   return (
     <motion.div 
-        className="space-y-8 p-4 sm:p-6 lg:p-8"
+        className="space-y-4 px-4 pt-4 pb-20"
         initial="initial"
         animate="animate"
         variants={{
             animate: {
             transition: {
-                staggerChildren: 0.1,
+                staggerChildren: 0.07,
             },
             },
         }}
     >
        <motion.header variants={cardVariants}>
-        <p className="text-xs text-zinc-400 mb-4 max-w-md">Manage your public profile information.</p>
+        <p className="text-xs text-zinc-400 mb-2 max-w-md">Manage your public profile information.</p>
       </motion.header>
 
       <motion.div variants={cardVariants}>
-        <Card>
-            <CardHeader>
-            <CardTitle>Your Profile</CardTitle>
-            <CardDescription>Update your photo and personal details here.</CardDescription>
+        <Card className="border border-zinc-800/50 bg-zinc-900/60">
+            <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-zinc-100">Your Profile</CardTitle>
+            <CardDescription className="text-xs text-zinc-400">Update your photo and personal details here.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -551,19 +551,19 @@ export default function ProfilePage() {
       </motion.div>
 
       <motion.div variants={cardVariants}>
-        <Card>
-            <CardHeader>
-                <CardTitle>Privacy</CardTitle>
-                <CardDescription>Control how others can find your account.</CardDescription>
+        <Card className="border border-zinc-800/50 bg-zinc-900/60">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-zinc-100">Privacy</CardTitle>
+                <CardDescription className="text-xs text-zinc-400">Control how others can find your account.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
-                    <Label htmlFor="private-account-mode" className="flex flex-col space-y-1">
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-zinc-800/40 border border-zinc-800/50">
+                    <Label htmlFor="private-account-mode" className="flex flex-col space-y-0.5">
                         <div className="flex items-center gap-2">
-                            <Shield className="h-5 w-5" />
-                            <span>Private Account</span>
+                            <Shield className="h-4 w-4 text-zinc-400" />
+                            <span className="text-sm font-medium text-zinc-100">Private Account</span>
                         </div>
-                        <span className="font-normal leading-snug text-muted-foreground">
+                        <span className="text-xs text-zinc-400 ml-6">
                            When enabled, your account can only be found by your exact email address.
                         </span>
                     </Label>
