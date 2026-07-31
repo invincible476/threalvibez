@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import type { Conversation, User } from '@/lib/types';
 import { UserAvatar } from './user-avatar';
-import { cn } from '@/lib/utils';
+import { cn, safeGetMillis, safeFormatTimestamp } from '@/lib/utils';
 import { VibezLogo } from './vibez-logo';
 import { NewChatDialog } from './new-chat-dialog';
 import { useAuth } from '@/hooks/use-auth';
@@ -454,22 +454,16 @@ interface ChatItemProps {
 const ChatItem = React.memo(
   function ChatItem({ conversation, isSelected, currentUser, selectedChat, onSelect, onAction, onFriendAction }: ChatItemProps) {
     const lastMessage = (convo: Conversation) => {
-      if(convo.lastMessage) {
-          const timestamp = convo.lastMessage.timestamp;
-          let date;
-          if (timestamp?.seconds) {
-              date = new Date(timestamp.seconds * 1000);
-          } else if (timestamp instanceof Date) {
-              date = timestamp;
-          }
-
-          return {
-              text: convo.lastMessage.text,
-              timestamp: date ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-          }
+      if (convo?.lastMessage) {
+        const rawTs = convo.lastMessage?.timestamp || (convo.lastMessage as any)?.createdAt;
+        const formattedTime = safeFormatTimestamp(rawTs);
+        return {
+          text: convo.lastMessage?.text || '',
+          timestamp: formattedTime,
+        };
       }
       return { text: 'No messages yet', timestamp: '' };
-    }
+    };
 
     const { text, timestamp } = lastMessage(conversation);
     
@@ -566,15 +560,17 @@ const ChatItem = React.memo(
     );
   },
   (prevProps, nextProps) => {
+    const prevTs = safeGetMillis(prevProps.conversation?.lastMessage?.timestamp || (prevProps.conversation?.lastMessage as any)?.createdAt);
+    const nextTs = safeGetMillis(nextProps.conversation?.lastMessage?.timestamp || (nextProps.conversation?.lastMessage as any)?.createdAt);
     return (
-      prevProps.conversation.id === nextProps.conversation.id &&
-      prevProps.conversation.lastMessage?.text === nextProps.conversation.lastMessage?.text &&
-      prevProps.conversation.lastMessage?.timestamp?.seconds === nextProps.conversation.lastMessage?.timestamp?.seconds &&
-      prevProps.conversation.unreadCount === nextProps.conversation.unreadCount &&
-      prevProps.conversation.isFavorite === nextProps.conversation.isFavorite &&
-      prevProps.conversation.isArchived === nextProps.conversation.isArchived &&
-      prevProps.conversation.name === nextProps.conversation.name &&
-      prevProps.conversation.avatar === nextProps.conversation.avatar &&
+      prevProps.conversation?.id === nextProps.conversation?.id &&
+      prevProps.conversation?.lastMessage?.text === nextProps.conversation?.lastMessage?.text &&
+      prevTs === nextTs &&
+      prevProps.conversation?.unreadCount === nextProps.conversation?.unreadCount &&
+      prevProps.conversation?.isFavorite === nextProps.conversation?.isFavorite &&
+      prevProps.conversation?.isArchived === nextProps.conversation?.isArchived &&
+      prevProps.conversation?.name === nextProps.conversation?.name &&
+      prevProps.conversation?.avatar === nextProps.conversation?.avatar &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.currentUser?.uid === nextProps.currentUser?.uid &&
       prevProps.currentUser?.friends?.length === nextProps.currentUser?.friends?.length &&

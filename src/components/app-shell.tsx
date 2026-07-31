@@ -32,6 +32,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileGalaxyBackground } from './mobile-galaxy-background';
 import { useTheme } from 'next-themes';
 import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
+import { safeGetMillis } from '@/lib/utils';
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -1510,7 +1511,7 @@ function useChatData() {
       // Always update the conversation's last message for optimistic UI
       const previousMessage = messages
         .filter(m => m.id !== messageToDelete.id && !m.deleted)
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+        .sort((a, b) => safeGetMillis(b?.timestamp) - safeGetMillis(a?.timestamp))[0];
       
       setConversations(prevConvos => prevConvos.map(convo =>
         convo.id === selectedChat.id ? {
@@ -1518,7 +1519,7 @@ function useChatData() {
           lastMessage: previousMessage ? {
             text: previousMessage.text,
             senderId: previousMessage.senderId,
-            timestamp: Timestamp.fromDate(previousMessage.timestamp)
+            timestamp: previousMessage.timestamp instanceof Date ? Timestamp.fromDate(previousMessage.timestamp) : previousMessage.timestamp
           } : undefined
         } : convo
       ));
@@ -1539,7 +1540,7 @@ function useChatData() {
           // Always check if this affects the last message
           const previousMessage = messages
             .filter(m => m.id !== messageToDelete.id && !m.deleted)
-            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+            .sort((a, b) => safeGetMillis(b?.timestamp) - safeGetMillis(a?.timestamp))[0];
 
           // Update conversation's lastMessage
           if (previousMessage) {
@@ -1547,7 +1548,7 @@ function useChatData() {
               lastMessage: {
                 text: previousMessage.text,
                 senderId: previousMessage.senderId,
-                timestamp: Timestamp.fromDate(previousMessage.timestamp)
+                timestamp: previousMessage.timestamp instanceof Date ? Timestamp.fromDate(previousMessage.timestamp) : previousMessage.timestamp
               }
             });
           } else {

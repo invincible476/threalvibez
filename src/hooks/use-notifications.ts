@@ -5,6 +5,8 @@ import { Conversation, User } from '@/lib/types';
 import { useAppearance } from '@/components/providers/appearance-provider';
 import { createToneAudio } from '@/lib/sound';
 
+import { safeGetMillis } from '@/lib/utils';
+
 interface UseNotificationsProps {
   conversations: Conversation[];
   usersCache: Map<string, User>;
@@ -86,9 +88,11 @@ export function useNotifications({
 
     const currentConvoState = new Map<string, number>();
     conversations.forEach((convo) => {
-        if(convo.lastMessage?.timestamp) {
-            const timestamp = convo.lastMessage.timestamp?.toMillis?.() || (convo.lastMessage.timestamp instanceof Date ? convo.lastMessage.timestamp.getTime() : 0);
-            currentConvoState.set(convo.id, timestamp);
+        if (convo?.lastMessage) {
+            const timestamp = safeGetMillis(convo.lastMessage.timestamp || (convo.lastMessage as any)?.createdAt);
+            if (timestamp > 0) {
+              currentConvoState.set(convo.id, timestamp);
+            }
         }
     });
 

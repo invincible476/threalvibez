@@ -3,7 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/ui/cards/GlassCard';
 import { UserAvatar } from '@/components/user-avatar';
-import { cn } from '@/lib/utils';
+import { cn, safeFormatTimestamp } from '@/lib/utils';
 import type { User, Conversation } from '@/lib/types';
 import { cardAnimationVariants, hoverAnimation, tapAnimation } from '@/styles/animation-specs';
 
@@ -46,9 +46,9 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, conversation, onClic
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-center">
             <p className="font-bold truncate text-sm">{contact.name}</p>
-            {lastMessage?.timestamp && (
+            {lastMessage && (
               <p className="text-xs text-muted-foreground">
-                {new Date(lastMessage.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {safeFormatTimestamp(lastMessage.timestamp || (lastMessage as any)?.createdAt)}
               </p>
             )}
           </div>
