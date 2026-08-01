@@ -102,30 +102,46 @@ const ChatViewComponent = ({
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [newMessagesCount, setNewMessagesCount] = useState(0);
+  const [newMessagesCount, setNewMessagesCount] = useState<number>(0);
+  const [optimisticMessages, setOptimisticMessages] = useState<MessageType[]>([]);
 
-  // Deduplicate messages
+  useEffect(() => {
+    setOptimisticMessages([]);
+  }, [chat?.id]);
+
+  // Deduplicate and merge server messages with local 0ms optimistic messages
   const displayMessages = React.useMemo(() => {
-    const confirmed = messages.length > 50 ? messages.slice(-50) : messages;
+    const combined = [...messages, ...optimisticMessages];
     const uniqueMap = new Map<string, MessageType>();
-    for (const msg of confirmed) {
+
+    for (const msg of combined) {
       const key = msg.clientTempId || msg.id;
       if (uniqueMap.has(key)) {
         const existing = uniqueMap.get(key)!;
-        if (existing.id === existing.clientTempId && msg.id !== msg.clientTempId) {
-          uniqueMap.set(key, msg);
-          continue;
-        }
         if (existing.status === 'sending' && msg.status !== 'sending') {
           uniqueMap.set(key, msg);
-          continue;
+        } else if (existing.id.startsWith('temp-') && !msg.id.startsWith('temp-')) {
+          uniqueMap.set(key, msg);
         }
         continue;
       }
       uniqueMap.set(key, msg);
     }
-    return Array.from(uniqueMap.values());
-  }, [messages]);
+
+    const result = Array.from(uniqueMap.values());
+    result.sort((a, b) => {
+      const getM = (ts: any) => {
+        if (!ts) return 0;
+        if (ts instanceof Date) return ts.getTime();
+        if (typeof ts.toMillis === 'function') return ts.toMillis();
+        if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+        if (typeof ts === 'string') return new Date(ts).getTime() || 0;
+        return 0;
+      };
+      return getM(a.timestamp) - getM(b.timestamp);
+    });
+    return result;
+  }, [messages, optimisticMessages]);
 
   const prevMessagesLength = useRef(displayMessages.length);
 
@@ -190,10 +206,8 @@ const ChatViewComponent = ({
     prevMessagesLength.current = displayMessages.length;
   }, [displayMessages, isAtBottom, chat, currentUser]);
   
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = useCallback(async (file: File) => {
     const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-  
     try {
       if (isImage) {
         setPreviewFile(file);
@@ -208,9 +222,9 @@ const ChatViewComponent = ({
         variant: "destructive",
       });
     }
-  };
+  }, [activeSendFile, toast]);
   
-  const handleSendFile = async (file: File, message: string) => {
+  const handleSendFile = useCallback(async (file: File, message: string) => {
     try {
         await activeSendFile(file, message);
     } catch (error) {
@@ -221,9 +235,9 @@ const ChatViewComponent = ({
         });
     }
     setPreviewFile(null);
-  };
+  }, [activeSendFile, toast]);
 
-  const handleSendMessageWithReply = (messageText: string) => {
+  const handleSendMessageWithReply = useCallback((messageText: string) => {
     if (!messageText.trim() || !chat || !currentUser) return;
     
     const messageReply = replyToMessage?.replyTo || (replyToMessage ? {
@@ -233,44 +247,97 @@ const ChatViewComponent = ({
     } : undefined);
     setReplyToMessage(null);
 
-    activeSendMessage(messageText, messageReply).catch((e) => {
-      console.error('Error sending message:', e);
-      toast({
+    // 1. Create temporary optimistic message object with id: temp-${Date.now()}, status: 'sending', timestamp: new Date()
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: MessageType = {
+      id: tempId,
+      clientTempId: tempId,
+      senderId: currentUser.uid,
+      text: messageText.trim(),
+      timestamp: new Date(),
+      status: 'sending',
+      ...(messageReply && { replyTo: messageReply }),
+    };
+
+    // 2. IMMEDIATELY append to local state (0ms delay)
+    setOptimisticMessages((prev) => [...prev, optimisticMsg]);
+
+    // 3. Trigger background Firestore write asynchronously
+    activeSendMessage(messageText, messageReply)
+      .then((realId) => {
+        // 4. On success, gracefully replace optimistic ID with real Firestore ID and update status to 'sent'
+        setOptimisticMessages((prev) =>
+          prev.map((m) =>
+            m.clientTempId === tempId ? { ...m, id: realId || m.id, status: 'sent' } : m
+          )
+        );
+      })
+      .catch((e) => {
+        console.error('Error sending message:', e);
+        // 5. On error, mark optimistic bubble with red retry icon without removing from state
+        setOptimisticMessages((prev) =>
+          prev.map((m) => (m.clientTempId === tempId ? { ...m, status: 'error' } : m))
+        );
+        toast({
           title: 'Error Sending Message',
-          description: 'Could not send your message. Please try again.',
+          description: 'Could not send your message. Click retry icon to try again.',
           variant: 'destructive',
+        });
       });
-    });
 
     if (messageText.includes('@gemini')) {
-        geminiService.processMessage({
-            id: crypto.randomUUID(),
-            senderId: currentUser.uid,
-            text: messageText,
-            timestamp: new Date(),
-            status: 'sent'
-        }, chat.id).then((aiResponse) => {
-            if (aiResponse) activeSendMessage(aiResponse);
-        }).catch((error) => {
-            console.error('AI error:', error);
-        });
+      geminiService.processMessage({
+        id: crypto.randomUUID(),
+        senderId: currentUser.uid,
+        text: messageText,
+        timestamp: new Date(),
+        status: 'sent'
+      }, chat.id).then((aiResponse) => {
+        if (aiResponse) activeSendMessage(aiResponse);
+      }).catch((error) => {
+        console.error('AI error:', error);
+      });
     }
-  };
+  }, [chat, currentUser, replyToMessage, usersCache, activeSendMessage, toast]);
 
-  const handleSendGif = (base64: string, fileType: string, fileName: string, caption: string) => {
+  const handleRetryMessage = useCallback((failedMsg: MessageType) => {
+    if (!chat || !currentUser) return;
+    const targetKey = failedMsg.clientTempId || failedMsg.id;
+
+    setOptimisticMessages((prev) =>
+      prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'sending' } : m))
+    );
+
+    activeSendMessage(failedMsg.text, failedMsg.replyTo)
+      .then((realId) => {
+        setOptimisticMessages((prev) =>
+          prev.map((m) =>
+            (m.clientTempId || m.id) === targetKey ? { ...m, id: realId || m.id, status: 'sent' } : m
+          )
+        );
+      })
+      .catch((err) => {
+        console.error('Error retrying message:', err);
+        setOptimisticMessages((prev) =>
+          prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'error' } : m))
+        );
+      });
+  }, [chat, currentUser, activeSendMessage]);
+
+  const handleSendGif = useCallback((base64: string, fileType: string, fileName: string, caption: string) => {
       activeSendFile(
         new File([Buffer.from(base64.split(',')[1], 'base64')], fileName, { type: fileType }),
         caption
       );
-  };
+  }, [activeSendFile]);
 
-  const navigateToChatInfo = () => {
+  const navigateToChatInfo = useCallback(() => {
     if (chat?.id && !isAIChat) {
       router.push(`/chat/${chat.id}/info`);
     } else {
       setIsProfileSheetOpen(true);
     }
-  };
+  }, [chat?.id, isAIChat, router]);
 
   const getStatusText = () => {
     if (isAiReplying) return 'typing...';
@@ -458,6 +525,7 @@ const ChatViewComponent = ({
         onCancelUpload={cancelUpload}
         onMessageAction={handleMessageAction}
         onReply={onReply}
+        onRetry={handleRetryMessage}
         isAiReplying={isAiReplying}
         otherParticipantLastRead={chat.otherParticipantLastRead}
         onLoadMore={loadMoreMessages}

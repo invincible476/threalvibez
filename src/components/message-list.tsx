@@ -7,10 +7,9 @@ import { Timestamp } from 'firebase/firestore';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
-import { MessageBubble } from './message-bubble';
+import { MessageItem } from './message-item';
 import { User, Message } from '@/lib/types';
 import { UserAvatar } from './user-avatar';
-
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
 
@@ -23,8 +22,6 @@ const messageListVariants = {
     }
 };
 
-const MemoizedMessageBubble = memo(MessageBubble);
-
 interface MessageListProps {
     messages: Message[];
     currentUser: User;
@@ -33,6 +30,7 @@ interface MessageListProps {
     onCancelUpload: (messageId: string) => void;
     onMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: any) => void;
     onReply: (message: Message) => void;
+    onRetry?: (message: Message) => void;
     isAiReplying: boolean;
     otherParticipantLastRead?: Timestamp;
     onLoadMore: () => Promise<void>;
@@ -67,6 +65,7 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
     onCancelUpload,
     onMessageAction,
     onReply,
+    onRetry,
     isAiReplying,
     otherParticipantLastRead,
     onLoadMore,
@@ -201,15 +200,16 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
                                         <span className="relative bg-background px-2 text-xs text-muted-foreground">{dateSeparator}</span>
                                     </div>
                                 )}
-                                <MemoizedMessageBubble
+                                <MessageItem
                                     message={message}
                                     sender={sender}
                                     isCurrentUser={message.senderId === currentUser.uid}
                                     isGroupChat={isGroupChat}
                                     progress={uploadProgress.get(message.clientTempId || message.id)}
-                                    onCancelUpload={() => onCancelUpload(message.clientTempId || message.id)}
+                                    onCancelUpload={onCancelUpload}
                                     onMessageAction={onMessageAction}
                                     onReply={onReply}
+                                    onRetry={onRetry}
                                     isRead={isRead}
                                     isGrouped={isGrouped}
                                 />

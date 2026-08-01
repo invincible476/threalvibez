@@ -16,6 +16,7 @@ import {
   Pin,
   Copy,
   MoreHorizontal,
+  AlertCircle,
 } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import Image from 'next/image';
@@ -55,6 +56,7 @@ interface MessageBubbleProps {
   onCancelUpload: () => void;
   onMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: any) => void;
   onReply: (message: Message) => void;
+  onRetry?: (message: Message) => void;
   isRead: boolean;
   isGrouped?: boolean;
   isGroupChat?: boolean;
@@ -80,6 +82,7 @@ function MessageBubble({
   onCancelUpload,
   onMessageAction,
   onReply,
+  onRetry,
   isRead,
   isGrouped = false,
   isGroupChat = false,
@@ -136,6 +139,22 @@ function MessageBubble({
   // Delivery status icons: single checkmark (sent), double checkmarks (delivered), indigo/violet double checkmarks (read)
   const renderReadReceiptIcon = () => {
     if (message.status === 'sending') return <Clock className="h-3.5 w-3.5 text-zinc-400" />;
+    if (message.status === 'error') {
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onRetry) onRetry(message);
+          }}
+          className="flex items-center gap-1 text-red-400 hover:text-red-300 transition-colors"
+          title="Failed to send. Click to retry"
+        >
+          <AlertCircle className="h-3.5 w-3.5 text-red-500 animate-pulse shrink-0" />
+          <span className="text-[10px] underline font-medium">Retry</span>
+        </button>
+      );
+    }
     if (isRead) return <CheckCheck className="h-3.5 w-3.5 text-indigo-300 fill-indigo-300/20" />;
     if (message.status === 'sent' || message.status === 'delivered' || message.status === 'read')
       return <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />;

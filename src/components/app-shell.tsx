@@ -33,6 +33,7 @@ import { MobileGalaxyBackground } from './mobile-galaxy-background';
 import { useTheme } from 'next-themes';
 import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
 import { safeGetMillis } from '@/lib/utils';
+import { debouncedUpdateTypingStatus, debouncedMarkAsRead, trimMessagePayload } from '@/lib/firebase/chat';
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -607,10 +608,7 @@ function useChatData() {
     const messagesColRef = collection(db, 'conversations', chat.id, 'messages');
     
     if (chat && authUser) {
-        const chatRef = doc(db, 'conversations', chat.id);
-        updateDoc(chatRef, {
-            [`lastRead.${authUser.uid}`]: serverTimestamp()
-        }).catch(console.error);
+        debouncedMarkAsRead(chat.id, authUser.uid, 1500);
     }
 
     // Shared timestamp parser used by both phases
@@ -703,7 +701,7 @@ function useChatData() {
         limitToLast(PAGE_SIZE)
     );
 
-    messagesUnsubscribe.current = onSnapshot(liveQuery, { includeMetadataChanges: true }, (snapshot) => {
+    messagesUnsubscribe.current = onSnapshot(liveQuery, { includeMetadataChanges: false }, (snapshot) => {
         if (snapshot.empty) return;
 
         // Only process docs that actually changed — skip metadata-only events
@@ -886,35 +884,31 @@ function useChatData() {
   ): Promise<string> => {
     if (!messageText.trim() || !currentUser) return Promise.reject("Cannot send empty message");
   
-    const tempId = uuidv4();
+    const tempId = `temp-${Date.now()}`;
 
     try {
       const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
-      const messageData = {
-        senderId: senderId,
-        text: messageText,
-        timestamp: serverTimestamp(),
-        clientTempId: tempId,
-        ...(replyTo && { replyTo })
-      };
+      const messageData = trimMessagePayload(senderId, messageText, tempId, replyTo);
 
       const chatRef = doc(db, 'conversations', chatId);
 
-      // Execute writes non-blocking using addDoc directly so local optimistic write updates instantly without stalling on network RTT
-      addDoc(messageCollectionRef, messageData).catch(error => {
+      // Execute writes non-blocking using addDoc directly so local optimistic write updates instantly
+      const docPromise = addDoc(messageCollectionRef, messageData);
+      docPromise.catch(error => {
         console.error('Error sending message addDoc:', error);
         setMessages(prev => prev.map(m => m.clientTempId === tempId ? { ...m, status: 'error' } : m));
       });
 
       updateDoc(chatRef, {
         lastMessage: {
-          text: messageText,
+          text: messageText.trim(),
           senderId: senderId,
           timestamp: serverTimestamp(),
         },
       }).catch(console.error);
       
-      return tempId;
+      const docRef = await docPromise;
+      return docRef.id;
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => prev.map(m => 
@@ -1955,21 +1949,7 @@ function useChatData() {
 
   const handleTyping = useCallback(async (isTyping: boolean) => {
     if (!selectedChat || !currentUser || selectedChat.id === AI_USER_ID) return;
-
-    const chatRef = doc(db, 'conversations', selectedChat.id);
-    try {
-      if (isTyping) {
-        await updateDoc(chatRef, {
-          typing: arrayUnion(currentUser.uid)
-        });
-      } else {
-        await updateDoc(chatRef, {
-          typing: arrayRemove(currentUser.uid)
-        });
-      }
-    } catch (error) {
-      console.error("Error updating typing status:", error);
-    }
+    debouncedUpdateTypingStatus(selectedChat.id, currentUser.uid, isTyping, 1500);
   }, [selectedChat, currentUser]);
   
   const handleStoryReply = useCallback(async (story: Story, message: string) => {

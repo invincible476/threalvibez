@@ -63,7 +63,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       onTyping(false);
-    }, 1000);
+    }, 1500);
   };
 
   const handleEmojiSelect = (emoji: string) => {
