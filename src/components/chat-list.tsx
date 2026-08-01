@@ -246,7 +246,7 @@ export function ChatList() {
   return (
     <>
     <div className="flex flex-col h-full min-h-0 w-full min-w-0 flex-1 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
-    <div className="flex-none p-4 border-b border-border/50 flex justify-between items-center gap-2">
+    <div className="flex items-center justify-between px-4 py-3 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-20 border-b border-zinc-800/40 shrink-0 flex-none gap-2">
          <VibezLogo className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden" />
          <div className="flex-1 flex justify-center group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
             {isWeatherVisible && <WeatherWidget />}
