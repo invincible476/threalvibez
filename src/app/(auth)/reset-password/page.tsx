@@ -28,7 +28,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Toaster } from '@/components/ui/toaster';
 import { verifyEmailCode as verifyEmailCodeAPI } from '@/utils/email-service';
 
 import { Check } from 'lucide-react';
@@ -47,7 +46,7 @@ const linkResetSchema = z.object({
 
 const codeResetSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
-  code: z.string().length(6, { message: 'Verification code must be 6 digits.' }),
+  code: z.string().min(6, { message: 'Verification code must be 6 digits.' }).max(6),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
 }).refine(data => data.password === data.confirmPassword, {
@@ -63,7 +62,7 @@ function ResetPasswordForm() {
   const [requestLoading, setRequestLoading] = useState(false);
   const [email, setEmail] = useState<string>('');
   const [codeVerified, setCodeVerified] = useState(false);
-  const [oobCode, setOobCode] = useState<string>('');
+  const [oobCode, setOobCode] = useState<string | null>(null);
   const [mode, setMode] = useState<'link' | 'code'>('code');
   const [isResetComplete, setIsResetComplete] = useState(false);
 
@@ -79,13 +78,6 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     const code = searchParams.get('oobCode');
-    const paramEmail = searchParams.get('email');
-
-    if (paramEmail) {
-      setEmail(paramEmail);
-      codeForm.setValue('email', paramEmail);
-    }
-
     if (code) {
       setOobCode(code);
       setMode('link');
@@ -96,7 +88,7 @@ function ResetPasswordForm() {
         })
         .catch(() => {
           toast({
-            title: 'Invalid reset link',
+            title: 'Invalid or Expired Link',
             description: 'This password reset link is invalid or has expired.',
             variant: 'destructive',
           });
@@ -105,8 +97,9 @@ function ResetPasswordForm() {
     }
   }, [searchParams]);
 
-  const handleLinkSubmit = async (values: z.infer<typeof linkResetSchema>) => {
-    if (!oobCode) return;
+  const handleLinkSubmit = async (values: z.infer<typeof linkResetSchema>, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
+    if (!oobCode || loading) return;
     setLoading(true);
     try {
       await confirmPasswordReset(auth, oobCode, values.password);
@@ -132,7 +125,9 @@ function ResetPasswordForm() {
     }
   };
 
-  const handleRequestCode = async () => {
+  const handleRequestCode = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (requestLoading || loading) return;
     const emailInput = codeForm.getValues('email');
     if (!emailInput || !emailInput.includes('@')) {
       toast({
@@ -145,7 +140,6 @@ function ResetPasswordForm() {
 
     setRequestLoading(true);
     try {
-      // 1. Send via backend API 6-digit code
       const response = await fetch('/api/verify-email?action=reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,11 +147,9 @@ function ResetPasswordForm() {
       });
       const data = await response.json();
 
-      // 2. Send Firebase reset link as fallback
       try {
         await sendPasswordResetEmail(auth, emailInput);
       } catch {
-        // Fallback catch
       }
 
       if (data.success) {
@@ -182,10 +174,11 @@ function ResetPasswordForm() {
     }
   };
 
-  const handleCodeSubmit = async (values: z.infer<typeof codeResetSchema>) => {
+  const handleCodeSubmit = async (values: z.infer<typeof codeResetSchema>, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
-      // Verify 6-digit code with backend API
       const verifyResult = await verifyEmailCodeAPI(values.email, values.code);
 
       if (!verifyResult.success) {
@@ -216,54 +209,46 @@ function ResetPasswordForm() {
 
   if (isResetComplete) {
     return (
-      <>
-        <Toaster />
-        <Card className="bg-transparent border-0 shadow-none text-center">
-          <CardHeader className="space-y-4 text-center p-6">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/30">
-              <Check className="h-7 w-7" />
-            </div>
-            <CardTitle className="text-2xl font-bold font-heading text-white">
-              Password Reset Complete
-            </CardTitle>
-            <CardDescription className="text-zinc-300 text-sm max-w-sm mx-auto leading-relaxed">
-              Your password has been updated successfully. You can now close this browser tab, open the Vibez mobile app, and sign in with your new credentials.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </>
+      <Card className="bg-transparent border-0 shadow-none text-center">
+        <CardHeader className="space-y-4 text-center p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/30">
+            <Check className="h-7 w-7" />
+          </div>
+          <CardTitle className="text-2xl font-bold font-heading text-white">
+            Password Reset Complete
+          </CardTitle>
+          <CardDescription className="text-zinc-300 text-sm max-w-sm mx-auto leading-relaxed">
+            Your password has been updated successfully. You can now close this browser tab, open the Vibez mobile app, and sign in with your new credentials.
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
   if (mode === 'link' && !codeVerified) {
     return (
-      <>
-        <Toaster />
-        <Card className="bg-transparent border-0 shadow-none">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">Verifying Reset Link</CardTitle>
-            <CardDescription>Validating password reset link...</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center p-6">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </CardContent>
-        </Card>
-      </>
+      <Card className="bg-transparent border-0 shadow-none">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">Verifying Reset Link</CardTitle>
+          <CardDescription>Validating password reset link...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center p-6">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <>
-      <Toaster />
-      <Card className="bg-transparent border-0 shadow-none">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
-          <CardDescription>
-            {mode === 'link'
-              ? `Enter a new password for ${email}`
-              : 'Enter your email and 6-digit verification code'}
-          </CardDescription>
-        </CardHeader>
+    <Card className="bg-transparent border-0 shadow-none">
+      <CardHeader className="space-y-1 text-center">
+        <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+        <CardDescription>
+          {mode === 'link'
+            ? `Enter a new password for ${email}`
+            : 'Enter your email and 6-digit verification code'}
+        </CardDescription>
+      </CardHeader>
 
         {mode === 'link' ? (
           <Form {...linkForm}>
@@ -396,7 +381,6 @@ function ResetPasswordForm() {
           </Form>
         )}
       </Card>
-    </>
   );
 }
 

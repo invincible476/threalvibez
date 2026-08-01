@@ -152,6 +152,9 @@ function toast({ ...props }: Toast) {
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
+  // Dismiss active toast first to prevent duplicate active toasts or overlay stacking
+  dispatch({ type: "DISMISS_TOAST" })
+
   dispatch({
     type: "ADD_TOAST",
     toast: {

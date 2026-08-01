@@ -37,7 +37,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Toaster } from '@/components/ui/toaster';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -82,6 +81,7 @@ export default function SignupPage() {
 
 
   const handleSendVerificationCode = async (email: string) => {
+    if (isSendingCode || isVerifying || loading || googleLoading) return;
     setIsSendingCode(true);
     try {
       const success = await sendVerificationRequest(email);
@@ -101,7 +101,9 @@ export default function SignupPage() {
     }
   };
 
-  const handleVerifyCode = async () => {
+  const handleVerifyCode = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (isVerifying || isSendingCode || loading || googleLoading) return;
     if (!verificationCodeInput.trim()) {
       toast({ title: 'Error', description: 'Please enter the verification code.', variant: 'destructive' });
       return;
@@ -207,7 +209,9 @@ export default function SignupPage() {
 
   // Function removed as its functionality is now in handleVerifyCode
 
-  const handleGoogleSignup = async () => {
+  const handleGoogleSignup = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (isSendingCode || isVerifying || loading || googleLoading) return;
     try {
       console.log('Starting Google signup...');
       const user = await authService.signInWithGoogle();
@@ -235,7 +239,9 @@ export default function SignupPage() {
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
+    if (isSendingCode || isVerifying || loading || googleLoading) return;
     try {
       // Step 1: Send verification code first, before creating account
       await handleSendVerificationCode(values.email);
@@ -258,7 +264,6 @@ export default function SignupPage() {
   if (showVerification) {
     return (
       <>
-        <Toaster />
         <Card className="bg-transparent border-0 shadow-none">
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl">Verify Your Email</CardTitle>
@@ -334,7 +339,6 @@ export default function SignupPage() {
 
   return (
     <>
-      <Toaster />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Card className="bg-transparent border-0 shadow-none">

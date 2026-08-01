@@ -29,7 +29,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { Mail, Lock, Eye, EyeOff, Loader2, CheckSquare, Square } from 'lucide-react';
 
@@ -76,7 +75,9 @@ function LoginForm() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
+    if (loading || googleLoading) return;
     setLoading(true);
     
     // Clear any existing stored auth error markers
@@ -168,7 +169,10 @@ function LoginForm() {
     }
   };
 
-  const handleForgotPassword = async () => {
+  const handleForgotPassword = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (loading || googleLoading) return;
+
     const isEmailValid = await form.trigger('email');
     const email = form.getValues('email');
     
@@ -231,7 +235,9 @@ function LoginForm() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (loading || googleLoading) return;
     setGoogleLoading(true);
     
     try {
@@ -306,7 +312,6 @@ function LoginForm() {
 
   return (
     <>
-      <Toaster />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Card className="bg-transparent border-0 shadow-none">
