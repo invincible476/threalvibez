@@ -364,7 +364,7 @@ export default function FriendsPage() {
                                         className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                         onClick={() => router.push(`/friends/${user.uid}`)}
                                     >
-                                        <UserAvatar user={user} isFriend={!!isFriend} className="h-10 w-10 shrink-0" />
+                                        <UserAvatar user={user} hasStory={user.hasActiveStory} storyViewed={user.storyViewed} isFriend={!!isFriend} className="h-10 w-10 shrink-0" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold text-sm text-zinc-100 truncate">{user.name}</p>
                                             <p className="text-xs text-zinc-400 truncate">
@@ -460,7 +460,7 @@ export default function FriendsPage() {
                                                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                                 onClick={() => router.push(`/friends/${friend.uid}`)}
                                             >
-                                                <UserAvatar user={friend} isFriend={true} className="h-10 w-10 shrink-0" />
+                                                <UserAvatar user={friend} hasStory={friend.hasActiveStory} storyViewed={friend.storyViewed} isFriend={true} className="h-10 w-10 shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-semibold text-sm text-zinc-100 truncate">{friend.name}</p>
                                                     <p className="text-xs text-zinc-400 truncate">{friend.email}</p>
@@ -511,7 +511,7 @@ export default function FriendsPage() {
                                                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                                 onClick={() => router.push(`/friends/${requestUser.uid}`)}
                                             >
-                                                <UserAvatar user={requestUser} className="h-10 w-10 shrink-0" />
+                                                <UserAvatar user={requestUser} hasStory={requestUser.hasActiveStory} storyViewed={requestUser.storyViewed} className="h-10 w-10 shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-semibold text-sm text-zinc-100 truncate">{requestUser.name}</p>
                                                     <p className="text-xs text-zinc-400 truncate">{requestUser.email}</p>
@@ -554,7 +554,7 @@ export default function FriendsPage() {
                                                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                                 onClick={() => router.push(`/friends/${sentRequestUser.uid}`)}
                                             >
-                                                <UserAvatar user={sentRequestUser} className="h-10 w-10 shrink-0" />
+                                                <UserAvatar user={sentRequestUser} hasStory={sentRequestUser.hasActiveStory} storyViewed={sentRequestUser.storyViewed} className="h-10 w-10 shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-semibold text-sm text-zinc-100 truncate">{sentRequestUser.name}</p>
                                                     <p className="text-xs text-zinc-400 truncate">{sentRequestUser.email}</p>

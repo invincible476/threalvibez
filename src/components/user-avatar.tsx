@@ -11,14 +11,25 @@ type UserAvatarProps = {
   user?: UserLike;
   className?: string;
   isFriend?: boolean;
+  hasStory?: boolean;
+  storyViewed?: boolean;
 };
 
-export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
+export function UserAvatar({ user, className, isFriend, hasStory, storyViewed }: UserAvatarProps) {
   const [hasImageError, setHasImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
 
+  const effectiveHasStory = hasStory ?? (user && typeof user === 'object' && 'hasActiveStory' in user ? (user as any).hasActiveStory : (user && typeof user === 'object' && 'hasStory' in user ? (user as any).hasStory : undefined));
+  const effectiveStoryViewed = storyViewed ?? (user && typeof user === 'object' && 'storyViewed' in user ? (user as any).storyViewed : undefined);
+
   if (!user) {
-    return <Avatar className={cn('border border-zinc-800/40 animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 rounded-full overflow-hidden', className)} />;
+    return (
+      <Avatar
+        hasStory={effectiveHasStory}
+        storyViewed={effectiveStoryViewed}
+        className={cn('animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 rounded-full overflow-hidden', className)}
+      />
+    );
   }
 
   const getInitials = (name: string) => {
@@ -48,10 +59,14 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
 
   return (
     <div className="relative shrink-0 flex-shrink-0 select-none">
-      <Avatar className={cn(
-        'border border-zinc-800/40 rounded-full overflow-hidden shrink-0 flex-shrink-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950', 
-        className
-      )}>
+      <Avatar
+        hasStory={effectiveHasStory}
+        storyViewed={effectiveStoryViewed}
+        className={cn(
+          'rounded-full overflow-hidden shrink-0 flex-shrink-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950', 
+          className
+        )}
+      >
         {canDisplayImage ? (
           <>
             <AvatarImage

@@ -109,7 +109,7 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
                 <div className="group/user-menu relative flex w-full cursor-pointer items-center justify-between p-2 transition-colors hover:bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="relative shrink-0">
-                            <UserAvatar user={activeUser} className="h-10 w-10" />
+                            <UserAvatar user={activeUser} hasStory={activeUser.hasActiveStory} storyViewed={activeUser.storyViewed} className="h-10 w-10" />
                             {hasFriendRequests && (
                                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-extrabold text-black ring-2 ring-background animate-pulse">
                                     {requestCount > 9 ? '9+' : requestCount}
@@ -518,10 +518,12 @@ const ChatItem = React.memo(
               )}
           >
           <UserAvatar 
-              user={{
+              user={otherParticipant || {
                   name: conversation.name || 'Unknown',
                   photoURL: conversation.avatar || '',
               }} 
+              hasStory={otherParticipant?.hasActiveStory}
+              storyViewed={otherParticipant?.storyViewed}
               isFriend={isFriend}
               className="h-10 w-10 flex-shrink-0"
           />
@@ -572,6 +574,8 @@ const ChatItem = React.memo(
   (prevProps, nextProps) => {
     const prevTs = safeGetMillis(prevProps.conversation?.lastMessage?.timestamp || (prevProps.conversation?.lastMessage as any)?.createdAt);
     const nextTs = safeGetMillis(nextProps.conversation?.lastMessage?.timestamp || (nextProps.conversation?.lastMessage as any)?.createdAt);
+    const prevOther = prevProps.conversation?.participantsDetails?.find(p => p.uid !== prevProps.currentUser?.uid);
+    const nextOther = nextProps.conversation?.participantsDetails?.find(p => p.uid !== nextProps.currentUser?.uid);
     return (
       prevProps.conversation?.id === nextProps.conversation?.id &&
       prevProps.conversation?.lastMessage?.text === nextProps.conversation?.lastMessage?.text &&
@@ -581,6 +585,8 @@ const ChatItem = React.memo(
       prevProps.conversation?.isArchived === nextProps.conversation?.isArchived &&
       prevProps.conversation?.name === nextProps.conversation?.name &&
       prevProps.conversation?.avatar === nextProps.conversation?.avatar &&
+      prevOther?.hasActiveStory === nextOther?.hasActiveStory &&
+      prevOther?.storyViewed === nextOther?.storyViewed &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.currentUser?.uid === nextProps.currentUser?.uid &&
       prevProps.currentUser?.friends?.length === nextProps.currentUser?.friends?.length &&

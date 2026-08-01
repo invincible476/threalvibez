@@ -22,6 +22,8 @@ export type User = {
   friendRequestsReceived?: string[];
   blockedUsers?: string[];
   stories?: string[]; // array of story ids
+  hasActiveStory?: boolean;
+  storyViewed?: boolean;
   isVerified?: boolean;
   background?: string;
   useCustomBackground?: boolean;
