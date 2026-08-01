@@ -50,18 +50,7 @@ export function LiveKitVoiceModal({
     setError(null);
     setToken('');
 
-    // 1. Direct Browser Network Ping Diagnostic
-    try {
-      await fetch('https://omegaone-7kb381s3.livekit.cloud', { method: 'HEAD', mode: 'no-cors' });
-      console.log('[LiveKit Diagnostic] Cloud Server is reachable!');
-    } catch (err: any) {
-      console.error('[LiveKit Diagnostic] Browser network fetch failed:', err);
-      setError('Browser blocked network request to LiveKit Cloud. Turn off Brave Shields or test in Chrome.');
-      setLoading(false);
-      return;
-    }
-
-    // 2. Explicit Microphone Permission Pre-fetch
+    // 1. Microphone Permission Pre-fetch Check
     try {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -74,7 +63,7 @@ export function LiveKitVoiceModal({
       return;
     }
 
-    // 3. Token Fetching from Server Route
+    // 2. Token Fetching from Server API Route
     try {
       const res = await fetch(
         `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(
@@ -157,8 +146,8 @@ export function LiveKitVoiceModal({
             data-lk-theme="default"
             onDisconnected={onClose}
             onError={(err) => {
-              console.error('[LiveKit Signal Error]', err);
-              setError(`Connection failed: ${err.message}. If using Brave Browser, disable Brave Shields.`);
+              console.error('[LiveKit Room Error]', err);
+              setError(`Connection Error: ${err.message || 'Disconnected from LiveKit Cloud.'}`);
               toast({
                 title: 'Voice Room Disconnected',
                 description: err.message || 'Connection error encountered.',
