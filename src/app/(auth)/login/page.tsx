@@ -351,7 +351,7 @@ function LoginForm() {
                         type="button"
                         variant="link"
                         tabIndex={-1}
-                        className="p-0 h-auto text-xs text-primary hover:underline font-medium"
+                        className="p-0 h-auto text-xs text-violet-400 hover:text-violet-300 font-medium hover:underline transition-colors"
                         onClick={handleForgotPassword}
                         disabled={loading || googleLoading}
                       >
@@ -468,12 +468,12 @@ function LoginForm() {
                 )}
               </Button>
 
-              <div className="text-center text-sm text-muted-foreground pt-1">
+              <div className="text-center text-sm text-muted-foreground pt-1 pb-2">
                 Don&apos;t have an account?{' '}
                 <Link
                   href="/signup"
                   className={cn(
-                    "font-semibold text-primary underline-offset-4 hover:underline transition-colors",
+                    "font-semibold text-violet-400 hover:text-violet-300 underline-offset-4 hover:underline transition-colors",
                     (loading || googleLoading) && "pointer-events-none opacity-50"
                   )}
                   aria-disabled={loading || googleLoading}

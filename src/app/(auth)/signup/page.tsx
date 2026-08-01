@@ -336,21 +336,21 @@ export default function SignupPage() {
     <>
       <Toaster />
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Card className="bg-transparent border-0 shadow-none">
-            <CardHeader className="space-y-1 text-center">
-              <CardTitle className="text-2xl">Create an account</CardTitle>
-              <CardDescription>
+            <CardHeader className="space-y-1.5 text-center pb-4">
+              <CardTitle className="text-2xl font-bold tracking-tight">Create an account</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground">
                 Enter your information to create an account
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4">
+            <CardContent className="grid gap-3.5 px-6">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }: { field: any }) => (
-                  <FormItem className="grid gap-2">
-                    <FormLabel>Name</FormLabel>
+                  <FormItem className="grid gap-1.5">
+                    <FormLabel className="text-sm font-medium">Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Your Name" {...field} disabled={loading || isSendingCode} />
                     </FormControl>
@@ -362,8 +362,8 @@ export default function SignupPage() {
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem className="grid gap-2">
-                    <FormLabel>Email</FormLabel>
+                  <FormItem className="grid gap-1.5">
+                    <FormLabel className="text-sm font-medium">Email</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -380,8 +380,8 @@ export default function SignupPage() {
                 control={form.control}
                 name="password"
                 render={({ field }) => (
-                  <FormItem className="grid gap-2">
-                    <FormLabel>Password</FormLabel>
+                  <FormItem className="grid gap-1.5">
+                    <FormLabel className="text-sm font-medium">Password</FormLabel>
                     <FormControl>
                       <Input type="password" {...field} disabled={loading || isSendingCode}/>
                     </FormControl>
@@ -390,8 +390,8 @@ export default function SignupPage() {
                 )}
               />
             </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button className="w-full" type="submit" disabled={loading || googleLoading || isSendingCode}>
+            <CardFooter className="flex flex-col gap-4 px-6 pb-6 pt-2">
+              <Button className="w-full h-10 font-semibold shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 active:scale-[0.99]" type="submit" disabled={loading || googleLoading || isSendingCode}>
                 {isSendingCode ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -419,7 +419,7 @@ export default function SignupPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full h-10 bg-background/40 hover:bg-background/80 border-border/70 font-medium transition-all"
                 onClick={handleGoogleSignup}
                 disabled={loading || googleLoading || isSendingCode}
               >
@@ -453,18 +453,18 @@ export default function SignupPage() {
                 )}
               </Button>
               
-              <div className="text-center text-sm text-muted-foreground">
+              <div className="text-center text-sm text-muted-foreground pt-1 pb-2">
                 Already have an account?{' '}
                 <Link
                   href="/login"
                   className={cn(
-                    "font-medium text-primary underline-offset-4 hover:underline",
+                    "font-semibold text-violet-400 hover:text-violet-300 underline-offset-4 hover:underline transition-colors",
                     (loading || googleLoading || isSendingCode) && "pointer-events-none opacity-50"
                   )}
                   aria-disabled={loading || googleLoading || isSendingCode}
                   tabIndex={(loading || googleLoading || isSendingCode) ? -1 : undefined}
                 >
-                  Login
+                  Log in
                 </Link>
               </div>
             </CardFooter>
