@@ -57,6 +57,7 @@ interface MessageBubbleProps {
   onReply: (message: Message) => void;
   isRead: boolean;
   isGrouped?: boolean;
+  isGroupChat?: boolean;
 }
 
 const isImage = (fileType?: string) => fileType?.startsWith('image/') || false;
@@ -81,6 +82,7 @@ function MessageBubble({
   onReply,
   isRead,
   isGrouped = false,
+  isGroupChat = false,
 }: MessageBubbleProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -113,14 +115,16 @@ function MessageBubble({
     setMenuOpen(true);
   };
 
+  const isOutgoing = isCurrentUser;
+
   if (!sender) {
     return (
-      <div className={cn('group flex w-full items-start gap-3', isCurrentUser && 'flex-row-reverse')}>
-        <div className="h-8 w-8 rounded-full bg-zinc-800 animate-pulse" />
+      <div className={cn('group flex w-full items-end gap-2 relative my-1', isOutgoing ? 'justify-end ml-auto' : 'justify-start mr-auto')}>
+        {!isOutgoing && isGroupChat && <div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse shrink-0" />}
         <div
           className={cn(
             'relative flex max-w-[70%] flex-col rounded-xl px-4 py-2',
-            isCurrentUser ? 'rounded-tr-none bg-violet-700 text-white' : 'rounded-tl-none bg-zinc-800 text-zinc-100'
+            isOutgoing ? 'rounded-tr-none bg-violet-700 text-white' : 'rounded-tl-none bg-zinc-800 text-zinc-100'
           )}
         >
           <p className="text-base">{message.text}</p>
@@ -207,10 +211,14 @@ function MessageBubble({
         const mediaList: LightboxMedia[] = [{ url: message.file.url, type: fileType, name: message.file.name }];
 
         return (
-          <div className="relative rounded-lg overflow-hidden my-1">
+          <div className="relative rounded-lg overflow-hidden my-1 bg-gradient-to-br from-zinc-900 via-zinc-800/60 to-zinc-950 animate-pulse">
             <img
               src={message.file.url}
               alt={message.file.name || 'Attached image'}
+              onLoad={(e) => {
+                const parent = e.currentTarget.parentElement;
+                if (parent) parent.classList.remove('animate-pulse');
+              }}
               className={cn(
                 'rounded-lg object-cover max-w-full max-h-72 cursor-pointer hover:opacity-95 transition-opacity',
                 isSending && 'opacity-60'
@@ -276,8 +284,7 @@ function MessageBubble({
         className={cn(
           'group flex w-full items-end gap-2 relative',
           isGrouped ? 'my-0.5' : 'my-1',
-          isCurrentUser ? 'justify-end' : 'justify-start',
-          message.isAiMessage && 'justify-start'
+          isOutgoing ? 'justify-end ml-auto' : 'justify-start mr-auto'
         )}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
@@ -285,12 +292,12 @@ function MessageBubble({
         dragElastic={{ right: 0.2, left: 0 }}
         style={{ x: 0 }}
       >
-        {/* Incoming message avatar */}
-        {!isCurrentUser && (
+        {/* Incoming message avatar (Group Chat only) */}
+        {!isOutgoing && isGroupChat && (
           isGrouped ? (
-            <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
+            <div className="w-8 h-8 shrink-0 flex-shrink-0" />
           ) : (
-            <UserAvatar user={sender!} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
+            <UserAvatar user={sender!} className="w-8 h-8 shrink-0 flex-shrink-0 mb-0.5" />
           )
         )}
 
@@ -302,14 +309,14 @@ function MessageBubble({
             'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-md transition-all overflow-hidden group/bubble select-text',
             message.isAiMessage
               ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-zinc-100 border border-emerald-800/40 backdrop-blur-md'
-              : isCurrentUser
+              : isOutgoing
               ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-zinc-100'
               : 'rounded-2xl rounded-tl-xs bg-zinc-800 border border-zinc-800/40 text-zinc-100',
             message.file && !message.text ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
           )}
         >
-          {/* Sender Name */}
-          {!isCurrentUser && !isGrouped && (
+          {/* Sender Name in Group Chat */}
+          {!isOutgoing && isGroupChat && !isGrouped && (
             <p className="text-[11px] font-semibold text-violet-300 mb-0.5 tracking-tight">{sender?.name}</p>
           )}
 
@@ -355,7 +362,7 @@ function MessageBubble({
 
           {/* Displayed Emoji Reactions */}
           {message.reactions && message.reactions.length > 0 && (
-            <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isCurrentUser ? 'justify-end' : 'justify-start')}>
+            <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isOutgoing ? 'justify-end' : 'justify-start')}>
               {message.reactions.map((r) => (
                 <motion.button
                   key={r.emoji}
@@ -374,7 +381,7 @@ function MessageBubble({
           {/* Inline Bottom-Right Timestamp & Status Stacking */}
           <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-zinc-400 ml-2 float-right select-none">
             <span>{formattedTimestamp}</span>
-            {isCurrentUser && renderReadReceiptIcon()}
+            {isOutgoing && renderReadReceiptIcon()}
           </div>
         </div>
 

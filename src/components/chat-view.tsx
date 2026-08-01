@@ -466,6 +466,7 @@ const ChatViewComponent = ({
         isLoadingMessages={isLoadingMore}
         ref={messageListRef}
         chatId={chat.id}
+        isGroupChat={isGroupChat}
       />
       {/* Floating Scroll to Bottom Button */}
       <div

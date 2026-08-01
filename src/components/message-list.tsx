@@ -40,6 +40,7 @@ interface MessageListProps {
     isLoadingMore: boolean;
     isLoadingMessages: boolean;
     chatId: string;
+    isGroupChat?: boolean;
 }
 
 function convertToDate(timestamp: any): Date | null {
@@ -73,6 +74,7 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
     isLoadingMore,
     isLoadingMessages,
     chatId,
+    isGroupChat,
 }, ref) => {
     
     const viewportRef = useRef<HTMLDivElement>(null);
@@ -202,7 +204,8 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
                                 <MemoizedMessageBubble
                                     message={message}
                                     sender={sender}
-                                    isCurrentUser={sender?.uid === currentUser.uid}
+                                    isCurrentUser={message.senderId === currentUser.uid}
+                                    isGroupChat={isGroupChat}
                                     progress={uploadProgress.get(message.clientTempId || message.id)}
                                     onCancelUpload={() => onCancelUpload(message.clientTempId || message.id)}
                                     onMessageAction={onMessageAction}
