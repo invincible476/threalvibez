@@ -14,6 +14,7 @@ interface MessageInputProps {
   onSendMessage: (messageText: string) => void;
   onFileSelect: (file: File) => void;
   onGifSelect: (base64: string, fileType: string, fileName: string, caption: string) => void;
+  onSelectGif?: (gifUrl: string, aspectRatio?: number) => void;
   onTyping: (isTyping: boolean) => void;
   isAiChat?: boolean;
 }
@@ -24,7 +25,7 @@ const COMMON_EMOJIS = [
   '👏', '🙏', '💡', '⚡', '🥳', '🥰', '🤩', '🎯'
 ];
 
-export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTyping, isAiChat }: MessageInputProps) {
+export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelectGif, onTyping, isAiChat }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<{ url: string; name: string; type: string }[]>([]);
@@ -318,6 +319,21 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
               <Smile className="h-5 w-5" />
               <span className="sr-only">Toggle Emoji Picker</span>
             </Button>
+
+            {/* GIF Picker Modal Button */}
+            {onSelectGif && (
+              <GifPicker onSelectGif={onSelectGif}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:bg-muted font-bold text-xs"
+                  title="Search and send GIF"
+                >
+                  <span className="px-1 py-0.5 rounded border border-current text-[10px] font-extrabold leading-none tracking-tight">GIF</span>
+                  <span className="sr-only">Open GIF Picker</span>
+                </Button>
+              </GifPicker>
+            )}
           </>
         )}
 

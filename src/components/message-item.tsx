@@ -32,6 +32,9 @@ function arePropsEqual(prevProps: MessageItemProps, nextProps: MessageItemProps)
     m1.clientTempId !== m2.clientTempId ||
     m1.status !== m2.status ||
     m1.text !== m2.text ||
+    m1.type !== m2.type ||
+    m1.gifUrl !== m2.gifUrl ||
+    m1.pending !== m2.pending ||
     m1.deleted !== m2.deleted
   ) {
     return false;

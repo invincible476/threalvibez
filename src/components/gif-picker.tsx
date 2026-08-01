@@ -1,5 +1,5 @@
-
 'use client';
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
@@ -10,171 +10,143 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search } from 'lucide-react';
-import Image from 'next/image';
-import { Button } from './ui/button';
+import { Loader2, Search, Film, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
-
-const TENOR_API_KEY = process.env.NEXT_PUBLIC_TENOR_API_KEY;
-
-interface Gif {
-  id: string;
-  url: string;
-  preview: string;
-  title: string;
-}
+import { GifItem } from '@/lib/gif-service';
 
 interface GifPickerProps {
   children: React.ReactNode;
-  onSelect: (base64: string, fileType: string, fileName: string, caption: string) => void;
+  onSelectGif: (gifMp4Url: string, aspectRatio?: number) => void;
 }
 
-const fileToBase64 = (file: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
-};
-
-async function fetchGifs(
-  searchTerm: string,
-  toast: (options: any) => void
-): Promise<Gif[]> {
-  if (!TENOR_API_KEY) {
-      toast({
-        title: 'Missing API Key',
-        description: 'The Tenor API key is missing. Please add it to your environment variables.',
-        variant: 'destructive',
-      });
-      return [];
-  }
-  
-  const searchUrl = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(
-    searchTerm
-  )}&key=${TENOR_API_KEY}&limit=20&media_filter=tinygif`;
-  const trendingUrl = `https://tenor.googleapis.com/v2/featured?key=${TENOR_API_KEY}&limit=20&media_filter=tinygif`;
-
-  const url = searchTerm ? searchUrl : trendingUrl;
-  
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    return data.results.map((gif: any) => ({
-      id: gif.id,
-      url: gif.media_formats.gif?.url || gif.media_formats.tinygif.url,
-      preview: gif.media_formats.tinygif.url,
-      title: gif.content_description,
-    })).filter((g: Gif) => g.url && g.preview);
-  } catch (error) {
-    console.error('Error fetching GIFs:', error);
-    return [];
-  }
-}
-
-export function GifPicker({ children, onSelect }: GifPickerProps) {
+export function GifPicker({ children, onSelectGif }: GifPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const [gifs, setGifs] = useState<Gif[]>([]);
+  const [gifs, setGifs] = useState<GifItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
-  const handleSearch = useCallback(async (term: string) => {
+  const fetchGifs = useCallback(async (query: string) => {
     setIsLoading(true);
     try {
-      const results = await fetchGifs(term, toast);
-      setGifs(results);
+      const endpoint = query.trim()
+        ? `/api/gifs/search?q=${encodeURIComponent(query.trim())}&page=1`
+        : `/api/gifs/trending?page=1`;
+
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setGifs(data);
+      } else {
+        setGifs([]);
+      }
     } catch (error) {
-      console.error('Failed to fetch GIFs', error);
-      toast({
-        title: 'Error fetching GIFs',
-        description: 'Could not load GIFs. Please try again later.',
-        variant: 'destructive',
-      });
+      console.error('Failed to fetch GIFs from API proxy:', error);
+      setGifs([]);
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
-      handleSearch(debouncedSearchTerm);
+      fetchGifs(debouncedSearchTerm);
     }
-  }, [isOpen, debouncedSearchTerm, handleSearch]);
+  }, [isOpen, debouncedSearchTerm, fetchGifs]);
 
-  const handleGifSelect = (gif: Gif) => {
-    fetch(gif.url)
-        .then(res => res.blob())
-        .then(blob => fileToBase64(blob))
-        .then(base64 => {
-            onSelect(base64, 'image/gif', gif.title || 'vibez-gif.gif', '');
-        })
-        .catch(err => {
-             console.error("Error fetching GIF blob", err);
-             toast({
-                title: "Couldn't send GIF",
-                description: "There was a problem downloading the selected GIF.",
-                variant: "destructive"
-             })
-        });
-
+  const handleGifClick = (gif: GifItem) => {
+    const selectedUrl = gif.mp4Url || gif.previewUrl;
+    // 1. Immediately invoke onSelectGif callback
+    onSelectGif(selectedUrl, gif.aspectRatio);
+    // 2. Instantly close modal
     setIsOpen(false);
   };
-  
+
   const memoizedGifs = useMemo(() => {
-    return gifs.map((gif) => (
+    return gifs.map((gif) => {
+      const isVideo = gif.previewUrl.endsWith('.mp4') || gif.previewUrl.includes('/mp4');
+      return (
         <button
-            key={gif.id}
-            onClick={() => handleGifSelect(gif)}
-            className="rounded-md overflow-hidden aspect-video relative group focus:outline-none focus:ring-2 focus:ring-primary"
+          key={gif.id}
+          type="button"
+          onClick={() => handleGifClick(gif)}
+          className="group relative w-full overflow-hidden rounded-xl bg-card border border-border/50 hover:border-violet-500/50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 aspect-square sm:aspect-auto"
+          style={{ aspectRatio: gif.aspectRatio || 1 }}
         >
-            <Image
-            src={gif.preview}
-            alt={gif.title}
-            fill
-            className="object-cover group-hover:scale-110 transition-transform duration-200"
-            unoptimized
+          {isVideo ? (
+            <video
+              src={gif.previewUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             />
+          ) : (
+            <img
+              src={gif.previewUrl}
+              alt={gif.title || 'GIF'}
+              loading="lazy"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+            <span className="text-[11px] font-medium text-white truncate">{gif.title}</span>
+          </div>
         </button>
-    ))
-  }, [gifs, handleGifSelect]);
+      );
+    });
+  }, [gifs]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Select a GIF</DialogTitle>
+      <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-xl border-border text-foreground shadow-2xl p-4 gap-3">
+        <DialogHeader className="pb-1">
+          <DialogTitle className="flex items-center gap-2 text-lg font-heading">
+            <Film className="h-5 w-5 text-violet-400" />
+            Select a GIF
+          </DialogTitle>
         </DialogHeader>
-        <div className="relative my-4">
+
+        {/* Search Bar */}
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search for a GIF..."
+            placeholder="Search GIFs on Tenor & Giphy..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-9 bg-background/60 border-border/60 focus-visible:ring-violet-500 rounded-xl text-sm"
           />
         </div>
 
-        <ScrollArea className={cn("h-80 border rounded-md", isLoading && 'flex items-center justify-center')}>
-            {isLoading ? (
-                <div className="flex justify-center items-center h-full">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : gifs.length > 0 ? (
-                <div className="p-2 grid grid-cols-2 gap-2">
-                    {memoizedGifs}
-                </div>
-            ) : (
-                <p className="text-center text-muted-foreground p-8">No GIFs found. Is your API key set?</p>
-            )}
+        {/* Header Indicator */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1 font-medium">
+          <TrendingUp className="h-3.5 w-3.5 text-violet-400" />
+          <span>{searchTerm.trim() ? `Search results for "${searchTerm}"` : 'Trending GIFs'}</span>
+        </div>
+
+        {/* Masonry / Grid Container */}
+        <ScrollArea className="h-80 border border-border/40 rounded-xl p-2 bg-background/30">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-72 gap-2 text-muted-foreground">
+              <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
+              <span className="text-xs">Loading GIFs...</span>
+            </div>
+          ) : gifs.length > 0 ? (
+            <div className="columns-2 sm:columns-3 gap-2 space-y-2">
+              {memoizedGifs}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-72 text-center p-4 text-muted-foreground">
+              <p className="text-sm font-medium">No GIFs found</p>
+              <p className="text-xs mt-1">Try searching for something else like "cat", "dance", or "vibe".</p>
+            </div>
+          )}
         </ScrollArea>
       </DialogContent>
     </Dialog>

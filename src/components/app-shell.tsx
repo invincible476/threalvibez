@@ -34,7 +34,7 @@ import { MobileGalaxyBackground } from './mobile-galaxy-background';
 import { useTheme } from 'next-themes';
 import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
 import { safeGetMillis } from '@/lib/utils';
-import { debouncedUpdateTypingStatus, debouncedMarkAsRead, trimMessagePayload } from '@/lib/firebase/chat';
+import { debouncedUpdateTypingStatus, debouncedMarkAsRead, trimMessagePayload, sendChatMessage } from '@/lib/firebase/chat';
 
 
 
@@ -1956,6 +1956,34 @@ function useChatData() {
   }, [currentUser]);
 
 
+  const handleSendGifMessage = useCallback(async (
+    chatId: string,
+    senderId: string,
+    gifUrl: string,
+    aspectRatio?: number,
+    replyTo?: Message['replyTo'],
+    clientTempId?: string
+  ): Promise<string> => {
+    if (!gifUrl || !currentUser) return Promise.reject("Cannot send empty GIF");
+    const tempId = clientTempId || `temp-${Date.now()}`;
+    try {
+      return await sendChatMessage(
+        chatId,
+        senderId,
+        '',
+        tempId,
+        replyTo,
+        undefined,
+        'gif',
+        gifUrl,
+        aspectRatio
+      );
+    } catch (error) {
+      console.error('Error sending GIF:', error);
+      throw error;
+    }
+  }, [currentUser]);
+
   const activeSendMessage = useCallback(async (messageText: string, replyTo?: Message['replyTo'], clientTempId?: string): Promise<string> => {
     if (!selectedChat || !currentUser) return Promise.reject("No chat selected");
     if (selectedChat.id === AI_USER_ID) {
@@ -1965,6 +1993,15 @@ function useChatData() {
       return handleSendMessage(selectedChat.id, currentUser.uid, messageText, replyTo, clientTempId);
     }
   }, [selectedChat, currentUser, handleAiConversation, handleSendMessage]);
+
+  const activeSendGif = useCallback(async (gifUrl: string, aspectRatio?: number, replyTo?: Message['replyTo'], clientTempId?: string): Promise<string> => {
+    if (!selectedChat || !currentUser) return Promise.reject("No chat selected");
+    if (selectedChat.id === AI_USER_ID) {
+      return Promise.resolve(uuidv4());
+    } else {
+      return handleSendGifMessage(selectedChat.id, currentUser.uid, gifUrl, aspectRatio, replyTo, clientTempId);
+    }
+  }, [selectedChat, currentUser, handleSendGifMessage]);
 
   const activeSendFile = useCallback((file: File, message: string): Promise<string> => {
       if (!selectedChat || !currentUser) return Promise.reject("No chat selected");
@@ -2096,6 +2133,7 @@ function useChatData() {
     handleStoryReaction,
     handleChatSelect,
     activeSendMessage,
+    activeSendGif,
     activeSendFile,
     activeSendBase64File,
     handleMessageAction,
@@ -2144,6 +2182,7 @@ interface AppShellContextType {
   handleStoryReaction: (storyId: string, emoji: string) => Promise<void>;
   handleChatSelect: (chatId: string) => Promise<void>;
   activeSendMessage: (messageText: string, replyTo?: Message['replyTo'], clientTempId?: string) => Promise<string>;
+  activeSendGif: (gifUrl: string, aspectRatio?: number, replyTo?: Message['replyTo'], clientTempId?: string) => Promise<string>;
   activeSendFile: (file: File, message: string) => Promise<string>;
   activeSendBase64File: (base64: string, fileType: string, fileName: string, caption: string) => Promise<string | undefined>;
   handleMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: unknown) => Promise<void>;

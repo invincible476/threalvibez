@@ -124,7 +124,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
               <div className="flex items-center gap-2">
                 <CardTitle>{profileUser.name}</CardTitle>
                 {profileUser.isPrivate && (
-                  <Shield className="h-4 w-4 text-muted-foreground" title="Private Account" />
+                  <span title="Private Account">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                  </span>
                 )}
               </div>
               <CardDescription>{profileUser.username ? `@${profileUser.username}` : profileUser.email}</CardDescription>

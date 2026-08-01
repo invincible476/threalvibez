@@ -222,6 +222,52 @@ function MessageBubble({
       return <p className="text-sm italic text-muted-foreground">This message was deleted.</p>;
     }
 
+    // GIF Rendering Logic (HTML5 Video for zero latency and low bandwidth, zero layout shift)
+    if (message.type === 'gif' || message.gifUrl) {
+      const isSending = message.status === 'sending' || message.pending;
+      const gifUrl = message.gifUrl || message.file?.url;
+      const isVideoFormat =
+        gifUrl?.endsWith('.mp4') ||
+        gifUrl?.endsWith('.webm') ||
+        gifUrl?.includes('/mp4') ||
+        gifUrl?.includes('tinymp4') ||
+        gifUrl?.includes('giphy.mp4') ||
+        !gifUrl?.endsWith('.gif');
+
+      return (
+        <div
+          className={cn(
+            'relative rounded-xl overflow-hidden my-1 bg-muted/40 max-w-[260px] max-h-[320px] w-auto h-auto',
+            isSending && 'opacity-80'
+          )}
+          style={message.aspectRatio ? { aspectRatio: message.aspectRatio } : undefined}
+        >
+          {isVideoFormat ? (
+            <video
+              src={gifUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="rounded-xl max-w-[260px] max-h-[320px] w-auto h-auto object-cover"
+            />
+          ) : (
+            <img
+              src={gifUrl}
+              alt="GIF"
+              loading="lazy"
+              className="rounded-xl max-w-[260px] max-h-[320px] w-auto h-auto object-cover"
+            />
+          )}
+          {isSending && (
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] flex items-center justify-center">
+              <div className="h-5 w-5 border-2 border-white/80 border-t-transparent rounded-full animate-spin text-white" />
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (message.file) {
       const fileType = message.file.type || '';
       const isSending = message.status === 'sending';

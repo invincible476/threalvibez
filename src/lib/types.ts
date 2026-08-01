@@ -43,11 +43,15 @@ export type MessageReaction = {
 };
 
 export type Message = {
-  id:string;
+  id: string;
   senderId: string;
-  text: string;
+  type?: 'text' | 'gif';
+  text?: string;
+  gifUrl?: string; // High-performance MP4/WebM/GIF CDN link
+  aspectRatio?: number;
   timestamp: any;
-  status: 'sent' | 'delivered' | 'read' | 'sending' | 'error';
+  status?: 'sent' | 'delivered' | 'read' | 'sending' | 'error';
+  pending?: boolean; // For optimistic UI tracking
   isAiMessage?: boolean;
   reactions?: MessageReaction[];
   file?: {

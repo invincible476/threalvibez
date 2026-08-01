@@ -66,7 +66,7 @@ interface ChatInfoPageProps {
 }
 
 export default function ChatInfoPage({ params }: ChatInfoPageProps) {
-  const resolvedParams = use(params);
+  const resolvedParams = typeof (params as any)?.then === 'function' ? use(params as Promise<{ id: string }>) : (params as { id: string });
   const chatId = resolvedParams.id;
   const router = useRouter();
   const { user: authUser } = useAuth();
@@ -223,7 +223,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
               links.push({
                 url,
                 domain,
-                text: msg.text,
+                text: msg.text || '',
                 senderId: msg.senderId,
               });
             } catch (e) {
@@ -515,7 +515,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                       <UserPlus className="h-5 w-5 text-violet-400" />
                       <span className="text-xs font-medium">Add</span>
                     </button>
-                  ) : (
+                  ) : targetUser ? (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <button
@@ -548,7 +548,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                  )}
+                  ) : null}
                 </div>
               </>
             );

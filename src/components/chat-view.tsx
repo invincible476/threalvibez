@@ -169,6 +169,7 @@ const ChatViewComponent = ({
     uploadProgress,
     cancelUpload,
     activeSendMessage,
+    activeSendGif,
     activeSendFile,
     handleMessageAction,
     handleTyping,
@@ -341,24 +342,91 @@ const ChatViewComponent = ({
     const targetKey = failedMsg.clientTempId || failedMsg.id;
 
     setOptimisticMessages((prev) =>
-      prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'sending' } : m))
+      prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'sending', pending: true } : m))
     );
 
-    activeSendMessage(failedMsg.text, failedMsg.replyTo, targetKey)
+    if (failedMsg.type === 'gif' || failedMsg.gifUrl) {
+      activeSendGif(failedMsg.gifUrl || '', failedMsg.aspectRatio, failedMsg.replyTo, targetKey)
+        .then((realId) => {
+          setOptimisticMessages((prev) =>
+            prev.map((m) =>
+              (m.clientTempId || m.id) === targetKey ? { ...m, id: realId || m.id, status: 'sent', pending: false } : m
+            )
+          );
+        })
+        .catch((err) => {
+          console.error('Error retrying GIF:', err);
+          setOptimisticMessages((prev) =>
+            prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'error', pending: false } : m))
+          );
+        });
+    } else {
+      activeSendMessage(failedMsg.text || '', failedMsg.replyTo, targetKey)
+        .then((realId) => {
+          setOptimisticMessages((prev) =>
+            prev.map((m) =>
+              (m.clientTempId || m.id) === targetKey ? { ...m, id: realId || m.id, status: 'sent', pending: false } : m
+            )
+          );
+        })
+        .catch((err) => {
+          console.error('Error retrying message:', err);
+          setOptimisticMessages((prev) =>
+            prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'error', pending: false } : m))
+          );
+        });
+    }
+  }, [chat, currentUser, activeSendMessage, activeSendGif]);
+
+  const handleSelectGifOptimistic = useCallback((gifUrl: string, aspectRatio?: number) => {
+    if (!chat || !currentUser) return;
+
+    const messageReply = replyToMessage?.replyTo || (replyToMessage ? {
+      messageId: replyToMessage.id,
+      messageText: replyToMessage.text || (replyToMessage.file ? 'Attachment' : replyToMessage.gifUrl ? 'GIF' : ''),
+      messageSender: usersCache.get(replyToMessage.senderId)?.name || 'Unknown User'
+    } : undefined);
+    setReplyToMessage(null);
+
+    // 1. Construct optimistic message object (0ms perception of network delay)
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: MessageType = {
+      id: tempId,
+      clientTempId: tempId,
+      senderId: currentUser.uid,
+      type: 'gif',
+      gifUrl: gifUrl,
+      aspectRatio: aspectRatio,
+      timestamp: new Date(),
+      status: 'sending',
+      pending: true,
+      ...(messageReply && { replyTo: messageReply }),
+    };
+
+    // 2. Instantly update local state array
+    setOptimisticMessages((prev) => [...prev, optimisticMsg]);
+
+    // 3. Send payload over Firestore in background
+    activeSendGif(gifUrl, aspectRatio, messageReply, tempId)
       .then((realId) => {
         setOptimisticMessages((prev) =>
           prev.map((m) =>
-            (m.clientTempId || m.id) === targetKey ? { ...m, id: realId || m.id, status: 'sent' } : m
+            m.clientTempId === tempId ? { ...m, id: realId || m.id, status: 'sent', pending: false } : m
           )
         );
       })
-      .catch((err) => {
-        console.error('Error retrying message:', err);
+      .catch((e) => {
+        console.error('Error sending GIF:', e);
         setOptimisticMessages((prev) =>
-          prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'error' } : m))
+          prev.map((m) => (m.clientTempId === tempId ? { ...m, status: 'error', pending: false } : m))
         );
+        toast({
+          title: 'Error Sending GIF',
+          description: 'Could not send GIF. Click retry to try again.',
+          variant: 'destructive',
+        });
       });
-  }, [chat, currentUser, activeSendMessage]);
+  }, [chat, currentUser, replyToMessage, usersCache, activeSendGif, toast]);
 
   const handleSendGif = useCallback((base64: string, fileType: string, fileName: string, caption: string) => {
       activeSendFile(
@@ -681,6 +749,7 @@ const ChatViewComponent = ({
         onSendMessage={handleSendMessageWithReply}
         onFileSelect={handleFileSelect}
         onGifSelect={handleSendGif}
+        onSelectGif={handleSelectGifOptimistic}
         onTyping={handleTyping}
         isAiChat={isAIChat}
       />

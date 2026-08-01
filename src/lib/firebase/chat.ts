@@ -25,7 +25,10 @@ const readReceiptDebounceTimers = new Map<string, NodeJS.Timeout>();
 
 export interface MinimalMessagePayload {
   senderId: string;
-  text: string;
+  type?: 'text' | 'gif';
+  text?: string;
+  gifUrl?: string;
+  aspectRatio?: number;
   timestamp: ReturnType<typeof serverTimestamp>;
   clientTempId: string;
   replyTo?: {
@@ -51,14 +54,26 @@ export function trimMessagePayload(
   text: string,
   clientTempId: string,
   replyTo?: Message['replyTo'],
-  file?: Message['file']
+  file?: Message['file'],
+  type?: 'text' | 'gif',
+  gifUrl?: string,
+  aspectRatio?: number
 ): MinimalMessagePayload {
   const payload: MinimalMessagePayload = {
     senderId,
-    text: text.trim(),
     timestamp: serverTimestamp(),
     clientTempId,
   };
+
+  if (type === 'gif' || gifUrl) {
+    payload.type = 'gif';
+    payload.gifUrl = gifUrl;
+    if (aspectRatio) payload.aspectRatio = aspectRatio;
+    if (text) payload.text = text.trim();
+  } else {
+    payload.type = 'text';
+    if (text) payload.text = text.trim();
+  }
 
   if (replyTo) {
     payload.replyTo = {
@@ -91,18 +106,22 @@ export async function sendChatMessage(
   text: string,
   clientTempId: string,
   replyTo?: Message['replyTo'],
-  file?: Message['file']
+  file?: Message['file'],
+  type?: 'text' | 'gif',
+  gifUrl?: string,
+  aspectRatio?: number
 ): Promise<string> {
   const messagesColRef = collection(db, 'conversations', chatId, 'messages');
-  const payload = trimMessagePayload(senderId, text, clientTempId, replyTo, file);
+  const payload = trimMessagePayload(senderId, text, clientTempId, replyTo, file, type, gifUrl, aspectRatio);
 
   const docRef = await addDoc(messagesColRef, payload);
 
   // Update conversation lastMessage non-blockingly
   const chatRef = doc(db, 'conversations', chatId);
+  const lastMessageText = type === 'gif' ? '👾 GIF' : (text.trim() || (file ? (file.type.startsWith('image/') ? '📷 Photo' : '📁 Attachment') : ''));
   updateDoc(chatRef, {
     lastMessage: {
-      text: text.trim() || (file ? (file.type.startsWith('image/') ? '📷 Photo' : '📁 Attachment') : ''),
+      text: lastMessageText,
       senderId,
       timestamp: serverTimestamp(),
     },
