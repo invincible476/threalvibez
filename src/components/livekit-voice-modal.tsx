@@ -23,8 +23,6 @@ interface LiveKitVoiceModalProps {
   onClose: () => void;
 }
 
-const LIVEKIT_SERVER_URL = "wss://omegaone-7kb381s3.livekit.cloud";
-
 export function LiveKitVoiceModal({
   isOpen,
   roomId,
@@ -45,29 +43,23 @@ export function LiveKitVoiceModal({
     setMounted(true);
   }, []);
 
-  // 1. Direct Native fetch() Diagnostic Check
-  useEffect(() => {
-    if (!isOpen) return;
-    async function testNetwork() {
-      try {
-        await fetch('https://omegaone-7kb381s3.livekit.cloud', { method: 'HEAD', mode: 'no-cors' });
-        console.log('[LiveKit Diagnostic] Cloud Server is reachable!');
-      } catch (err: any) {
-        console.error('[LiveKit Diagnostic] Browser network fetch failed:', err);
-        setError(
-          `Browser blocked connection to LiveKit Cloud (${err.message}). If using Brave or AdBlock, turn off Shields for this site.`
-        );
-      }
-    }
-    testNetwork();
-  }, [isOpen]);
-
   const initVoiceConnection = useCallback(async () => {
     if (!roomId || !userId) return;
 
     setLoading(true);
     setError(null);
     setToken('');
+
+    // 1. Direct Browser Network Ping Diagnostic
+    try {
+      await fetch('https://omegaone-7kb381s3.livekit.cloud', { method: 'HEAD', mode: 'no-cors' });
+      console.log('[LiveKit Diagnostic] Cloud Server is reachable!');
+    } catch (err: any) {
+      console.error('[LiveKit Diagnostic] Browser network fetch failed:', err);
+      setError('Browser blocked network request to LiveKit Cloud. Turn off Brave Shields or test in Chrome.');
+      setLoading(false);
+      return;
+    }
 
     // 2. Explicit Microphone Permission Pre-fetch
     try {
@@ -135,7 +127,7 @@ export function LiveKitVoiceModal({
           <div className="flex flex-col items-center justify-center py-4 space-y-3 text-center">
             <ShieldAlert className="h-8 w-8 text-destructive animate-bounce" />
             <p className="text-sm font-semibold text-destructive">{error}</p>
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center justify-center gap-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -160,17 +152,13 @@ export function LiveKitVoiceModal({
             video={false}
             audio={true}
             token={token}
-            serverUrl={LIVEKIT_SERVER_URL}
+            serverUrl="wss://omegaone-7kb381s3.livekit.cloud"
             connect={true}
             data-lk-theme="default"
             onDisconnected={onClose}
             onError={(err) => {
-              console.error('[LiveKit Cloud Error]', err);
-              setError(
-                `Connection Rejected: ${
-                  err.message || 'Check if API Key/Secret matches omegaone project in LiveKit Console'
-                }`
-              );
+              console.error('[LiveKit Signal Error]', err);
+              setError(`Connection failed: ${err.message}. If using Brave Browser, disable Brave Shields.`);
               toast({
                 title: 'Voice Room Disconnected',
                 description: err.message || 'Connection error encountered.',
