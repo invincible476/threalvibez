@@ -29,7 +29,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Toaster } from '@/components/ui/toaster';
 import { sendVerificationRequest, verifyEmailCode as verifyEmailCodeAPI } from '@/utils/email-service';
 
 const formSchema = z.object({
@@ -225,7 +224,6 @@ export default function VerifyEmailPage() {
 
   return (
     <>
-      <Toaster />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Card>
