@@ -5,7 +5,15 @@ import { cn } from '@/lib/utils';
 import type { User } from '@/lib/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 
-type UserLike = Partial<User> | (FirebaseUser | null);
+type UserLike = Partial<User> | (FirebaseUser | null) | {
+  name?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  avatarUrl?: string | null;
+  avatar?: string | null;
+  isGroup?: boolean;
+  type?: string;
+};
 
 type UserAvatarProps = {
   user?: UserLike;
@@ -13,14 +21,20 @@ type UserAvatarProps = {
   isFriend?: boolean;
   hasStory?: boolean;
   storyViewed?: boolean;
+  isGroup?: boolean;
 };
 
-export function UserAvatar({ user, className, isFriend, hasStory, storyViewed }: UserAvatarProps) {
+export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, isGroup }: UserAvatarProps) {
   const [hasImageError, setHasImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
 
-  const effectiveHasStory = hasStory ?? (user && typeof user === 'object' && 'hasActiveStory' in user ? (user as any).hasActiveStory : (user && typeof user === 'object' && 'hasStory' in user ? (user as any).hasStory : undefined));
-  const effectiveStoryViewed = storyViewed ?? (user && typeof user === 'object' && 'storyViewed' in user ? (user as any).storyViewed : undefined);
+  const isGroupChat = isGroup ?? (user && typeof user === 'object' && (
+    ('isGroup' in user && Boolean((user as any).isGroup)) ||
+    ('type' in user && (user as any).type === 'group')
+  ));
+
+  const effectiveHasStory = !isGroupChat && (hasStory ?? (user && typeof user === 'object' && 'hasActiveStory' in user ? (user as any).hasActiveStory : (user && typeof user === 'object' && 'hasStory' in user ? (user as any).hasStory : undefined)));
+  const effectiveStoryViewed = !isGroupChat && (storyViewed ?? (user && typeof user === 'object' && 'storyViewed' in user ? (user as any).storyViewed : undefined));
 
   if (!user) {
     return (
@@ -32,17 +46,29 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed }:
     );
   }
 
-  const getInitials = (name: string) => {
-    const names = name.split(' ');
+  const getInitials = (nameStr: string) => {
+    const names = nameStr.trim().split(' ');
     const initials = names.map(n => n[0]).join('');
     return initials.slice(0, 2).toUpperCase();
-  }
+  };
 
-  const name = 'name' in user ? user.name : ('displayName' in user ? user.displayName : null);
-  const photoURL = 'photoURL' in user ? user.photoURL : user.photoURL;
-  const status = 'status' in user ? user.status : undefined;
+  const name = user && typeof user === 'object' ? (
+    ('name' in user && (user as any).name) ||
+    ('displayName' in user && (user as any).displayName) ||
+    null
+  ) : null;
+
+  const photoURL = user && typeof user === 'object' ? (
+    ('photoURL' in user && (user as any).photoURL) ||
+    ('avatarUrl' in user && (user as any).avatarUrl) ||
+    ('avatar' in user && (user as any).avatar) ||
+    null
+  ) : null;
+
+  const status = user && typeof user === 'object' && 'status' in user ? (user as any).status : undefined;
   
-  const fallback = name ? getInitials(name) : 'U';
+  const groupLetter = isGroupChat ? ((name || 'Group').trim().charAt(0).toUpperCase() || 'G') : null;
+  const fallback = isGroupChat ? groupLetter! : (name ? getInitials(name) : 'U');
   
   const canDisplayImage = photoURL && (photoURL.startsWith('data:image') || photoURL.startsWith('http')) && !hasImageError;
 
@@ -71,7 +97,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed }:
           <>
             <AvatarImage
               src={photoURL}
-              alt={name || 'User avatar'}
+              alt={name || (isGroupChat ? 'Group avatar' : 'User avatar')}
               className={cn(
                 "aspect-square w-full h-full object-cover rounded-full transition-opacity duration-200",
                 isImageLoading ? 'opacity-0' : 'opacity-100'
@@ -84,16 +110,24 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed }:
               onLoad={handleImageLoad}
             />
             {isImageLoading && (
-              <AvatarFallback className="rounded-full animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 text-zinc-300">
+              <AvatarFallback className={cn(
+                "rounded-full animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 text-zinc-300",
+                isGroupChat && "bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 text-white font-bold"
+              )}>
                 {fallback}
               </AvatarFallback>
             )}
           </>
         ) : (
-          <AvatarFallback className="rounded-full bg-zinc-800 text-zinc-200">{fallback}</AvatarFallback>
+          <AvatarFallback className={cn(
+            "rounded-full bg-zinc-800 text-zinc-200 font-medium",
+            isGroupChat && "bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 text-white font-bold"
+          )}>
+            {fallback}
+          </AvatarFallback>
         )}
       </Avatar>
-      {status === 'online' && (
+      {!isGroupChat && status === 'online' && (
         <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
       )}
     </div>

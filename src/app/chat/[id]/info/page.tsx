@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   Loader2,
   Check,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
@@ -42,6 +43,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { addGroupMembers } from '@/lib/firebase/chat';
 
 interface ChatInfoPageProps {
   params: Promise<{ id: string }>;
@@ -66,8 +79,12 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // Add Member Modal State
-  const [addMemberInput, setAddMemberInput] = useState('');
+  // Friend Picker Modal State
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [availableFriends, setAvailableFriends] = useState<User[]>([]);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [loadingFriends, setLoadingFriends] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
 
   useEffect(() => {
@@ -125,6 +142,41 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
       unsubscribeMessages();
     };
   }, [chatId, authUser, toast]);
+
+  // Load available friends for group addition modal
+  const fetchAvailableFriends = async () => {
+    if (!authUser || !chat) return;
+    setLoadingFriends(true);
+    try {
+      const userSnap = await getDoc(doc(db, 'users', authUser.uid));
+      if (userSnap.exists()) {
+        const userData = userSnap.data() as User;
+        const currentParticipants = new Set(chat.participants || []);
+        const friendIds = (userData.friends || []).filter((fId) => !currentParticipants.has(fId));
+
+        const friendsList: User[] = [];
+        for (const fId of friendIds) {
+          const fSnap = await getDoc(doc(db, 'users', fId));
+          if (fSnap.exists()) {
+            friendsList.push({ id: fSnap.id, uid: fSnap.id, ...fSnap.data() } as User);
+          }
+        }
+        setAvailableFriends(friendsList);
+      }
+    } catch (e) {
+      console.error('Error fetching friends list:', e);
+      toast({ title: 'Error', description: 'Could not load friends list', variant: 'destructive' });
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  const openAddMemberModal = () => {
+    setSelectedFriendIds([]);
+    setFriendSearchQuery('');
+    setIsAddMemberModalOpen(true);
+    fetchAvailableFriends();
+  };
 
   // Derived Media & Links
   const mediaItems = useMemo(() => {
@@ -185,6 +237,17 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
     );
   }, [messages, searchQuery]);
 
+  const filteredAvailableFriends = useMemo(() => {
+    const queryStr = friendSearchQuery.trim().toLowerCase();
+    if (!queryStr) return availableFriends;
+    return availableFriends.filter((f) => {
+      const name = (f.name || '').toLowerCase();
+      const email = (f.email || '').toLowerCase();
+      const username = (f.username || '').toLowerCase();
+      return name.includes(queryStr) || email.includes(queryStr) || username.includes(queryStr);
+    });
+  }, [availableFriends, friendSearchQuery]);
+
   // Actions
   const handleToggleMute = async () => {
     if (!authUser || !chatId) return;
@@ -233,6 +296,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
       const chatRef = doc(db, 'conversations', chatId);
       await updateDoc(chatRef, {
         participants: arrayRemove(targetUid),
+        participantIds: arrayRemove(targetUid),
       });
       toast({ title: 'Member removed' });
     } catch (e) {
@@ -246,6 +310,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
       const chatRef = doc(db, 'conversations', chatId);
       await updateDoc(chatRef, {
         participants: arrayRemove(authUser.uid),
+        participantIds: arrayRemove(authUser.uid),
       });
       toast({ title: 'Left group successfully' });
       router.push('/');
@@ -254,18 +319,27 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
     }
   };
 
-  const handleAddMember = async () => {
-    if (!addMemberInput.trim() || !chatId) return;
+  const toggleFriendSelection = (uid: string) => {
+    setSelectedFriendIds((prev) =>
+      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
+    );
+  };
+
+  const handleAddSelectedMembers = async () => {
+    if (!chatId || selectedFriendIds.length === 0) return;
     setIsAddingMember(true);
     try {
-      const chatRef = doc(db, 'conversations', chatId);
-      await updateDoc(chatRef, {
-        participants: arrayUnion(addMemberInput.trim()),
+      const friendsToAdd = availableFriends.filter((f) => selectedFriendIds.includes(f.uid));
+      await addGroupMembers(chatId, friendsToAdd);
+      toast({
+        title: 'Members Added',
+        description: `Added ${friendsToAdd.length} member(s) to the group.`,
       });
-      toast({ title: 'Member added successfully' });
-      setAddMemberInput('');
+      setIsAddMemberModalOpen(false);
+      setSelectedFriendIds([]);
     } catch (e) {
-      toast({ title: 'Error', description: 'Could not add member', variant: 'destructive' });
+      console.error('Error adding group members:', e);
+      toast({ title: 'Error', description: 'Could not add members', variant: 'destructive' });
     } finally {
       setIsAddingMember(false);
     }
@@ -279,7 +353,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
     );
   }
 
-  const isGroup = chat?.type === 'group';
+  const isGroup = chat?.type === 'group' || (chat as any)?.isGroup === true;
   const isAdmin = authUser?.uid === chat?.createdBy;
 
   return (
@@ -304,7 +378,13 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
         {/* Profile Card */}
         <div className="flex flex-col items-center justify-center p-6 bg-zinc-900/60 rounded-2xl border border-zinc-800/60 backdrop-blur-sm text-center space-y-3">
           <UserAvatar
-            user={{ name: chat?.name || 'Chat', photoURL: chat?.avatar || '' }}
+            user={{
+              name: chat?.name || 'Group',
+              photoURL: chat?.avatar || (chat as any)?.avatarUrl || null,
+              isGroup: isGroup,
+              type: isGroup ? 'group' : 'private',
+            }}
+            isGroup={isGroup}
             className="w-24 h-24 text-3xl shadow-xl ring-2 ring-violet-500/20"
           />
           <div>
@@ -514,23 +594,14 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                 Group Members ({participantsDetails.length})
               </h3>
               {isAdmin && (
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="User UID to add..."
-                    value={addMemberInput}
-                    onChange={(e) => setAddMemberInput(e.target.value)}
-                    className="h-8 text-xs bg-zinc-950 border-zinc-800 text-white w-40"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-8 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-xs gap-1"
-                    onClick={handleAddMember}
-                    disabled={isAddingMember}
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    Add
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  className="h-8 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-xs gap-1.5 shadow-md"
+                  onClick={openAddMemberModal}
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add Members
+                </Button>
               )}
             </div>
 
@@ -608,6 +679,106 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
         )}
       </main>
 
+      {/* Multi-Select Friend Picker Modal for Group Addition */}
+      <Dialog open={isAddMemberModalOpen} onOpenChange={setIsAddMemberModalOpen}>
+        <DialogContent className="sm:max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold font-heading text-zinc-100">
+              <Users className="h-5 w-5 text-violet-400" />
+              Add Group Members
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+              <Input
+                type="search"
+                placeholder="Search friends by name or email..."
+                value={friendSearchQuery}
+                onChange={(e) => setFriendSearchQuery(e.target.value)}
+                className="pl-9 bg-zinc-900 border-zinc-800 text-zinc-100 text-sm h-9"
+              />
+            </div>
+
+            <ScrollArea className="h-64 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-2">
+              {loadingFriends ? (
+                <div className="flex items-center justify-center h-48">
+                  <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                </div>
+              ) : availableFriends.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center p-4">
+                  <p className="text-sm text-zinc-400">
+                    No eligible friends found. All your friends may already be in this group.
+                  </p>
+                </div>
+              ) : filteredAvailableFriends.length === 0 ? (
+                <div className="p-6 text-center text-sm text-zinc-400">
+                  No friends match "{friendSearchQuery}"
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredAvailableFriends.map((friend) => {
+                    const isSelected = selectedFriendIds.includes(friend.uid);
+                    return (
+                      <div
+                        key={friend.uid}
+                        onClick={() => toggleFriendSelection(friend.uid)}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-violet-950/40 border border-violet-800/50'
+                            : 'hover:bg-zinc-800/50 border border-transparent'
+                        }`}
+                      >
+                        <Checkbox
+                          id={`friend-${friend.uid}`}
+                          checked={isSelected}
+                          onCheckedChange={() => toggleFriendSelection(friend.uid)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="data-[state=checked]:bg-violet-700 data-[state=checked]:border-violet-700 border-zinc-600"
+                        />
+                        <UserAvatar user={friend} isFriend={true} className="h-9 w-9 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-zinc-100 truncate">{friend.name}</p>
+                          <p className="text-xs text-zinc-400 truncate">
+                            {friend.username ? `@${friend.username}` : (friend.email || '')}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => setIsAddMemberModalOpen(false)}
+              disabled={isAddingMember}
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSelectedMembers}
+              disabled={selectedFriendIds.length === 0 || isAddingMember}
+              className="bg-violet-700 hover:bg-violet-600 text-white font-semibold text-xs shadow-lg disabled:opacity-50"
+            >
+              {isAddingMember ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                `Add Selected (${selectedFriendIds.length})`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Full-Screen Media Lightbox Modal */}
       <MediaLightbox
         media={mediaItems}
@@ -618,3 +789,4 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
     </div>
   );
 }
+

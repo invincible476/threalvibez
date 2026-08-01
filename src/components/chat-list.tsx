@@ -490,10 +490,11 @@ const ChatItem = React.memo(
       }
     }
 
-    const otherParticipant = conversation.participantsDetails?.find(p => p.uid !== currentUser?.uid);
-    const isFriend = currentUser?.friends?.includes(otherParticipant?.uid || '');
-    const hasSentRequest = currentUser?.friendRequestsSent?.includes(otherParticipant?.uid || '');
-    const hasReceivedRequest = currentUser?.friendRequestsReceived?.includes(otherParticipant?.uid || '');
+    const isGroupChat = conversation.type === 'group' || (conversation as any).isGroup === true;
+    const otherParticipant = isGroupChat ? undefined : conversation.participantsDetails?.find(p => p.uid !== currentUser?.uid);
+    const isFriend = !isGroupChat && currentUser?.friends?.includes(otherParticipant?.uid || '');
+    const hasSentRequest = !isGroupChat && currentUser?.friendRequestsSent?.includes(otherParticipant?.uid || '');
+    const hasReceivedRequest = !isGroupChat && currentUser?.friendRequestsReceived?.includes(otherParticipant?.uid || '');
     const isAiChat = conversation.id === 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
     
     const canSendRequest = conversation.type === 'private' && !isFriend && !hasSentRequest && !hasReceivedRequest && !isAiChat;
@@ -518,13 +519,19 @@ const ChatItem = React.memo(
               )}
           >
           <UserAvatar 
-              user={otherParticipant || {
+              user={isGroupChat ? {
+                  name: conversation.name || 'Group',
+                  photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
+                  isGroup: true,
+                  type: 'group'
+              } : (otherParticipant || {
                   name: conversation.name || 'Unknown',
-                  photoURL: conversation.avatar || '',
-              }} 
-              hasStory={otherParticipant?.hasActiveStory}
-              storyViewed={otherParticipant?.storyViewed}
+                  photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
+              })} 
+              hasStory={!isGroupChat ? otherParticipant?.hasActiveStory : false}
+              storyViewed={!isGroupChat ? otherParticipant?.storyViewed : undefined}
               isFriend={isFriend}
+              isGroup={isGroupChat}
               className="h-10 w-10 flex-shrink-0"
           />
           <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">

@@ -388,10 +388,12 @@ const ChatViewComponent = ({
 
   const headerAvatarUser = isGroupChat ? { 
     name: displayName, 
-    photoURL: displayAvatar 
+    photoURL: displayAvatar || (chat as any)?.avatarUrl || null,
+    isGroup: true,
+    type: 'group'
   } : (participantForProfile || { 
     name: displayName, 
-    photoURL: displayAvatar 
+    photoURL: displayAvatar || null
   });
 
   return (
@@ -413,7 +415,7 @@ const ChatViewComponent = ({
             className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
             onClick={navigateToChatInfo}
           >
-            <UserAvatar user={headerAvatarUser} className="h-10 w-10"/>
+            <UserAvatar user={headerAvatarUser} isGroup={isGroupChat} className="h-10 w-10"/>
             <div>
               <p className="font-semibold font-heading text-zinc-100">{displayName}</p>
               <p className="text-xs text-zinc-400 capitalize flex items-center gap-1">

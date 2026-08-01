@@ -31,6 +31,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { verifyEmailCode as verifyEmailCodeAPI } from '@/utils/email-service';
 
+import { Check } from 'lucide-react';
+
 const linkResetSchema = z.object({
   password: z
     .string()
@@ -63,6 +65,7 @@ function ResetPasswordForm() {
   const [codeVerified, setCodeVerified] = useState(false);
   const [oobCode, setOobCode] = useState<string>('');
   const [mode, setMode] = useState<'link' | 'code'>('code');
+  const [isResetComplete, setIsResetComplete] = useState(false);
 
   const linkForm = useForm<z.infer<typeof linkResetSchema>>({
     resolver: zodResolver(linkResetSchema),
@@ -108,12 +111,10 @@ function ResetPasswordForm() {
     try {
       await confirmPasswordReset(auth, oobCode, values.password);
       toast({
-        title: 'Password Reset Successful',
-        description: 'Your password has been updated. Redirecting to login...',
+        title: 'Password Reset Complete',
+        description: 'Your password has been updated successfully.',
       });
-      setTimeout(() => {
-        router.replace('/login?message=Password reset successful. Please log in with your new password.');
-      }, 1500);
+      setIsResetComplete(true);
     } catch (error: any) {
       let errorMessage = 'Failed to reset password. Please try again.';
       if (error.code === 'auth/weak-password') {
@@ -198,14 +199,10 @@ function ResetPasswordForm() {
       }
 
       toast({
-        title: 'Code Verified!',
-        description: 'Updating your account password...',
+        title: 'Password Reset Complete',
+        description: 'Your password has been updated successfully.',
       });
-
-      // Navigate to login with success banner
-      setTimeout(() => {
-        router.replace(`/login?message=Password verified. Please log in with your email ${encodeURIComponent(values.email)}.`);
-      }, 1500);
+      setIsResetComplete(true);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -216,6 +213,27 @@ function ResetPasswordForm() {
       setLoading(false);
     }
   };
+
+  if (isResetComplete) {
+    return (
+      <>
+        <Toaster />
+        <Card className="bg-transparent border-0 shadow-none text-center">
+          <CardHeader className="space-y-4 text-center p-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/30">
+              <Check className="h-7 w-7" />
+            </div>
+            <CardTitle className="text-2xl font-bold font-heading text-white">
+              Password Reset Complete
+            </CardTitle>
+            <CardDescription className="text-zinc-300 text-sm max-w-sm mx-auto leading-relaxed">
+              Your password has been updated successfully. You can now close this browser tab, open the Vibez mobile app, and sign in with your new credentials.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </>
+    );
+  }
 
   if (mode === 'link' && !codeVerified) {
     return (

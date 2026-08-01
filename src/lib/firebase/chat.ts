@@ -200,3 +200,46 @@ export function subscribeToMessages(
     }
   );
 }
+
+export interface GroupMemberData {
+  uid: string;
+  name?: string;
+  email?: string;
+  photoURL?: string | null;
+  username?: string;
+}
+
+/**
+ * Adds new members to a group chat in Firestore.
+ * Updates both `participants` and `participantIds` using `arrayUnion`,
+ * updates participant metadata objects, and refreshes `updatedAt`.
+ */
+export async function addGroupMembers(
+  chatId: string,
+  newMembers: GroupMemberData[]
+): Promise<void> {
+  if (!chatId || newMembers.length === 0) return;
+
+  const chatRef = doc(db, 'conversations', chatId);
+  const uidsToAdd = newMembers.map((m) => m.uid);
+
+  const updatePayload: Record<string, any> = {
+    participants: arrayUnion(...uidsToAdd),
+    participantIds: arrayUnion(...uidsToAdd),
+    updatedAt: serverTimestamp(),
+  };
+
+  newMembers.forEach((member) => {
+    updatePayload[`participantMetadata.${member.uid}`] = {
+      uid: member.uid,
+      name: member.name || '',
+      email: member.email || '',
+      photoURL: member.photoURL || '',
+      username: member.username || '',
+      addedAt: new Date().toISOString(),
+    };
+  });
+
+  await updateDoc(chatRef, updatePayload);
+}
+
