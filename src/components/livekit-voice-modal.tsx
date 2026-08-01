@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   LiveKitRoom,
@@ -23,14 +23,24 @@ interface VoiceModalProps {
 
 const LIVEKIT_WS_URL = 'wss://omegaone-7kb381s3.livekit.cloud';
 
-// Inner component to display active room status and participant count
 function ActiveCallUI({ onClose }: { onClose: () => void }) {
   const participants = useParticipants();
   const connectionState = useConnectionState();
+  const hasConnected = useRef(false);
+
+  // Track if we successfully connected first
+  useEffect(() => {
+    if (connectionState === 'connected') {
+      hasConnected.current = true;
+    }
+    // Only auto-close if we were previously connected and then explicitly disconnected
+    if (connectionState === 'disconnected' && hasConnected.current) {
+      onClose();
+    }
+  }, [connectionState, onClose]);
 
   return (
     <div className="flex flex-col items-center gap-6 w-full py-2">
-      {/* Call Header Status */}
       <div className="text-center">
         <h3 className="text-lg font-bold text-white mb-1">Voice Call</h3>
         <p className="text-xs text-emerald-400 font-medium capitalize">
@@ -41,14 +51,12 @@ function ActiveCallUI({ onClose }: { onClose: () => void }) {
         </p>
       </div>
 
-      {/* Participant Avatar/Indicator */}
       <div className="w-20 h-20 rounded-full bg-zinc-800 border-2 border-emerald-500/50 flex items-center justify-center animate-pulse shadow-lg shadow-emerald-500/10">
         <span className="text-2xl font-bold text-zinc-200">
           {participants.length}
         </span>
       </div>
 
-      {/* Pre-built LiveKit Control Bar with styled Mute and Leave buttons */}
       <div className="w-full flex justify-center scale-110 mt-2">
         <ControlBar
           controls={{
@@ -83,7 +91,6 @@ export function LiveKitVoiceModal({
     setMounted(true);
   }, []);
 
-  // Fetch LiveKit access token with a unique identity timestamp to avoid server identity collisions
   useEffect(() => {
     if (isOpen === false) return;
     let isMounted = true;
@@ -121,7 +128,10 @@ export function LiveKitVoiceModal({
   if (isOpen === false || !mounted) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 pointer-events-auto">
+    <div
+      className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 pointer-events-auto"
+      onClick={(e) => e.stopPropagation()} // Prevent backdrop clicks from instantly closing during call start
+    >
       <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-white my-auto">
         {errorMessage ? (
           <div className="text-center">
@@ -146,8 +156,10 @@ export function LiveKitVoiceModal({
             token={token}
             serverUrl={LIVEKIT_WS_URL}
             data-lk-theme="default"
-            onDisconnected={onClose}
-            onError={(err: any) => console.error('[LiveKit Error]:', err)}
+            onError={(err: any) => {
+              console.error('[LiveKit Error]:', err);
+              setErrorMessage(err.message || 'Connection error occurred');
+            }}
           >
             <ActiveCallUI onClose={onClose} />
             <RoomAudioRenderer />

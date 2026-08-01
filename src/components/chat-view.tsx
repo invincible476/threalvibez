@@ -429,7 +429,9 @@ const ChatViewComponent = ({
                 variant="ghost"
                 size="icon"
                 className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-emerald-400"
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   if (!currentUser?.uid || !chat?.id) return;
                   setIsLiveKitModalOpen(true);
                 }}
