@@ -61,7 +61,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { addGroupMembers } from '@/lib/firebase/chat';
 
 interface ChatInfoPageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string }> | { id: string };
 }
 
 export default function ChatInfoPage({ params }: ChatInfoPageProps) {
@@ -69,6 +69,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
   const chatId = resolvedParams.id;
   const router = useRouter();
   const { user: authUser } = useAuth();
+  const { handleBlockUser, currentUser: shellCurrentUser } = useAppShell();
   const { toast } = useToast();
 
   const [chat, setChat] = useState<Conversation | null>(null);
@@ -514,13 +515,38 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                       <span className="text-xs font-medium">Add</span>
                     </button>
                   ) : (
-                    <button
-                      onClick={() => setIsSearchActive(!isSearchActive)}
-                      className="bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer col-span-3 sm:col-span-1"
-                    >
-                      <MoreHorizontal className="h-5 w-5 text-zinc-300" />
-                      <span className="text-xs font-medium">More</span>
-                    </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          className="bg-red-950/30 hover:bg-red-900/50 border border-red-800/40 text-red-300 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer col-span-3 sm:col-span-1"
+                        >
+                          <Ban className="h-5 w-5 text-red-400" />
+                          <span className="text-xs font-medium">{shellCurrentUser?.blockedUsers?.includes(targetUser.uid) ? 'Unblock' : 'Block'}</span>
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white rounded-3xl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-white">
+                            {shellCurrentUser?.blockedUsers?.includes(targetUser.uid) ? 'Unblock User?' : `Block ${targetUser.name}?`}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-zinc-400 text-xs">
+                            {shellCurrentUser?.blockedUsers?.includes(targetUser.uid)
+                              ? `If you unblock ${targetUser.name}, they will be able to message you and see your profile.`
+                              : `You will no longer see messages or chats from ${targetUser.name}. They will not be notified.`
+                            }
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2 sm:gap-0">
+                          <AlertDialogCancel className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 rounded-xl text-xs">Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => handleBlockUser(targetUser.uid, !!shellCurrentUser?.blockedUsers?.includes(targetUser.uid))}
+                            className="bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs"
+                          >
+                            {shellCurrentUser?.blockedUsers?.includes(targetUser.uid) ? 'Unblock' : 'Block User'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </div>
               </>

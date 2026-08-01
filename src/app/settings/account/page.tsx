@@ -9,11 +9,12 @@ import { motion } from 'framer-motion';
 import { sendPasswordResetEmail, deleteUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, getDoc, collection, getDocs, query, where, writeBatch, runTransaction, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import React, { useState, useRef } from 'react';
+import { doc, getDoc, collection, getDocs, query, where, writeBatch, runTransaction, addDoc, serverTimestamp, updateDoc, arrayRemove, onSnapshot } from 'firebase/firestore';
+import React, { useState, useRef, useEffect } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Ban, ShieldOff, UserX } from 'lucide-react';
 import type { Conversation, Message, User } from '@/lib/types';
+import { UserAvatar } from '@/components/user-avatar';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -73,6 +74,54 @@ export default function AccountPage() {
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
     const importInputRef = useRef<HTMLInputElement>(null);
+    const [blockedUsersList, setBlockedUsersList] = useState<User[]>([]);
+    const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!user) return;
+        const userRef = doc(db, 'users', user.uid);
+        const unsubscribe = onSnapshot(userRef, async (snapshot) => {
+            const data = snapshot.data();
+            const blockedIds: string[] = Array.isArray(data?.blockedUsers) ? data.blockedUsers : [];
+            
+            if (blockedIds.length === 0) {
+                setBlockedUsersList([]);
+                return;
+            }
+
+            try {
+                const fetchedUsers = await Promise.all(
+                    blockedIds.map(async (bId) => {
+                        const bDoc = await getDoc(doc(db, 'users', bId));
+                        if (bDoc.exists()) {
+                            return { uid: bDoc.id, ...bDoc.data() } as User;
+                        }
+                        return { uid: bId, name: 'Blocked User' } as User;
+                    })
+                );
+                setBlockedUsersList(fetchedUsers);
+            } catch (e) {
+                console.error("Error fetching blocked users:", e);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const handleUnblockUser = async (targetUserId: string) => {
+        if (!user) return;
+        setUnblockingUserId(targetUserId);
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            await updateDoc(userRef, { blockedUsers: arrayRemove(targetUserId) });
+            toast({ title: 'User Unblocked', description: 'User removed from your blocked list.' });
+        } catch (error: any) {
+            console.error("Error unblocking user:", error);
+            toast({ title: 'Error', description: error.message || 'Failed to unblock user.', variant: 'destructive' });
+        } finally {
+            setUnblockingUserId(null);
+        }
+    };
 
     const handlePasswordChange = async () => {
         if (!user || !user.email) {
@@ -322,6 +371,55 @@ export default function AccountPage() {
                                  </motion.button>
                             </Button>
                         </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            <motion.div variants={cardVariants}>
+                <Card className="border border-border/50 bg-card/60">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
+                            <Ban className="h-4 w-4 text-red-400" />
+                            <span>Blocked Accounts</span>
+                        </CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
+                            Users you have blocked cannot message you or see your activity.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {blockedUsersList.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-3 italic text-center rounded-xl bg-muted/20 border border-border/30">
+                                You have not blocked any accounts.
+                            </p>
+                        ) : (
+                            <div className="space-y-2.5">
+                                {blockedUsersList.map((bUser) => (
+                                    <div key={bUser.uid} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/40">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <UserAvatar user={bUser} className="h-9 w-9 shrink-0" />
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-sm text-foreground truncate">{bUser.name || 'Blocked User'}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{bUser.username ? `@${bUser.username}` : bUser.email || bUser.uid}</p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={unblockingUserId === bUser.uid}
+                                            onClick={() => handleUnblockUser(bUser.uid)}
+                                            className="text-xs shrink-0 border-border/60 hover:bg-violet-600/10 hover:text-violet-400"
+                                        >
+                                            {unblockingUserId === bUser.uid ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                            ) : (
+                                                <ShieldOff className="h-3.5 w-3.5 mr-1 text-violet-400" />
+                                            )}
+                                            Unblock
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </motion.div>

@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
 import { useAppShell } from '@/components/app-shell';
-import { MessageSquare, UserPlus, UserCheck, UserX, Shield } from 'lucide-react';
+import { MessageSquare, UserPlus, UserCheck, UserX, Shield, Ban } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export default function UserProfilePage({ params }: { params: Promise<{ userId: string }> | { userId: string } }) {
   const resolvedParams = params && 'then' in params ? use(params) : params;
@@ -20,7 +21,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
   const [loading, setLoading] = useState(true);
   const { user: authUser } = useAuth();
   const [currentUserProfile, setCurrentUserProfile] = useState<User | null>(null);
-  const { handleCreateChat, handleFriendAction } = useAppShell();
+  const { handleCreateChat, handleFriendAction, handleBlockUser } = useAppShell();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -219,6 +220,35 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
                     Remove Friend
                   </Button>
                 )}
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant={isBlocked ? "outline" : "destructive"}>
+                      <Ban className="mr-2 h-4 w-4" />
+                      {isBlocked ? 'Unblock User' : 'Block User'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-card border-border text-foreground">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{isBlocked ? 'Unblock User?' : 'Block User?'}</AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground text-xs">
+                        {isBlocked 
+                          ? `If you unblock ${profileUser.name}, they will be able to message you and see your profile.`
+                          : `You will no longer see messages or chats from ${profileUser.name}. They will not be notified.`
+                        }
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-muted text-foreground border-none">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleBlockUser(profileUser.uid, !!isBlocked)}
+                        className={isBlocked ? "bg-violet-600 hover:bg-violet-700 text-white" : "bg-destructive hover:bg-destructive/90 text-white"}
+                      >
+                        {isBlocked ? 'Unblock' : 'Block Account'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             )}
           </div>
