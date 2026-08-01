@@ -72,7 +72,7 @@ function validateSession(user: User | null): boolean {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, authLoading, error] = useAuthState(auth);
-  const [isProcessingRedirect, setIsProcessingRedirect] = useState(false);
+  const [isProcessingRedirect, setIsProcessingRedirect] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const REDIRECT_COOLDOWN = 2000; // 2 second cooldown between redirects
   const VERIFICATION_CHECK_COOLDOWN = 300000; // 5 minutes between verification checks
   
-  // Initialize Firebase auth state
+  // Initialize Firebase auth state and process redirect results on mount
   useEffect(() => {
     const clearAuthState = () => {
       if (typeof window !== 'undefined') {
@@ -99,45 +99,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Check for redirect result only if we expect one or from OAuth callback
-    const pendingRedirect = typeof window !== 'undefined' ? sessionStorage.getItem('expectingRedirect') : null;
-    if (pendingRedirect) {
-      setIsProcessingRedirect(true);
-      getRedirectResult(auth)
-        .then(async (result) => {
-          if (result?.user) {
-            await authService.ensureUserDocument(result.user);
-            await setupPresence(result.user.uid);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('lastLogin', Date.now().toString());
-              localStorage.setItem('sessionUser', result.user.uid);
-            }
-            router.replace('/');
-          }
-        })
-        .catch((error) => {
-          console.error('Error processing redirect:', error);
-          if (error.code === 'auth/argument-error') {
-            clearAuthState();
-          }
-        })
-        .finally(() => {
+    // Process redirect result (e.g. Google OAuth redirect) unconditionally on app load
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
           if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('expectingRedirect');
+            sessionStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
+            localStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
+            localStorage.setItem('lastLogin', Date.now().toString());
+            localStorage.setItem('sessionUser', result.user.uid);
           }
-          setIsProcessingRedirect(false);
-        });
-    }
+          await authService.ensureUserDocument(result.user);
+          await setupPresence(result.user.uid);
+          router.replace('/');
+        }
+      })
+      .catch((error) => {
+        console.error('Error processing redirect:', error);
+        if (error.code === 'auth/argument-error') {
+          clearAuthState();
+        }
+      })
+      .finally(() => {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('expectingRedirect');
+        }
+        setIsProcessingRedirect(false);
+      });
   }, [router]);
 
   // ─── onIdTokenChanged: keep session alive past 60-minute token expiry ──────
-  // Firebase silently refreshes ID tokens every ~55 minutes, but that event
-  // fires onIdTokenChanged — NOT onAuthStateChanged. react-firebase-hooks'
-  // useAuthState only listens to onAuthStateChanged, so without this listener
-  // the provider would not react to token refreshes and could treat the user
-  // as signed out after the first hour. By subscribing here we force a
-  // re-render with the refreshed user object, keeping the session alive
-  // indefinitely while the tab remains open.
   useEffect(() => {
     const unsubscribeToken = onIdTokenChanged(auth, (updatedUser) => {
       if (updatedUser) {
@@ -154,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const isAuthRoute = AUTH_ROUTES.includes(pathname || '');
     const isLoading = authLoading || isProcessingRedirect;
+    const now = Date.now();
 
     const handleAuth = async () => {
       if (isLoading) return;
@@ -161,8 +153,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Handle authenticated user on auth routes (login, signup) -> redirect to home
       if (user && isAuthRoute && pathname !== '/verify-email') {
         if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          localStorage.setItem(`emailVerified_${user.uid}`, 'true');
           localStorage.setItem('sessionUser', user.uid);
-          localStorage.setItem('lastLogin', Date.now().toString());
+          localStorage.setItem('lastLogin', now.toString());
         }
         router.replace('/');
         return;
@@ -171,40 +165,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user && !isAuthRoute) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('sessionUser', user.uid);
-          localStorage.setItem('lastLogin', Date.now().toString());
+          localStorage.setItem('lastLogin', now.toString());
         }
       }
 
       if (!user && !isAuthRoute) {
-        // Allow Firebase Auth a grace period to restore session from IndexedDB/localStorage
-        const hasSavedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('sessionUser'));
-        if (hasSavedSession) {
-          return;
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('sessionUser');
+          localStorage.removeItem('lastLogin');
         }
 
-        lastRedirectTime.current = now;
-        navigationInProgress.current = true;
-        router.replace('/login');
-        setTimeout(() => { navigationInProgress.current = false; }, 100);
+        if (now - lastRedirectTime.current >= REDIRECT_COOLDOWN && !navigationInProgress.current) {
+          lastRedirectTime.current = now;
+          navigationInProgress.current = true;
+          router.replace('/login');
+          setTimeout(() => { navigationInProgress.current = false; }, 500);
+        }
         return;
       }
 
       // Handle email verification
       if (user && !isAuthRoute && pathname !== '/verify-email') {
         try {
-          // Use cached verification status when possible (check both sessionStorage and localStorage)
+          const isGoogleUser = user.providerData?.some(p => p.providerId === 'google.com');
           const cachedSessionStatus = typeof window !== 'undefined' ? sessionStorage.getItem(`emailVerified_${user.uid}`) : null;
           const cachedLocalStatus = typeof window !== 'undefined' ? localStorage.getItem(`emailVerified_${user.uid}`) : null;
           
-          if (cachedSessionStatus === 'true' || cachedLocalStatus === 'true') {
+          if (isGoogleUser || cachedSessionStatus === 'true' || cachedLocalStatus === 'true') {
             if (typeof window !== 'undefined' && cachedSessionStatus !== 'true') {
               sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+            }
+            if (typeof window !== 'undefined' && cachedLocalStatus !== 'true') {
+              localStorage.setItem(`emailVerified_${user.uid}`, 'true');
             }
             return;
           }
           
-          // Check if we should verify again
-          const now = Date.now();
           const lastVerificationCheck = parseInt(sessionStorage.getItem(`lastVerificationCheck_${user.uid}`) || '0');
           
           if (now - lastVerificationCheck < VERIFICATION_CHECK_COOLDOWN) {
@@ -213,15 +209,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           sessionStorage.setItem(`lastVerificationCheck_${user.uid}`, now.toString());
           
-          // Get user document (or initialize with unified schema if missing)
           let userDoc = await getDoc(doc(db, 'users', user.uid));
           if (!userDoc.exists()) {
             userDoc = await authService.ensureUserDocument(user);
           }
           const userData = userDoc.data() as DocumentData | undefined;
           
-          // Consider email verified if Firebase auth, local markers, or Firestore indicate so
           const isVerified = Boolean(
+            isGoogleUser ||
             user.emailVerified ||
             cachedSessionStatus === 'true' ||
             cachedLocalStatus === 'true' ||
@@ -233,7 +228,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
               localStorage.setItem(`emailVerified_${user.uid}`, 'true');
             }
-            // Update Firestore if needed
             if (!userData?.emailVerified) {
               await setDoc(doc(db, 'users', user.uid), {
                 emailVerified: true,
@@ -246,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Clear cached verified state if not verified
           sessionStorage.removeItem(`emailVerified_${user.uid}`);
+          localStorage.removeItem(`emailVerified_${user.uid}`);
 
           // Handle unverified user - only redirect if not in a navigation cooldown
           const lastVerifyRedirect = parseInt(sessionStorage.getItem(`lastVerifyRedirect_${user.uid}`) || '0');
@@ -260,8 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error('Error checking email verification status from Firestore:', error);
           if (user.emailVerified) {
             sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
-          } else {
-            sessionStorage.removeItem(`emailVerified_${user.uid}`);
+            localStorage.setItem(`emailVerified_${user.uid}`, 'true');
           }
         }
       }
@@ -288,6 +282,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error updating offline status:', error);
       }
     }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('lastLogin');
+      localStorage.removeItem('sessionUser');
+      if (user?.uid) {
+        localStorage.removeItem(`emailVerified_${user.uid}`);
+        sessionStorage.removeItem(`emailVerified_${user.uid}`);
+      }
+      sessionStorage.clear();
+    }
     await firebaseSignOut(auth);
   };
 
@@ -305,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user: user ?? null, loading: authLoading, error, signOut, auth }}>
+    <AuthContext.Provider value={{ user: user ?? null, loading: isLoading, error, signOut, auth }}>
       {children}
     </AuthContext.Provider>
   );

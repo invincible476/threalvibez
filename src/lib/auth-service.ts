@@ -244,6 +244,13 @@ export const authService = {
         throw new AuthError('Failed to sign in', 'auth/sign-in-failed');
       }
 
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
+        localStorage.setItem(`emailVerified_${userCredential.user.uid}`, 'true');
+        localStorage.setItem('sessionUser', userCredential.user.uid);
+        localStorage.setItem('lastLogin', Date.now().toString());
+      }
+
       // Setup presence system and ensure user document exists
       await this.ensureUserDocument(userCredential.user);
       await setupPresence(userCredential.user.uid);
@@ -283,11 +290,13 @@ export const authService = {
         
         // Fallback to redirect if popup was blocked
         if (popupError.code === 'auth/popup-blocked' || 
-            popupError.code === 'auth/popup-closed-by-user' ||
             popupError.code === 'auth/cancelled-popup-request') {
           sessionStorage.setItem('expectingRedirect', 'true');
           await signInWithRedirect(auth, provider);
           return null;
+        } else if (popupError.code === 'auth/popup-closed-by-user') {
+          // User manually closed popup, don't force redirect
+          throw popupError;
         }
         
         throw popupError;
@@ -299,6 +308,13 @@ export const authService = {
 
       logDebug('Google sign-in successful, ensuring user document');
       
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
+        localStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
+        localStorage.setItem('sessionUser', result.user.uid);
+        localStorage.setItem('lastLogin', Date.now().toString());
+      }
+
       // Ensure user document exists with unified schema (Idempotent merge)
       await this.ensureUserDocument(result.user);
       

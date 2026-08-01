@@ -220,6 +220,8 @@ export default function SignupPage() {
 
       if (user) {
         if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          localStorage.setItem(`emailVerified_${user.uid}`, 'true');
           localStorage.setItem('sessionUser', user.uid);
           localStorage.setItem('lastLogin', Date.now().toString());
         }
@@ -235,12 +237,21 @@ export default function SignupPage() {
           description: 'Successfully signed up with Google.',
         });
         router.replace('/');
+      } else {
+        toast({
+          title: 'Redirecting to Google',
+          description: 'Please complete sign up in the Google window...',
+        });
       }
     } catch (error: any) {
       console.error("Google signup error:", error);
+      let errorMessage = error.message || 'Failed to sign up with Google.';
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Google sign-in was cancelled.';
+      }
       toast({
         title: 'Error',
-        description: error.message || 'Failed to sign up with Google.',
+        description: errorMessage,
         variant: 'destructive',
       });
     }

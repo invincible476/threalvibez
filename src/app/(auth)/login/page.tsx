@@ -246,6 +246,8 @@ function LoginForm() {
       }
 
       if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+        localStorage.setItem(`emailVerified_${user.uid}`, 'true');
         localStorage.setItem('sessionUser', user.uid);
         localStorage.setItem('lastLogin', Date.now().toString());
       }
