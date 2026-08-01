@@ -29,6 +29,7 @@ import { UserProfileSheet } from './user-profile-sheet';
 import { SidebarTrigger } from './ui/sidebar';
 import { useAppearance } from './providers/appearance-provider';
 import { LiveKitVoiceModal } from './livekit-voice-modal';
+import { startVoiceCall, acceptVoiceCall, endVoiceCall } from '@/lib/firebase/chat';
 
 import Image from 'next/image';
 import { ImagePreviewDialog } from './image-preview-dialog';
@@ -429,11 +430,12 @@ const ChatViewComponent = ({
                 variant="ghost"
                 size="icon"
                 className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-emerald-400"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (!currentUser?.uid || !chat?.id) return;
                   setIsLiveKitModalOpen(true);
+                  await startVoiceCall(chat.id, currentUser);
                 }}
               >
                 <Phone className="h-4 w-4" />
@@ -448,7 +450,12 @@ const ChatViewComponent = ({
                   userName={currentUser.name || 'User'}
                   userAvatar={currentUser.photoURL || undefined}
                   targetUser={otherParticipant ? { name: otherParticipant.name, photoURL: otherParticipant.photoURL || undefined } : undefined}
-                  onClose={() => setIsLiveKitModalOpen(false)}
+                  onClose={async () => {
+                    setIsLiveKitModalOpen(false);
+                    if (chat.id) {
+                      await endVoiceCall(chat.id);
+                    }
+                  }}
                 />
               )}
             </>
@@ -497,6 +504,49 @@ const ChatViewComponent = ({
           </DropdownMenu>
         </div>
       </header>
+
+      {/* Active Voice Call In-Chat Banner */}
+      {chat?.activeCall && (chat.activeCall.status === 'calling' || chat.activeCall.status === 'active') && (
+        <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-4 py-2 flex items-center justify-between z-10 shrink-0 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span>
+              Voice Call {chat.activeCall.status === 'calling' ? 'Ringing...' : 'Active'}
+              {chat.activeCall.callerName ? ` • ${chat.activeCall.callerName}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isLiveKitModalOpen ? (
+              <Button
+                size="sm"
+                className="h-7 text-xs bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full px-3"
+                onClick={async () => {
+                  setIsLiveKitModalOpen(true);
+                  if (chat.id) await acceptVoiceCall(chat.id);
+                }}
+              >
+                <Phone className="h-3.5 w-3.5 mr-1" />
+                Join Call
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 text-xs rounded-full px-3"
+                onClick={async () => {
+                  setIsLiveKitModalOpen(false);
+                  if (chat.id) await endVoiceCall(chat.id);
+                }}
+              >
+                End Call
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Messages View */}
       <div className="flex flex-1 flex-col min-h-0 relative w-full max-w-full">

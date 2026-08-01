@@ -64,6 +64,16 @@ export type Message = {
   clientTempId?: string;
 };
 
+export type ActiveCall = {
+  callId: string;
+  callerId: string;
+  callerName: string;
+  callerAvatar?: string | null;
+  startedAt: number;
+  status: 'calling' | 'active' | 'ended';
+  roomId: string;
+};
+
 export type Conversation = {
   id: string;
   type: 'private' | 'group';
@@ -84,6 +94,7 @@ export type Conversation = {
     [userId: string]: Timestamp;
   },
   otherParticipantLastRead?: Timestamp; // Added for convenience
+  activeCall?: ActiveCall | null;
   createdBy?: string;
   isFavorite?: boolean;
   isArchived?: boolean;

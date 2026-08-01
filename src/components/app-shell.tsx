@@ -21,6 +21,7 @@ import { db, storage } from '@/lib/firebase';
 import type { Conversation, Message, Story, User, StoryReaction } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { StoryViewer } from './story-viewer';
+import { IncomingCallIndicator } from './incoming-call-indicator';
 import { StoriesContext } from './providers/stories-provider';
 import { ImagePreviewDialog } from './image-preview-dialog';
 import { useAppearance } from './providers/appearance-provider';
@@ -2246,6 +2247,14 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
                 onReact={chatData.handleStoryReaction}
                 usersCache={chatData.usersCache}
             />
+        )}
+
+        {!isAuthRoute && (
+          <IncomingCallIndicator
+            conversations={chatData.conversations}
+            currentUser={chatData.currentUser}
+            onAcceptCall={(conversationId) => chatData.handleChatSelect(conversationId)}
+          />
         )}
       </StoriesContext.Provider>
     </AppShellContext.Provider>

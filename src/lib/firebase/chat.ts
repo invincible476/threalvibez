@@ -304,3 +304,46 @@ export async function deleteChatMessage(
   }
 }
 
+/**
+ * Initiates an active voice call for a conversation in Firestore.
+ */
+export async function startVoiceCall(
+  chatId: string,
+  caller: { uid: string; name?: string; photoURL?: string | null }
+): Promise<void> {
+  if (!chatId || !caller.uid) return;
+  const chatRef = doc(db, 'conversations', chatId);
+  await updateDoc(chatRef, {
+    activeCall: {
+      callId: `${chatId}_${Date.now()}`,
+      callerId: caller.uid,
+      callerName: caller.name || 'User',
+      callerAvatar: caller.photoURL || null,
+      startedAt: Date.now(),
+      status: 'calling',
+      roomId: `voice_room_${chatId}`,
+    },
+  });
+}
+
+/**
+ * Marks an active voice call as accepted/active in Firestore.
+ */
+export async function acceptVoiceCall(chatId: string): Promise<void> {
+  if (!chatId) return;
+  const chatRef = doc(db, 'conversations', chatId);
+  await updateDoc(chatRef, {
+    'activeCall.status': 'active',
+  });
+}
+
+/**
+ * Ends and cleans up an active voice call for a conversation in Firestore.
+ */
+export async function endVoiceCall(chatId: string): Promise<void> {
+  if (!chatId) return;
+  const chatRef = doc(db, 'conversations', chatId);
+  await updateDoc(chatRef, {
+    activeCall: deleteField(),
+  });
+}
