@@ -28,9 +28,6 @@ import { cn } from '@/lib/utils';
 import { UserProfileSheet } from './user-profile-sheet';
 import { SidebarTrigger } from './ui/sidebar';
 import { useAppearance } from './providers/appearance-provider';
-import { checkMicrophonePermission, callTelemetry, logVoiceError } from '@/lib/voice/telemetry';
-import { MicPermissionModal } from './mic-permission-modal';
-
 import Image from 'next/image';
 import { ImagePreviewDialog } from './image-preview-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -40,9 +37,6 @@ import { MessageList } from './message-list';
 import { RightPaneBackground } from './right-pane-background';
 import { Timestamp } from 'firebase/firestore';
 import { useAppShell } from './app-shell';
-import { useVoiceChat } from '@/hooks/voice/use-voice-chat';
-import { VoiceChat } from '@/components/voice-chat/voice-chat';
-import { OutgoingCallModal } from './outgoing-call-modal';
 import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
 import { useRouter } from 'next/navigation';
 
@@ -86,33 +80,7 @@ const ChatViewComponent = ({
     return chat.id;
   }, [chat?.id]);
 
-  const [isOutgoingCalling, setIsOutgoingCalling] = useState(false);
 
-  const {
-    isConnected: isVoiceConnected,
-    isMuted,
-    participants: voiceParticipants,
-    remoteStreams,
-    connectionState,
-    metrics,
-    join: joinVoice,
-    startCall,
-    cancelCall,
-    leave: leaveVoice,
-    toggleMute,
-  } = useVoiceChat({
-    userId: currentUser?.uid || '',
-    roomId: voiceRoomId,
-    onError: (error: Error) => {
-      console.error('Voice chat hook error:', error);
-      toast({
-        title: 'Voice Chat Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-      setIsOutgoingCalling(false);
-    },
-  });
 
   const [replyToMessage, setReplyToMessage] = useState<MessageType | null>(null);
   const { chatBackground } = useAppearance();
@@ -450,63 +418,22 @@ const ChatViewComponent = ({
         </div>
 
         <div className={cn("flex items-center gap-2", isAIChat && "hidden")}>
-          {/* Voice Call Button — Icon Only Control */}
-          {!isVoiceConnected && !isAIChat && (
-            <>
-              <MicPermissionModal
-                isOpen={showMicModal}
-                onClose={() => setShowMicModal(false)}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-                onClick={async () => {
-                  if (!currentUser?.uid || !chat?.id) return;
-
-                  // 1. Explicit permission check before initializing WebRTC
-                  const permResult = await checkMicrophonePermission();
-                  if (permResult.state === 'denied') {
-                    logVoiceError(101, 'Microphone permission state is denied');
-                    callTelemetry.setError('ERR_MIC_DENIED', 'Microphone access denied in browser settings');
-                    setShowMicModal(true);
-                    return;
-                  }
-
-                  // 2. Direct getUserMedia test synchronously inside user action handler
-                  try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    stream.getTracks().forEach((track) => track.stop());
-                  } catch (micErr: any) {
-                    logVoiceError(101, micErr);
-                    callTelemetry.setError('ERR_MIC_DENIED', micErr?.message || 'Microphone access rejected by user');
-                    setShowMicModal(true);
-                    return;
-                  }
-
-                  try {
-                    const targetUserId = chat.participants?.find((id) => id !== currentUser.uid) || '';
-                    const targetUser = usersCache.get(targetUserId);
-                    setIsOutgoingCalling(true);
-                    if (startCall) {
-                      await startCall(
-                        { uid: targetUserId, name: targetUser?.name || 'User', photoURL: targetUser?.photoURL || undefined },
-                        { name: currentUser.name, photoURL: currentUser.photoURL || undefined }
-                      );
-                    } else {
-                      await joinVoice();
-                    }
-                    setIsVoiceEnabled(true);
-                  } catch (error: any) {
-                    toast({ title: 'Voice Call Error', description: error?.message || 'Could not connect.', variant: 'destructive' });
-                    setIsOutgoingCalling(false);
-                  }
-                }}
-              >
-                <Phone className="h-4 w-4" />
-                <span className="sr-only">Voice Call</span>
-              </Button>
-            </>
+          {/* Voice Call Button — Disabled / Placeholder Toast */}
+          {!isAIChat && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+              onClick={() => {
+                toast({
+                  title: 'Voice Call',
+                  description: 'Voice calls are currently disabled.',
+                });
+              }}
+            >
+              <Phone className="h-4 w-4" />
+              <span className="sr-only">Voice Call</span>
+            </Button>
           )}
 
           {/* 3-dots Menu Button */}
@@ -556,34 +483,6 @@ const ChatViewComponent = ({
       {/* Main Messages View */}
       <div className="flex flex-1 flex-col min-h-0 relative w-full max-w-full">
         <div className="flex-1 min-h-0 relative w-full overflow-hidden">
-        {isOutgoingCalling && !isVoiceConnected && (
-          <OutgoingCallModal
-            receiverName={otherParticipant?.name || 'User'}
-            receiverAvatar={otherParticipant?.photoURL || undefined}
-            onCancel={() => {
-              if (cancelCall) cancelCall();
-              setIsOutgoingCalling(false);
-              setIsVoiceEnabled(false);
-            }}
-          />
-        )}
-        {(isVoiceEnabled || isVoiceConnected) && (
-          <VoiceChat
-            participants={voiceParticipants}
-            currentUserId={currentUser.uid}
-            remoteStreams={remoteStreams}
-            isMuted={isMuted}
-            connectionState={connectionState}
-            metrics={metrics}
-            onMuteToggle={toggleMute}
-            onLeave={() => {
-              leaveVoice();
-              setIsOutgoingCalling(false);
-              setIsVoiceEnabled(false);
-            }}
-            className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border/40"
-          />
-        )}
          {chatBackground && (
           <div className="absolute inset-0 opacity-15 pointer-events-none z-0">
              {!chatBackground.startsWith('data:image') ? (

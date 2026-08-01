@@ -34,11 +34,7 @@ import { useTheme } from 'next-themes';
 import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
 import { safeGetMillis } from '@/lib/utils';
 import { debouncedUpdateTypingStatus, debouncedMarkAsRead, trimMessagePayload } from '@/lib/firebase/chat';
-import { IncomingCallModal } from './incoming-call-modal';
-import { useVoiceChatManager } from '@/hooks/use-voice-chat-manager';
-import type { CallSession } from '@/lib/voice/types';
-import { CallDebugBanner } from './call-debug-banner';
-import { MicPermissionModal } from './mic-permission-modal';
+
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -2211,29 +2207,6 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
   usePresence(isAuthRoute ? undefined : chatData.currentUser);
   useOnlineStatus(isAuthRoute ? undefined : chatData.currentUser);
 
-  const {
-    callStatus,
-    incomingCall,
-    acceptCall: managerAcceptCall,
-    declineCall: managerDeclineCall,
-    showMicPermissionModal,
-    setShowMicPermissionModal,
-  } = useVoiceChatManager(
-    isAuthRoute ? undefined : chatData.currentUser?.uid
-  );
-
-  const handleAcceptIncomingCall = async (call: CallSession) => {
-    const success = await managerAcceptCall(call);
-    if (success !== false && call.chatId) {
-      chatData.handleChatSelect(call.chatId);
-    }
-    return success;
-  };
-
-  const handleDeclineIncomingCall = async (call: CallSession) => {
-    await managerDeclineCall(call);
-  };
-
   return (
     <AppShellContext.Provider value={chatData}>
       <StoriesContext.Provider value={{
@@ -2244,30 +2217,12 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
         onCreateStory: chatData.setPreviewStoryFile,
         usersCache: chatData.usersCache,
       }}>
-        {!isAuthRoute && <CallDebugBanner />}
-        {!isAuthRoute && (
-          <MicPermissionModal
-            isOpen={showMicPermissionModal}
-            onClose={() => setShowMicPermissionModal(false)}
-          />
-        )}
         <div className="relative h-full h-[100dvh] w-full overflow-hidden flex flex-col min-h-0">
           {!isAuthRoute && <AppBackground />}
           <div className="relative z-10 flex-1 h-full w-full overflow-hidden flex flex-col min-h-0">
             {children}
           </div>
         </div>
-
-        {!isAuthRoute && (callStatus === 'ringing' || incomingCall !== null) && (
-          <IncomingCallModal
-            call={incomingCall}
-            incomingCall={incomingCall}
-            callStatus={callStatus}
-            onAccept={handleAcceptIncomingCall}
-            onDecline={handleDeclineIncomingCall}
-            user={chatData.currentUser}
-          />
-        )}
 
         {!isAuthRoute && chatData.previewStoryFile && (
           <ImagePreviewDialog
