@@ -26,6 +26,7 @@ import { doc, getDoc, updateDoc, arrayRemove, collection, deleteDoc, getDocs } f
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useAppShell } from './app-shell';
+import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
 
 const listVariants = {
     initial: { opacity: 0 },
@@ -174,7 +175,25 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
     )
 }
 
-import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
+export function ChatListSkeleton() {
+  return (
+    <div className="flex flex-col gap-1 p-2 w-full">
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-900/60 animate-pulse border border-zinc-800/20 my-0.5"
+        >
+          <div className="h-10 w-10 rounded-full bg-zinc-800/80 shrink-0" />
+          <div className="flex-1 space-y-2 min-w-0">
+            <div className="h-3.5 w-28 bg-zinc-800/80 rounded" />
+            <div className="h-3 w-40 bg-zinc-800/50 rounded" />
+          </div>
+          <div className="h-3 w-8 bg-zinc-800/40 rounded shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function ChatList() {
   const {
@@ -274,6 +293,9 @@ export function ChatList() {
       
             <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
                 <div className="flex flex-col w-full overflow-hidden">
+            {!conversations ? (
+              <ChatListSkeleton />
+            ) : (
             <div className="">
             {favoriteChats.length > 0 && (
                 <div>
@@ -419,6 +441,7 @@ export function ChatList() {
                 </div>
             )}
             </div>
+            )}
         </div>
       </ScrollArea>
 
@@ -490,7 +513,7 @@ const ChatItem = React.memo(
           <div
               onClick={onSelect}
               className={cn(
-                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3 px-4 text-left transition-all cursor-pointer overflow-x-hidden border-b border-zinc-800/40',
+                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3 px-4 text-left transition-all cursor-pointer overflow-x-hidden border-b border-zinc-800/40 active:scale-[0.98]',
                   isSelected ? 'bg-primary/15' : 'hover:bg-muted/10'
               )}
           >

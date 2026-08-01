@@ -67,8 +67,8 @@ const isVideo = (fileType?: string) => fileType?.startsWith('video/') || false;
 const QUICK_REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
 
 const messageVariants = {
-  initial: { opacity: 0, y: 10, scale: 0.95 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: [0.25, 1, 0.5, 1] } },
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } },
 };
 
 function MessageBubble({
@@ -357,14 +357,16 @@ function MessageBubble({
           {message.reactions && message.reactions.length > 0 && (
             <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isCurrentUser ? 'justify-end' : 'justify-start')}>
               {message.reactions.map((r) => (
-                <button
+                <motion.button
                   key={r.emoji}
+                  whileTap={{ scale: 1.25 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 15 }}
                   onClick={() => onMessageAction(message.id, 'react', r.emoji)}
-                  className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2 py-0.5 text-[11px] shadow-sm hover:scale-105 transition-transform"
+                  className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2 py-0.5 text-[11px] shadow-sm hover:scale-105 active:scale-125 transition-transform duration-150 ease-out select-none"
                 >
                   <span>{r.emoji}</span>
                   <span className="ml-1 font-semibold text-zinc-200">{r.count}</span>
-                </button>
+                </motion.button>
               ))}
             </div>
           )}
@@ -385,21 +387,23 @@ function MessageBubble({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align={isCurrentUser ? 'end' : 'start'}
-            className="w-56 bg-zinc-900/95 border-zinc-800 backdrop-blur-xl text-zinc-100 shadow-2xl p-1.5"
+            className="w-56 bg-zinc-900/95 border-zinc-800 backdrop-blur-xl text-zinc-100 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150"
           >
             {/* Quick Reaction Emoji Pill */}
             <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-zinc-800">
               {QUICK_REACTION_EMOJIS.map((emoji) => (
-                <button
+                <motion.button
                   key={emoji}
+                  whileTap={{ scale: 1.25 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 15 }}
                   onClick={() => {
                     onMessageAction(message.id, 'react', emoji);
                     setMenuOpen(false);
                   }}
-                  className="text-lg hover:scale-125 transition-transform p-1"
+                  className="text-lg hover:scale-125 active:scale-125 transition-transform p-1 select-none"
                 >
                   {emoji}
-                </button>
+                </motion.button>
               ))}
             </div>
 

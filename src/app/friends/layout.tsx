@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { SlideIn } from '@/components/transitions';
 
 export default function FriendsLayout({
   children,
@@ -25,8 +26,11 @@ export default function FriendsLayout({
         <h1 className="text-base font-semibold text-zinc-100 font-heading">Friends</h1>
       </header>
       <main className="flex-1 overflow-y-auto min-h-0 w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
-        {children}
+        <SlideIn>
+          {children}
+        </SlideIn>
       </main>
     </div>
   );
 }
+

@@ -18,7 +18,7 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   if (!user) {
-    return <Avatar className={cn('border-2 border-background bg-muted rounded-full overflow-hidden', className)} />;
+    return <Avatar className={cn('border border-zinc-800/40 animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 rounded-full overflow-hidden', className)} />;
   }
 
   const getInitials = (name: string) => {
@@ -49,7 +49,7 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
   return (
     <div className="relative shrink-0 flex-shrink-0 select-none">
       <Avatar className={cn(
-        'border border-zinc-800/40 rounded-full overflow-hidden shrink-0 flex-shrink-0', 
+        'border border-zinc-800/40 rounded-full overflow-hidden shrink-0 flex-shrink-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950', 
         className
       )}>
         {canDisplayImage ? (
@@ -69,7 +69,7 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
               onLoad={handleImageLoad}
             />
             {isImageLoading && (
-              <AvatarFallback className="rounded-full animate-pulse bg-zinc-800 text-zinc-200">
+              <AvatarFallback className="rounded-full animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 text-zinc-300">
                 {fallback}
               </AvatarFallback>
             )}

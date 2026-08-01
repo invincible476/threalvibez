@@ -287,13 +287,12 @@ const ChatViewComponent = ({
     return otherParticipant?.status;
   };
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (smooth = true) => {
     if (messageListRef.current) {
-        requestAnimationFrame(() => {
-            if (messageListRef.current) {
-                messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
-            }
-        });
+      messageListRef.current.scrollTo({
+        top: messageListRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
     }
     setNewMessagesCount(0);
   };
@@ -468,34 +467,56 @@ const ChatViewComponent = ({
         ref={messageListRef}
         chatId={chat.id}
       />
-      {newMessagesCount > 0 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-          <Button onClick={scrollToBottom} className="rounded-full shadow-lg bg-violet-700 hover:bg-violet-600 text-white">
-            <ArrowDown className="mr-2 h-4 w-4"/>
-            {newMessagesCount} New Message{newMessagesCount > 1 && 's'}
-          </Button>
-        </div>
-      )}
+      {/* Floating Scroll to Bottom Button */}
+      <div
+        className={cn(
+          "absolute bottom-4 right-4 z-20 transition-all duration-200 ease-out",
+          !isAtBottom
+            ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+            : "opacity-0 translate-y-2 scale-90 pointer-events-none"
+        )}
+      >
+        <Button
+          onClick={() => scrollToBottom(true)}
+          size="icon"
+          className="h-10 w-10 rounded-full shadow-xl bg-zinc-900/90 hover:bg-zinc-800 text-violet-400 border border-violet-500/30 backdrop-blur-md active:scale-95 transition-transform relative"
+          title="Scroll to bottom"
+        >
+          <ArrowDown className="h-5 w-5" />
+          {newMessagesCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold text-white shadow-md animate-pulse">
+              {newMessagesCount > 9 ? '9+' : newMessagesCount}
+            </span>
+          )}
+        </Button>
+      </div>
     </div>
 
     {/* Quoted Message Reply Banner & Input Container */}
     <div className="flex-none shrink-0 p-3 bg-zinc-950/90 backdrop-blur-md border-t border-zinc-800/40 z-20 w-full pb-safe">
-      {replyToMessage && (
-        <div className="p-2 px-4 mb-2 bg-zinc-900/90 rounded-xl border border-violet-500/30 flex justify-between items-center animate-in fade-in duration-150">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <Reply className="h-4 w-4 text-violet-400 shrink-0" />
-            <div className="text-xs overflow-hidden">
-              <p className="font-medium text-violet-400">
-                {replyToMessage.senderId === currentUser.uid ? "Replying to yourself" : usersCache.get(replyToMessage.senderId)?.name || "Replying to message"}
-              </p>
-              <p className="text-zinc-300 truncate max-w-xs">{replyToMessage.text || 'Attachment'}</p>
+      <div
+        className={cn(
+          "overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-in-out",
+          replyToMessage ? "max-h-24 opacity-100 mb-2" : "max-h-0 opacity-0 mb-0"
+        )}
+      >
+        {replyToMessage && (
+          <div className="p-2 px-4 bg-zinc-900/90 rounded-xl border border-violet-500/30 flex justify-between items-center">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Reply className="h-4 w-4 text-violet-400 shrink-0" />
+              <div className="text-xs overflow-hidden">
+                <p className="font-medium text-violet-400">
+                  {replyToMessage.senderId === currentUser.uid ? "Replying to yourself" : usersCache.get(replyToMessage.senderId)?.name || "Replying to message"}
+                </p>
+                <p className="text-zinc-300 truncate max-w-xs">{replyToMessage.text || 'Attachment'}</p>
+              </div>
             </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => setReplyToMessage(null)}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => setReplyToMessage(null)}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
       <MessageInput
         onSendMessage={handleSendMessageWithReply}
         onFileSelect={handleFileSelect}

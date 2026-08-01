@@ -41,6 +41,8 @@ const getTitleFromPath = (path: string) => {
     return 'Settings';
 }
 
+import { SlideIn } from '@/components/transitions';
+
 function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -61,7 +63,9 @@ function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
                 <h1 className="text-base font-semibold text-zinc-100">{title}</h1>
             </header>
             <main className="flex-1 overflow-y-auto min-h-0 w-full pb-20" style={{ WebkitOverflowScrolling: 'touch' }}>
-                {children}
+                <SlideIn key={pathname}>
+                  {children}
+                </SlideIn>
             </main>
         </div>
     )

@@ -200,3 +200,35 @@ textarea:-webkit-autofill:focus {
 body {
   background-color: transparent;
 }
+
+/* GPU Acceleration & Performance Optimization */
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Reduced Motion Fallbacks for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Gracefully replace complex spring translations with simple fade transitions */
+  .motion-reduce-fade {
+    transform: none !important;
+    transition: opacity 0.15s ease-in-out !important;
+  }
+
+  [data-state='open'],
+  [data-state='closed'] {
+    animation-duration: 0.1s !important;
+    transform: none !important;
+  }
+}
+
