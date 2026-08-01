@@ -72,6 +72,16 @@ export function matchesUserSearch(user: User, searchTerm: string, currentUserId?
   const cleanTerm = rawTerm.replace(/^@/, '');
   if (!cleanTerm) return false;
 
+  // Private Account Privacy Enforcement:
+  // If account is private and searcher is NOT already a friend, they can ONLY be found by exact email match.
+  const isFriend = Array.isArray(user.friends) && currentUserId ? user.friends.includes(currentUserId) : false;
+  if (user.isPrivate && !isFriend) {
+    const userEmail = (user.email || '').toLowerCase().trim();
+    if (!userEmail || userEmail !== cleanTerm) {
+      return false;
+    }
+  }
+
   const nameStr = (user.name || '').toLowerCase();
   const emailStr = (user.email || '').toLowerCase();
   const usernameStr = (user.username || '').toLowerCase();
