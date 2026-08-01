@@ -58,8 +58,8 @@ export function MobileSettingsMenu() {
     const requestCount = currentUser?.friendRequestsReceived?.length || 0;
 
     return (
-        <div className="max-w-2xl mx-auto">
-            <div className="divide-y divide-zinc-800/50">
+        <div className="w-full max-w-md mx-auto px-4 py-2">
+            <div className="w-full flex flex-col">
             {settingsItems.map(item => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
@@ -70,23 +70,23 @@ export function MobileSettingsMenu() {
                         href={item.href} 
                         key={item.href} 
                         className={cn(
-                            "flex items-center justify-between py-3 px-4 transition-all duration-200 relative border-b border-zinc-800/40",
+                            "w-full flex items-center justify-between py-3.5 px-2 transition-all duration-200 relative border-b border-zinc-800/40 active:scale-[0.98]",
                             isActive 
                                 ? "bg-zinc-800/80 text-zinc-100" 
                                 : "hover:bg-zinc-800/30 text-zinc-100"
                         )}
                     >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className={cn(
-                                "p-2 rounded-lg shrink-0 relative",
-                                isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-zinc-800 text-zinc-400"
+                                "p-2 rounded-lg shrink-0 relative flex items-center justify-center",
+                                isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-zinc-800/80 text-zinc-400"
                             )}>
                                 <Icon className="h-5 w-5" />
                                 {showBadge && (
                                     <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950 animate-pulse" />
                                 )}
                             </div>
-                            <div className="flex flex-col min-w-0">
+                            <div className="flex flex-col min-w-0 flex-1">
                                 <span className={cn("font-medium text-base truncate flex items-center gap-2 text-zinc-100")}>
                                     {item.title}
                                     {showBadge && (
@@ -98,7 +98,7 @@ export function MobileSettingsMenu() {
                                 <span className="text-xs text-zinc-400 truncate mt-0.5">{item.description}</span>
                             </div>
                         </div>
-                        <ChevronRight className={cn("h-4 w-4 shrink-0 ml-2", isActive ? "text-zinc-200" : "text-zinc-500")} />
+                        <ChevronRight className={cn("h-5 w-5 shrink-0 ml-2", isActive ? "text-zinc-200" : "text-zinc-500")} />
                     </Link>
                 );
             })}
