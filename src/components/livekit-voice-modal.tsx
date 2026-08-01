@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   LiveKitRoom,
-  AudioConference,
   RoomAudioRenderer,
+  ControlBar,
+  useParticipants,
+  useConnectionState,
 } from '@livekit/components-react';
 
 interface VoiceModalProps {
@@ -21,6 +23,48 @@ interface VoiceModalProps {
 
 const LIVEKIT_WS_URL = 'wss://omegaone-7kb381s3.livekit.cloud';
 
+// Inner component to display active room status and participant count
+function ActiveCallUI({ onClose }: { onClose: () => void }) {
+  const participants = useParticipants();
+  const connectionState = useConnectionState();
+
+  return (
+    <div className="flex flex-col items-center gap-6 w-full py-2">
+      {/* Call Header Status */}
+      <div className="text-center">
+        <h3 className="text-lg font-bold text-white mb-1">Voice Call</h3>
+        <p className="text-xs text-emerald-400 font-medium capitalize">
+          Status: {connectionState}
+        </p>
+        <p className="text-xs text-zinc-400 mt-1">
+          {participants.length} {participants.length === 1 ? 'participant' : 'participants'} in room
+        </p>
+      </div>
+
+      {/* Participant Avatar/Indicator */}
+      <div className="w-20 h-20 rounded-full bg-zinc-800 border-2 border-emerald-500/50 flex items-center justify-center animate-pulse shadow-lg shadow-emerald-500/10">
+        <span className="text-2xl font-bold text-zinc-200">
+          {participants.length}
+        </span>
+      </div>
+
+      {/* Pre-built LiveKit Control Bar with styled Mute and Leave buttons */}
+      <div className="w-full flex justify-center scale-110 mt-2">
+        <ControlBar
+          controls={{
+            microphone: true,
+            camera: false,
+            chat: false,
+            screenShare: false,
+            leave: true,
+          }}
+          onLeave={onClose}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function LiveKitVoiceModal({
   isOpen = true,
   roomId,
@@ -35,25 +79,21 @@ export function LiveKitVoiceModal({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [mounted, setMounted] = useState<boolean>(false);
 
-  const activeUsername = username || userName || 'User';
-  const activeUserId = userId || activeUsername;
-
-  // Client-side mount check for React Portal
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Fetch LiveKit access token
+  // Fetch LiveKit access token with a unique identity timestamp to avoid server identity collisions
   useEffect(() => {
     if (isOpen === false) return;
     let isMounted = true;
 
     async function fetchToken() {
       try {
+        const baseUsername = username || userName || 'User';
+        const uniqueUsername = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
         const res = await fetch(
-          `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(
-            activeUsername
-          )}&identity=${encodeURIComponent(activeUserId)}`
+          `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(uniqueUsername)}`
         );
         const data = await res.json();
 
@@ -76,11 +116,10 @@ export function LiveKitVoiceModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, roomId, activeUsername, activeUserId]);
+  }, [isOpen, roomId, username, userName]);
 
   if (isOpen === false || !mounted) return null;
 
-  // Content render
   const modalContent = (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 pointer-events-auto">
       <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-white my-auto">
@@ -95,9 +134,9 @@ export function LiveKitVoiceModal({
             </button>
           </div>
         ) : !token ? (
-          <div className="text-center py-4">
+          <div className="text-center py-6">
             <div className="animate-pulse text-sm font-medium text-zinc-300">
-              Joining voice channel...
+              Connecting to Voice Server...
             </div>
           </div>
         ) : (
@@ -110,7 +149,7 @@ export function LiveKitVoiceModal({
             onDisconnected={onClose}
             onError={(err: any) => console.error('[LiveKit Error]:', err)}
           >
-            <AudioConference />
+            <ActiveCallUI onClose={onClose} />
             <RoomAudioRenderer />
           </LiveKitRoom>
         )}
@@ -118,6 +157,5 @@ export function LiveKitVoiceModal({
     </div>
   );
 
-  // Force render directly into document.body to escape parent container CSS transforms
   return createPortal(modalContent, document.body);
 }
