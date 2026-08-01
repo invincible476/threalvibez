@@ -160,6 +160,12 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [instagramUrl, setInstagramUrl] = useState('');
+  
+  // Track local user editing state so background snapshots do not overwrite active user input
+  const [isNameDirty, setIsNameDirty] = useState(false);
+  const [isAboutDirty, setIsAboutDirty] = useState(false);
+  const [isInstagramDirty, setIsInstagramDirty] = useState(false);
+
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -272,11 +278,11 @@ export default function ProfilePage() {
     const activeInitialUser = shellCurrentUser || fallbackUser;
     if (activeInitialUser) {
       setUser(prev => prev || activeInitialUser);
-      setName(prev => prev || activeInitialUser.name || '');
-      setAbout(prev => prev || activeInitialUser.about || '');
-      setAvatarUrl(prev => prev || activeInitialUser.photoURL || '');
-      setIsPrivate(prev => prev || activeInitialUser.isPrivate || false);
-      setInstagramUrl(prev => prev || activeInitialUser.instagramUrl || '');
+      setName(prev => (prev || activeInitialUser.name || ''));
+      setAbout(prev => (prev || activeInitialUser.about || ''));
+      setAvatarUrl(prev => (prev || activeInitialUser.photoURL || ''));
+      setIsPrivate(prev => (prev || activeInitialUser.isPrivate || false));
+      setInstagramUrl(prev => (prev || activeInitialUser.instagramUrl || ''));
       setLoading(false);
     }
 
@@ -285,11 +291,12 @@ export default function ProfilePage() {
         if (docSnap.exists()) {
             const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as UserType;
             setUser(userData);
-            setName(userData.name || '');
-            setAbout(userData.about || '');
+            // Only update local input states if user is NOT actively editing them
+            if (!isNameDirty) setName(userData.name || '');
+            if (!isAboutDirty) setAbout(userData.about || '');
+            if (!isInstagramDirty) setInstagramUrl(userData.instagramUrl || '');
             setAvatarUrl(userData.photoURL || '');
             setIsPrivate(userData.isPrivate || false);
-            setInstagramUrl(userData.instagramUrl || '');
         } else {
             // Self-healing: ensure user document is created in Firestore
             await authService.ensureUserDocument(authUser);
@@ -301,7 +308,7 @@ export default function ProfilePage() {
     });
 
     return () => unsubscribe();
-  }, [authUser, authLoading, shellCurrentUser, fallbackUser]);
+  }, [authUser, authLoading, shellCurrentUser, fallbackUser, isNameDirty, isAboutDirty, isInstagramDirty]);
 
   const activeUser = user || shellCurrentUser || fallbackUser;
 
@@ -316,8 +323,19 @@ export default function ProfilePage() {
 
   const handleNameInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setName(event.target.value);
-  }
+    setIsNameDirty(true);
+  };
   
+  const handleAboutInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setAbout(event.target.value);
+    setIsAboutDirty(true);
+  };
+
+  const handleInstagramInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setInstagramUrl(event.target.value);
+    setIsInstagramDirty(true);
+  };
+
   const handleSetAvatarFromUrl = async () => {
     if (!avatarUrl) {
       toast({ title: 'Error', description: 'Please enter a URL.', variant: 'destructive' });
@@ -360,9 +378,9 @@ export default function ProfilePage() {
         }
 
         if(instagramUrl !== (activeUser.instagramUrl || '')) {
-            // Validate Instagram URL format
-            if (instagramUrl && !instagramUrl.match(/^https?:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9_.]+\/?$/)) {
-                throw new Error('Please enter a valid Instagram profile URL');
+            // Validate Instagram URL format if provided
+            if (instagramUrl && !instagramUrl.match(/^https?:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9_.]+\/?$/i)) {
+                throw new Error('Please enter a valid Instagram profile URL (e.g. https://instagram.com/username)');
             }
             dataToUpdate.instagramUrl = instagramUrl;
         }
@@ -375,6 +393,10 @@ export default function ProfilePage() {
             await setDoc(userDocRef, dataToUpdate, { merge: true });
         }
         
+        setIsNameDirty(false);
+        setIsAboutDirty(false);
+        setIsInstagramDirty(false);
+
         toast({
             title: "Saved!",
             description: "Your profile information has been updated."
@@ -503,7 +525,7 @@ export default function ProfilePage() {
                     <Textarea 
                         id="about" 
                         value={about} 
-                        onChange={(e) => setAbout(e.target.value)}
+                        onChange={handleAboutInputChange}
                         placeholder="Tell everyone a little about yourself."
                         disabled={isSaving}
                         rows={3}
@@ -522,7 +544,7 @@ export default function ProfilePage() {
                                 type="url"
                                 placeholder="https://instagram.com/username"
                                 value={instagramUrl || ''}
-                                onChange={(e) => setInstagramUrl(e.target.value)}
+                                onChange={handleInstagramInputChange}
                                 disabled={isSaving}
                                 className="pl-9"
                             />
