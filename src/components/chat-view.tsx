@@ -75,6 +75,11 @@ const ChatViewComponent = ({
   const isAIChat = chat?.id === AI_USER_ID;
   const isGroupChat = chat?.type === 'group';
 
+  const voiceRoomId = useMemo(() => {
+    if (!chat?.id) return '';
+    return chat.id.startsWith('voice_room_') ? chat.id : `voice_room_${chat.id}`;
+  }, [chat?.id]);
+
   const {
     isConnected: isVoiceConnected,
     isMuted,
@@ -85,7 +90,7 @@ const ChatViewComponent = ({
     toggleMute,
   } = useVoiceChat({
     userId: currentUser?.uid || '',
-    roomId: chat?.id || '',
+    roomId: voiceRoomId,
     onError: (error: Error) => {
       console.error('Voice chat hook error:', error);
       toast({

@@ -12,10 +12,13 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   collection,
   addDoc,
   onSnapshot,
   serverTimestamp,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 
 const DEFAULT_CONFIG: VoiceConnectionConfig = {
@@ -46,12 +49,17 @@ export class VoiceRoom {
   private audioContext: AudioContext | null = null;
   private audioAnalyser: AnalyserNode | null = null;
   private animationFrameId: number | null = null;
+  private participantsMap: Map<string, VoiceRoomParticipant> = new Map();
 
   constructor(
     private userId: string,
     private roomId: string,
     private config: VoiceConnectionConfig = DEFAULT_CONFIG
-  ) {}
+  ) {
+    if (!this.roomId.startsWith('voice_room_') && !this.roomId.startsWith('call_')) {
+      this.roomId = `voice_room_${this.roomId}`;
+    }
+  }
 
   public getLocalStream(): MediaStream | null {
     return this.localStream;
@@ -69,12 +77,14 @@ export class VoiceRoom {
       await this.setupLocalStream();
 
       // 2. Register Local Participant State
-      this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, {
+      const localParticipant: VoiceRoomParticipant = {
         id: this.userId,
         joinedAt: Date.now(),
         isMuted: this.isMuted,
         isSpeaking: false,
-      });
+      };
+      this.participantsMap.set(this.userId, localParticipant);
+      this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
 
       // 3. Setup WebRTC PeerConnection & Firestore Signaling
       await this.setupFirestoreSignaling();
@@ -91,11 +101,29 @@ export class VoiceRoom {
   /**
    * Leave the voice room and clean up resources
    */
-  public leave(): void {
+  public async leave(): Promise<void> {
     try {
-      // Signal call end in Firestore
       const callDocRef = doc(db, 'calls', this.roomId);
-      setDoc(callDocRef, { status: 'ended' }, { merge: true }).catch(() => {});
+      const callSnap = await getDoc(callDocRef).catch(() => null);
+
+      if (callSnap && callSnap.exists()) {
+        const data = callSnap.data();
+        const currentParticipants: string[] = Array.isArray(data.participantIds) ? data.participantIds : [];
+        const remainingParticipants = currentParticipants.filter(id => id !== this.userId);
+
+        if (remainingParticipants.length === 0) {
+          await updateDoc(callDocRef, {
+            participantIds: arrayRemove(this.userId),
+            status: 'ended',
+          }).catch(async () => {
+            await setDoc(callDocRef, { status: 'ended' }, { merge: true }).catch(() => {});
+          });
+        } else {
+          await updateDoc(callDocRef, {
+            participantIds: arrayRemove(this.userId),
+          }).catch(() => {});
+        }
+      }
 
       this.cleanup();
     } catch (error) {
@@ -112,12 +140,18 @@ export class VoiceRoom {
       this.localStream.getAudioTracks().forEach(track => {
         track.enabled = !muted;
       });
-      this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, {
-        id: this.userId,
-        joinedAt: Date.now(),
-        isMuted: muted,
-        isSpeaking: this.isSpeaking,
-      });
+      const localParticipant = this.participantsMap.get(this.userId);
+      if (localParticipant) {
+        localParticipant.isMuted = muted;
+        this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, { ...localParticipant });
+      } else {
+        this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, {
+          id: this.userId,
+          joinedAt: Date.now(),
+          isMuted: muted,
+          isSpeaking: this.isSpeaking,
+        });
+      }
     }
   }
 
@@ -192,12 +226,18 @@ export class VoiceRoom {
 
         if (nowSpeaking !== this.isSpeaking) {
           this.isSpeaking = nowSpeaking;
-          this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, {
-            id: this.userId,
-            joinedAt: Date.now(),
-            isMuted: this.isMuted,
-            isSpeaking: nowSpeaking,
-          });
+          const localParticipant = this.participantsMap.get(this.userId);
+          if (localParticipant) {
+            localParticipant.isSpeaking = nowSpeaking;
+            this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, { ...localParticipant });
+          } else {
+            this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, {
+              id: this.userId,
+              joinedAt: Date.now(),
+              isMuted: this.isMuted,
+              isSpeaking: nowSpeaking,
+            });
+          }
         }
 
         this.animationFrameId = requestAnimationFrame(checkAudioLevel);
@@ -206,6 +246,35 @@ export class VoiceRoom {
       checkAudioLevel();
     } catch (err) {
       console.warn('Audio level analyzer setup warning:', err);
+    }
+  }
+
+  /**
+   * Sync participant list from live Firestore participantIds array
+   */
+  private syncParticipants(remoteParticipantIds: string[]): void {
+    const remoteIdSet = new Set(remoteParticipantIds);
+
+    // Add newly joined participants
+    remoteParticipantIds.forEach((pId) => {
+      if (!this.participantsMap.has(pId)) {
+        const participantObj: VoiceRoomParticipant = {
+          id: pId,
+          joinedAt: Date.now(),
+          isMuted: false,
+          isSpeaking: false,
+        };
+        this.participantsMap.set(pId, participantObj);
+        this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, participantObj);
+      }
+    });
+
+    // Remove participants who left
+    for (const [existingId] of Array.from(this.participantsMap.entries())) {
+      if (!remoteIdSet.has(existingId)) {
+        this.participantsMap.delete(existingId);
+        this.emit(VoiceRoomEvent.PARTICIPANT_LEFT, existingId);
+      }
     }
   }
 
@@ -248,8 +317,10 @@ export class VoiceRoom {
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, pc.connectionState as any);
     };
 
-    // Determine if Caller or Callee
-    const isCaller = !callSnap.exists() || callSnap.data()?.status === 'ended' || callSnap.data()?.callerId === this.userId;
+    const callData = callSnap.exists() ? callSnap.data() : null;
+
+    // Caller vs Callee joining logic
+    const isCaller = !callSnap.exists() || callData?.status === 'ended' || callData?.callerId === this.userId;
 
     if (isCaller) {
       console.log('Setting up WebRTC as CALLER for room:', this.roomId);
@@ -270,37 +341,36 @@ export class VoiceRoom {
         type: offerDescription.type,
       };
 
+      // Create doc at calls/${roomId} with status: 'calling', callerId: currentUserId, participantIds: [currentUserId]
       await setDoc(callDocRef, {
         roomId: this.roomId,
         callerId: this.userId,
+        participantIds: [this.userId],
         offer,
         status: 'calling',
         createdAt: serverTimestamp(),
       });
 
-      // Listen for Answer
+      // Listen for Answer and live participant sync
       const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
         const data = snapshot.data();
         if (!data) return;
 
         if (data.status === 'ended') {
-          this.leave();
+          this.cleanup();
           return;
         }
 
-        if (data.calleeId && data.calleeId !== this.userId) {
-          this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, {
-            id: data.calleeId,
-            joinedAt: Date.now(),
-            isMuted: false,
-            isSpeaking: false,
-          });
+        // Live participant sync
+        if (Array.isArray(data.participantIds)) {
+          this.syncParticipants(data.participantIds);
         }
 
-        if (data.answer && !pc.currentRemoteDescription) {
+        // Listen for callee's SDP Answer on caller device
+        if (data.answer && pc.signalingState !== 'stable' && !pc.currentRemoteDescription) {
           console.log('Caller received answer SDP from callee');
           const answerDescription = new RTCSessionDescription(data.answer);
-          await pc.setRemoteDescription(answerDescription);
+          await pc.setRemoteDescription(answerDescription).catch(console.error);
         }
       });
       this.unsubscribes.push(unsubCallDoc);
@@ -319,18 +389,6 @@ export class VoiceRoom {
     } else {
       console.log('Setting up WebRTC as CALLEE for room:', this.roomId);
 
-      const callData = callSnap.data();
-
-      // Emit caller participant
-      if (callData?.callerId) {
-        this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, {
-          id: callData.callerId,
-          joinedAt: Date.now(),
-          isMuted: false,
-          isSpeaking: false,
-        });
-      }
-
       // Collect ICE candidates & write to calleeCandidates subcollection
       pc.onicecandidate = (event) => {
         if (event.candidate) {
@@ -340,7 +398,7 @@ export class VoiceRoom {
 
       // Set Remote Description from Caller Offer
       if (callData?.offer) {
-        await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+        await pc.setRemoteDescription(new RTCSessionDescription(callData.offer)).catch(console.error);
       }
 
       // Create Answer
@@ -352,17 +410,35 @@ export class VoiceRoom {
         sdp: answerDescription.sdp,
       };
 
-      await setDoc(callDocRef, {
+      // Update doc adding currentUserId to participantIds array (arrayUnion) and set status: 'connected'
+      await updateDoc(callDocRef, {
         calleeId: this.userId,
+        participantIds: arrayUnion(this.userId),
         answer,
         status: 'connected',
-      }, { merge: true });
+      }).catch(async (err) => {
+        console.warn('Fallback setDoc for callee update:', err);
+        await setDoc(callDocRef, {
+          calleeId: this.userId,
+          participantIds: arrayUnion(this.userId),
+          answer,
+          status: 'connected',
+        }, { merge: true });
+      });
 
-      // Listen for Call Document status changes (e.g. ended)
+      // Listen for Call Document status changes & live participant sync
       const unsubCallDoc = onSnapshot(callDocRef, (snapshot) => {
         const data = snapshot.data();
-        if (data?.status === 'ended') {
-          this.leave();
+        if (!data) return;
+
+        if (data.status === 'ended') {
+          this.cleanup();
+          return;
+        }
+
+        // Live participant sync
+        if (Array.isArray(data.participantIds)) {
+          this.syncParticipants(data.participantIds);
         }
       });
       this.unsubscribes.push(unsubCallDoc);
@@ -427,6 +503,7 @@ export class VoiceRoom {
     });
     this.remoteStreams.clear();
 
+    this.participantsMap.clear();
     this.isSpeaking = false;
     this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.DISCONNECTED as any);
   }

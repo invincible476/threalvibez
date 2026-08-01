@@ -18,18 +18,22 @@ export function useVoiceChatManager() {
 
   const joinVoiceRoom = useCallback(async (roomId: string, userId: string) => {
     try {
+      const deterministicRoomId = roomId.startsWith('voice_room_') || roomId.startsWith('call_')
+        ? roomId
+        : `voice_room_${roomId}`;
+
       // Leave current room if in one
       if (voiceRoomRef.current) {
         voiceRoomRef.current.leave();
       }
 
       // Create new voice room instance
-      const voiceRoom = new VoiceRoom(userId, roomId);
+      const voiceRoom = new VoiceRoom(userId, deterministicRoomId);
       voiceRoomRef.current = voiceRoom;
 
       // Join the room
       await voiceRoom.join();
-      setActiveVoiceRoom(roomId);
+      setActiveVoiceRoom(deterministicRoomId);
 
       toast({
         title: 'Voice Chat',
