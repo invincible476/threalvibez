@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing "room" query parameter' }, { status: 400 });
   }
 
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const wsUrl = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  const apiKey = process.env.LIVEKIT_API_KEY || 'APId25jaZKgoP5t';
+  const apiSecret = process.env.LIVEKIT_API_SECRET || 'JEJfZvN4S7saeK1Q94DKfLskk10JD0l7V319EanBweiB';
+  const wsUrl = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://omegaone-7kb381s3.livekit.cloud';
 
   if (!apiKey || !apiSecret || !wsUrl) {
     return NextResponse.json(
