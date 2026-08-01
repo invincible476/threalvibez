@@ -143,6 +143,8 @@ export default function SignupPage() {
         sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
         localStorage.setItem(`emailVerified_${user.uid}`, 'true');
         sessionStorage.setItem(`lastVerificationCheck_${user.uid}`, Date.now().toString());
+        localStorage.setItem('sessionUser', user.uid);
+        localStorage.setItem('lastLogin', Date.now().toString());
       }
       
       toast({
@@ -150,7 +152,7 @@ export default function SignupPage() {
         description: 'Your account has been created and verified successfully.'
       });
 
-      router.push('/');
+      router.replace('/');
 
     } catch (error: any) {
       console.error('Error during verification/signup:', error);
@@ -217,6 +219,11 @@ export default function SignupPage() {
       const user = await authService.signInWithGoogle();
 
       if (user) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sessionUser', user.uid);
+          localStorage.setItem('lastLogin', Date.now().toString());
+        }
+
         // Register device securely for both new and existing users
         const deviceResult = await registerDeviceSecurely(user);
         if (!deviceResult.success) {
@@ -227,7 +234,7 @@ export default function SignupPage() {
           title: 'Welcome!',
           description: 'Successfully signed up with Google.',
         });
-        router.push('/');
+        router.replace('/');
       }
     } catch (error: any) {
       console.error("Google signup error:", error);

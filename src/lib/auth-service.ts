@@ -237,18 +237,6 @@ export const authService = {
    */
   async signInWithEmail(email: string, password: string) {
     try {
-      // Clear any existing corrupted auth state
-      if (auth.currentUser) {
-        await auth.signOut();
-        // Clear any persisted session markers safely without wiping IndexedDB
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('lastLogin');
-          localStorage.removeItem('sessionUser');
-        }
-        // Wait for auth state to clear
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
       // Attempt sign in
       const userCredential = await firebaseSignIn(auth, email, password);
       

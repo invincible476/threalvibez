@@ -99,11 +99,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Check for redirect result only if we expect one
-    const pendingRedirect = sessionStorage.getItem('expectingRedirect');
+    // Check for redirect result only if we expect one or from OAuth callback
+    const pendingRedirect = typeof window !== 'undefined' ? sessionStorage.getItem('expectingRedirect') : null;
     if (pendingRedirect) {
       setIsProcessingRedirect(true);
       getRedirectResult(auth)
+        .then(async (result) => {
+          if (result?.user) {
+            await authService.ensureUserDocument(result.user);
+            await setupPresence(result.user.uid);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('lastLogin', Date.now().toString());
+              localStorage.setItem('sessionUser', result.user.uid);
+            }
+            router.replace('/');
+          }
+        })
         .catch((error) => {
           console.error('Error processing redirect:', error);
           if (error.code === 'auth/argument-error') {
@@ -111,11 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         })
         .finally(() => {
-          sessionStorage.removeItem('expectingRedirect');
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('expectingRedirect');
+          }
           setIsProcessingRedirect(false);
         });
     }
-  }, []);
+  }, [router]);
 
   // ─── onIdTokenChanged: keep session alive past 60-minute token expiry ──────
   // Firebase silently refreshes ID tokens every ~55 minutes, but that event
@@ -143,24 +156,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isLoading = authLoading || isProcessingRedirect;
 
     const handleAuth = async () => {
-      if (isLoading || navigationInProgress.current) return;
+      if (isLoading) return;
 
-      // Prevent rapid redirects
-      const now = Date.now();
-      if (now - lastRedirectTime.current < REDIRECT_COOLDOWN) {
-        return;
-      }
-
-      // Handle authentication routes
+      // Handle authenticated user on auth routes (login, signup) -> redirect to home
       if (user && isAuthRoute && pathname !== '/verify-email') {
         if (typeof window !== 'undefined') {
           localStorage.setItem('sessionUser', user.uid);
           localStorage.setItem('lastLogin', Date.now().toString());
         }
-        lastRedirectTime.current = now;
-        navigationInProgress.current = true;
         router.replace('/');
-        setTimeout(() => { navigationInProgress.current = false; }, 100);
         return;
       }
 

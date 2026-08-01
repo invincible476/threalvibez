@@ -90,11 +90,6 @@ function LoginForm() {
       // Always set local persistence for reliable persistent logins
       await setPersistence(auth, browserLocalPersistence);
 
-      // Clear any existing auth state first if signed in as another user
-      if (auth.currentUser) {
-        await auth.signOut();
-      }
-      
       // Attempt to sign in
       const user = await authService.signInWithEmail(values.email, values.password);
       
@@ -102,10 +97,10 @@ function LoginForm() {
         throw new Error('No user returned from sign in');
       }
       
-      // Verify session token
-      const token = await user.getIdToken(true);
-      if (!token) {
-        throw new Error('Failed to obtain valid session token');
+      // Update session markers
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sessionUser', user.uid);
+        localStorage.setItem('lastLogin', Date.now().toString());
       }
       
       toast({
@@ -113,7 +108,7 @@ function LoginForm() {
         description: 'Successfully signed in.',
       });
       
-      router.push('/');
+      router.replace('/');
     } catch (e: any) {
         console.error("Login submission error:", e);
         
@@ -250,13 +245,18 @@ function LoginForm() {
         return;
       }
 
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sessionUser', user.uid);
+        localStorage.setItem('lastLogin', Date.now().toString());
+      }
+
       await registerDeviceSecurely(user);
 
       toast({
         title: 'Welcome!',
         description: 'Successfully signed in with Google.',
       });
-      router.push('/');
+      router.replace('/');
     } catch (e: any) {
       console.error("Google Sign-In error:", e);
       let errorMessage = 'An unexpected error occurred. Please try again.';
