@@ -3,6 +3,10 @@ import {
   doc, 
   addDoc, 
   updateDoc, 
+  getDocs,
+  limit,
+  deleteField,
+  runTransaction,
   arrayUnion, 
   arrayRemove, 
   serverTimestamp, 
@@ -241,5 +245,62 @@ export async function addGroupMembers(
   });
 
   await updateDoc(chatRef, updatePayload);
+}
+
+/**
+ * Safely deletes an individual message document within a conversation.
+ * Targets ONLY the message document (conversations/{chatId}/messages/{messageId})
+ * and NEVER touches conversation-level deletion fields (deletedFor/deletedBy).
+ * Recalculates lastMessage on the top-level conversation if the deleted message
+ * was the latest one.
+ */
+export async function deleteChatMessage(
+  chatId: string,
+  messageId: string
+): Promise<void> {
+  if (!chatId || !messageId) return;
+
+  const messageRef = doc(db, 'conversations', chatId, 'messages', messageId);
+  const chatRef = doc(db, 'conversations', chatId);
+
+  // Soft delete the message document
+  await updateDoc(messageRef, {
+    text: 'This message was deleted.',
+    file: deleteField(),
+    deleted: true,
+    reactions: [],
+  });
+
+  // Query recent messages to find previous non-deleted message
+  try {
+    const messagesColRef = collection(db, 'conversations', chatId, 'messages');
+    const recentQuery = query(messagesColRef, orderBy('timestamp', 'desc'), limit(10));
+    const snap = await getDocs(recentQuery);
+
+    const prevDoc = snap.docs.find((d) => d.id !== messageId && !d.data().deleted);
+
+    if (prevDoc) {
+      const prevData = prevDoc.data();
+      const lastText = prevData.text || (prevData.file ? (prevData.file.type?.startsWith('image/') ? '📷 Photo' : '📁 Attachment') : 'Message');
+      await updateDoc(chatRef, {
+        lastMessage: {
+          text: lastText,
+          senderId: prevData.senderId || '',
+          timestamp: prevData.timestamp || serverTimestamp(),
+        },
+      });
+    } else {
+      // All messages in chat are deleted: preserve chat document, set fallback text
+      await updateDoc(chatRef, {
+        lastMessage: {
+          text: 'No messages yet',
+          senderId: '',
+          timestamp: serverTimestamp(),
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Error recalculating lastMessage after deleteChatMessage:', err);
+  }
 }
 

@@ -87,6 +87,8 @@ export type Conversation = {
   isFavorite?: boolean;
   isArchived?: boolean;
   typing?: string[];
+  deletedFor?: string[];
+  deletedBy?: string[];
 };
 
 export type StoryReaction = {

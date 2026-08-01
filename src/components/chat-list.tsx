@@ -219,6 +219,9 @@ export function ChatList() {
     const term = searchTerm.trim().toLowerCase();
 
     return conversations.filter(convo => {
+      const isDeletedForUser = (convo.deletedFor?.includes(currentUser?.uid || '') || convo.deletedBy?.includes(currentUser?.uid || ''));
+      if (isDeletedForUser) return false;
+
       const isBlocked = convo.type === 'private' && (convo.participants?.some(p => blockedUserIds.includes(p) && p !== currentUser?.uid) ?? false);
       if (isBlocked) return false;
       if (!term) return true;

@@ -702,15 +702,8 @@ function useChatData() {
     );
 
     messagesUnsubscribe.current = onSnapshot(liveQuery, { includeMetadataChanges: false }, (snapshot) => {
-        if (snapshot.empty) return;
-
-        // Only process docs that actually changed — skip metadata-only events
-        // that only flip hasPendingWrites without any real content change.
         const changes = snapshot.docChanges();
         if (!changes.length) return;
-
-        const relevantChanges = changes.filter(c => c.type === 'added' || c.type === 'modified');
-        if (!relevantChanges.length) return;
 
         setMessages(prev => {
             const prevById = new Map(prev.map(m => [m.id, m]));
@@ -719,42 +712,48 @@ function useChatData() {
             );
 
             let changed = false;
-            // needsSort is only true when timestamps actually shift (pending→confirmed)
-            // or a genuinely new message arrives — avoids O(n log n) on status-only updates
             let needsSort = false;
-            const result = [...prev];
+            let result = [...prev];
 
-            for (const change of relevantChanges) {
+            for (const change of changes) {
+                if (change.type === 'removed') {
+                    const remId = change.doc.id;
+                    const idx = result.findIndex(m => m.id === remId);
+                    if (idx !== -1) {
+                        result.splice(idx, 1);
+                        changed = true;
+                    }
+                    continue;
+                }
+
                 const incoming = parseMessageDoc(change.doc);
                 const existingById = prevById.get(incoming.id);
                 const existingByTempId = incoming.clientTempId ? prevByTempId.get(incoming.clientTempId) : undefined;
 
                 if (existingById) {
-                    // Update status / timestamp in-place only when something actually changed
                     const statusChanged = existingById.status !== incoming.status;
+                    const textChanged = existingById.text !== incoming.text;
+                    const deletedChanged = Boolean(existingById.deleted) !== Boolean(incoming.deleted);
                     const tsMillisOld = getMillis(existingById.timestamp);
                     const tsMillisNew = getMillis(incoming.timestamp);
                     const tsChanged = tsMillisOld !== tsMillisNew && tsMillisNew > 0;
-                    if (statusChanged || tsChanged) {
+                    if (statusChanged || tsChanged || textChanged || deletedChanged) {
                         const idx = result.indexOf(existingById);
                         if (idx !== -1) {
                             result[idx] = { ...existingById, ...incoming };
                             changed = true;
-                            // Sort only needed when timestamp shifts (pending null → server value)
                             if (tsChanged) needsSort = true;
                         }
                     }
                 } else if (existingByTempId) {
-                    // Replace optimistic bubble with confirmed server doc
                     const idx = result.indexOf(existingByTempId);
                     if (idx !== -1) {
                         result[idx] = { ...incoming };
                         prevById.set(incoming.id, result[idx]);
                         changed = true;
-                        needsSort = true; // temp used new Date(), real doc has server ts
+                        needsSort = true;
                     }
                 } else if (!seenInitialIds.has(incoming.id)) {
-                    // Genuinely new message not in the initial batch
                     result.push(incoming);
                     seenInitialIds.add(incoming.id);
                     changed = true;
@@ -1559,9 +1558,9 @@ function useChatData() {
       const messageToDelete = messages.find(m => m.id === messageId || m.clientTempId === messageId);
       if (!messageToDelete) return;
       
-      // Optimistically update messages list
+      // Optimistically update messages list regardless of sender or receiver
       setMessages(prevMessages => prevMessages.map(msg => 
-        msg.id === messageToDelete.id ? {
+        (msg.id === messageToDelete.id || (messageToDelete.clientTempId && msg.clientTempId === messageToDelete.clientTempId)) ? {
           ...msg,
           text: 'This message was deleted.',
           file: undefined,
@@ -1570,19 +1569,25 @@ function useChatData() {
         } : msg
       ));
       
-      // Always update the conversation's last message for optimistic UI
+      // Always update the conversation's last message for optimistic UI without setting undefined/null
       const previousMessage = messages
-        .filter(m => m.id !== messageToDelete.id && !m.deleted)
+        .filter(m => m.id !== messageToDelete.id && m.clientTempId !== messageToDelete.clientTempId && !m.deleted)
         .sort((a, b) => safeGetMillis(b?.timestamp) - safeGetMillis(a?.timestamp))[0];
       
+      const optimisticLastMsg = previousMessage ? {
+        text: previousMessage.text || (previousMessage.file ? (previousMessage.file.type?.startsWith('image/') ? '📷 Photo' : '📁 Attachment') : 'Message'),
+        senderId: previousMessage.senderId,
+        timestamp: previousMessage.timestamp instanceof Date ? Timestamp.fromDate(previousMessage.timestamp) : (previousMessage.timestamp || Timestamp.now())
+      } : {
+        text: 'No messages yet',
+        senderId: '',
+        timestamp: Timestamp.now()
+      };
+
       setConversations(prevConvos => prevConvos.map(convo =>
         convo.id === selectedChat.id ? {
           ...convo,
-          lastMessage: previousMessage ? {
-            text: previousMessage.text,
-            senderId: previousMessage.senderId,
-            timestamp: previousMessage.timestamp instanceof Date ? Timestamp.fromDate(previousMessage.timestamp) : previousMessage.timestamp
-          } : undefined
+          lastMessage: optimisticLastMsg
         } : convo
       ));
       
@@ -1591,7 +1596,7 @@ function useChatData() {
       
       try {
         await runTransaction(db, async (transaction) => {
-          // Update the message
+          // Update the message document ONLY
           transaction.update(messageRef, {
             text: 'This message was deleted.',
             file: deleteField(),
@@ -1599,23 +1604,26 @@ function useChatData() {
             reactions: []
           });
           
-          // Always check if this affects the last message
+          // Always update lastMessage safely without deleting the field
           const previousMessage = messages
-            .filter(m => m.id !== messageToDelete.id && !m.deleted)
+            .filter(m => m.id !== messageToDelete.id && m.clientTempId !== messageToDelete.clientTempId && !m.deleted)
             .sort((a, b) => safeGetMillis(b?.timestamp) - safeGetMillis(a?.timestamp))[0];
 
-          // Update conversation's lastMessage
           if (previousMessage) {
             transaction.update(convoRef, {
               lastMessage: {
-                text: previousMessage.text,
+                text: previousMessage.text || (previousMessage.file ? (previousMessage.file.type?.startsWith('image/') ? '📷 Photo' : '📁 Attachment') : 'Message'),
                 senderId: previousMessage.senderId,
-                timestamp: previousMessage.timestamp instanceof Date ? Timestamp.fromDate(previousMessage.timestamp) : previousMessage.timestamp
+                timestamp: previousMessage.timestamp instanceof Date ? Timestamp.fromDate(previousMessage.timestamp) : (previousMessage.timestamp || serverTimestamp())
               }
             });
           } else {
             transaction.update(convoRef, {
-              lastMessage: deleteField()
+              lastMessage: {
+                text: 'No messages yet',
+                senderId: '',
+                timestamp: serverTimestamp()
+              }
             });
           }
         });
@@ -2016,7 +2024,11 @@ function useChatData() {
       }
 
       await updateDoc(doc(db, 'conversations', conversationId), {
-        lastMessage: null
+        lastMessage: {
+          text: 'No messages yet',
+          senderId: '',
+          timestamp: serverTimestamp()
+        }
       });
       
       setMessages([]);

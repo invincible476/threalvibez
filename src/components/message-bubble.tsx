@@ -458,7 +458,7 @@ function MessageBubble({
                 </DropdownMenuItem>
               )}
 
-              {isCurrentUser && !message.deleted && (
+              {!message.deleted && (
                 <>
                   <DropdownMenuSeparator className="bg-border" />
                   <DropdownMenuItem
