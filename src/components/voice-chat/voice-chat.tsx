@@ -116,8 +116,8 @@ export function VoiceChat({
       </div>
 
       {/* Participants list */}
-      <ScrollArea className="px-4 pb-4">
-        <div className="grid gap-2">
+      <ScrollArea className="px-4 pb-4 max-h-60">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {sortedParticipants.map((participant) => {
             const user = usersCache.get(participant.id);
             const isCurrentUser = participant.id === currentUserId;

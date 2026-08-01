@@ -7,18 +7,16 @@ import {
   VoiceTopology,
   VoiceConnectionState,
 } from './types';
-import { 
-  SignalingMessage,
-  SignalingMessageType,
-  JoinRoomMessage,
-  LeaveRoomMessage,
-  OfferMessage,
-  AnswerMessage,
-  IceCandidateMessage,
-  RoomInfoMessage,
-  ErrorMessage,
-  ParticipantUpdateMessage
-} from './signaling-messages';
+import { db } from '@/lib/firebase';
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  addDoc,
+  onSnapshot,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 const DEFAULT_CONFIG: VoiceConnectionConfig = {
   iceServers: [
@@ -41,13 +39,13 @@ export class VoiceRoom {
   private localStream: MediaStream | null = null;
   private remoteStreams: Map<string, MediaStream> = new Map();
   private eventHandlers: Partial<{ [K in VoiceRoomEvent]: VoiceRoomEventHandler[K][] }> = {};
-  private websocket: globalThis.WebSocket | null = null;
+  private unsubscribes: Array<() => void> = [];
   private topology: VoiceTopology = VoiceTopology.P2P;
-  private retryCount: number = 0;
-  private roomInfo: VoiceRoomType | null = null;
   private isSpeaking: boolean = false;
+  private isMuted: boolean = false;
   private audioContext: AudioContext | null = null;
   private audioAnalyser: AnalyserNode | null = null;
+  private animationFrameId: number | null = null;
 
   constructor(
     private userId: string,
@@ -55,36 +53,50 @@ export class VoiceRoom {
     private config: VoiceConnectionConfig = DEFAULT_CONFIG
   ) {}
 
+  public getLocalStream(): MediaStream | null {
+    return this.localStream;
+  }
+
   /**
-   * Join the voice room
+   * Join the voice room via Firestore WebRTC signaling
    */
   public async join(): Promise<void> {
-    console.log('VoiceRoom join called:', { userId: this.userId, roomId: this.roomId });
+    console.log('VoiceRoom joining room via Firestore signaling:', { userId: this.userId, roomId: this.roomId });
     try {
-      console.log('Setting up local stream...');
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
+      
+      // 1. Request Microphone Access & Setup Local MediaStream
       await this.setupLocalStream();
-      console.log('Local stream setup complete');
-      
-      console.log('Connecting to signaling server...');
-      await this.connectToSignalingServer();
-      console.log('Signaling server connection established');
-      
-      console.log('Sending join room message...');
-      await this.sendJoinRoom();
-      console.log('Join room message sent');
+
+      // 2. Register Local Participant State
+      this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, {
+        id: this.userId,
+        joinedAt: Date.now(),
+        isMuted: this.isMuted,
+        isSpeaking: false,
+      });
+
+      // 3. Setup WebRTC PeerConnection & Firestore Signaling
+      await this.setupFirestoreSignaling();
+
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTED as any);
     } catch (error) {
       const formattedError = error instanceof Error ? error : new Error(String(error));
       this.handleError(formattedError);
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
       throw formattedError;
     }
   }
 
   /**
-   * Leave the voice room
+   * Leave the voice room and clean up resources
    */
-  public async leave(): Promise<void> {
+  public leave(): void {
     try {
-      this.sendLeaveRoom();
+      // Signal call end in Firestore
+      const callDocRef = doc(db, 'calls', this.roomId);
+      setDoc(callDocRef, { status: 'ended' }, { merge: true }).catch(() => {});
+
       this.cleanup();
     } catch (error) {
       this.handleError(error as Error);
@@ -92,22 +104,27 @@ export class VoiceRoom {
   }
 
   /**
-   * Mute/unmute local audio
+   * Mute or unmute local audio tracks
    */
-  public setMuted(muted: boolean) {
+  public setMuted(muted: boolean): void {
+    this.isMuted = muted;
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach(track => {
         track.enabled = !muted;
       });
-
-      this.sendParticipantUpdate({ isMuted: muted });
+      this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, {
+        id: this.userId,
+        joinedAt: Date.now(),
+        isMuted: muted,
+        isSpeaking: this.isSpeaking,
+      });
     }
   }
 
   /**
    * Register event handler
    */
-  public on<E extends VoiceRoomEvent>(event: E, handler: VoiceRoomEventHandler[E]) {
+  public on<E extends VoiceRoomEvent>(event: E, handler: VoiceRoomEventHandler[E]): void {
     if (!this.eventHandlers[event]) {
       this.eventHandlers[event] = [];
     }
@@ -117,7 +134,7 @@ export class VoiceRoom {
   /**
    * Remove event handler
    */
-  public off<E extends VoiceRoomEvent>(event: E, handler: VoiceRoomEventHandler[E]) {
+  public off<E extends VoiceRoomEvent>(event: E, handler: VoiceRoomEventHandler[E]): void {
     const handlers = this.eventHandlers[event];
     if (handlers) {
       const index = handlers.indexOf(handler);
@@ -128,11 +145,10 @@ export class VoiceRoom {
   }
 
   /**
-   * Setup local audio stream
+   * Setup local media stream with WebRTC audio constraints
    */
   private async setupLocalStream(): Promise<void> {
     try {
-      // Check if browser supports required audio constraints
       const supported = await navigator.mediaDevices.getSupportedConstraints();
       const audioConstraints: MediaTrackConstraints = {
         echoCancellation: supported.echoCancellation ? true : undefined,
@@ -141,608 +157,230 @@ export class VoiceRoom {
       };
 
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints
+        audio: audioConstraints,
       });
 
-      // Setup audio level detection
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(this.localStream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
+      this.setupAudioAnalysis();
+    } catch (error) {
+      throw new Error('Microphone access denied or unavailable: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  }
 
-      const bufferLength = analyser.frequencyBinCount;
+  /**
+   * Real-time audio level detection using Web Audio API
+   */
+  private setupAudioAnalysis(): void {
+    if (!this.localStream) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      this.audioContext = new AudioCtx();
+      const source = this.audioContext.createMediaStreamSource(this.localStream);
+      this.audioAnalyser = this.audioContext.createAnalyser();
+      this.audioAnalyser.fftSize = 256;
+      source.connect(this.audioAnalyser);
+
+      const bufferLength = this.audioAnalyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
 
       const checkAudioLevel = () => {
-        if (!this.localStream) return;
-        
-        analyser.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((a, b) => a + b) / bufferLength;
-        const isSpeaking = average > 30; // Adjust threshold as needed
+        if (!this.localStream || !this.audioAnalyser) return;
+        this.audioAnalyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+        const nowSpeaking = average > 20 && !this.isMuted;
 
-        if (isSpeaking !== this.isSpeaking) {
-          this.isSpeaking = isSpeaking;
-          this.sendParticipantUpdate({ isSpeaking });
+        if (nowSpeaking !== this.isSpeaking) {
+          this.isSpeaking = nowSpeaking;
+          this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, {
+            id: this.userId,
+            joinedAt: Date.now(),
+            isMuted: this.isMuted,
+            isSpeaking: nowSpeaking,
+          });
         }
 
-        requestAnimationFrame(checkAudioLevel);
+        this.animationFrameId = requestAnimationFrame(checkAudioLevel);
       };
 
       checkAudioLevel();
-    } catch (error) {
-      throw new Error('Failed to access microphone: ' + error);
+    } catch (err) {
+      console.warn('Audio level analyzer setup warning:', err);
     }
   }
 
   /**
-   * Connect to signaling server
+   * Firestore WebRTC SDP Offer/Answer and ICE candidate signaling
    */
-  private async connectToSignalingServer(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      // Determine the WebSocket protocol based on the current page protocol
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Log environment state
-      console.log('Environment:', {
-        NODE_ENV: process.env.NODE_ENV,
-        NEXT_PUBLIC_WS_HOST: process.env.NEXT_PUBLIC_WS_HOST,
-        NEXT_PUBLIC_WS_PORT: process.env.NEXT_PUBLIC_WS_PORT,
-        windowProtocol: window.location.protocol,
-        windowHostname: window.location.hostname,
-        windowPort: window.location.port
-      });
+  private async setupFirestoreSignaling(): Promise<void> {
+    const callDocRef = doc(db, 'calls', this.roomId);
+    const callSnap = await getDoc(callDocRef);
 
-      let wsUrl: string;
-      // In development, always use localhost with the WebSocket port
-      if (process.env.NODE_ENV === 'development') {
-        wsUrl = `ws://localhost:9000/api/voice?userId=${encodeURIComponent(this.userId)}`;
-        console.log('Development WebSocket URL constructed:', wsUrl);
-      } else {
-        // In production, use the configured host and port or fallback to the current host
-        const host = process.env.NEXT_PUBLIC_WS_HOST || window.location.hostname;
-        const port = process.env.NEXT_PUBLIC_WS_PORT || window.location.port;
-        
-        // Construct URL with port only if specified
-        wsUrl = port
-          ? `${protocol}//${host}:${port}/api/voice?userId=${encodeURIComponent(this.userId)}`
-          : `${protocol}//${host}/api/voice?userId=${encodeURIComponent(this.userId)}`;
-        console.log('Production WebSocket URL constructed:', wsUrl);
-      }
-      
-      // Validate WebSocket URL
-      try {
-        const parsedUrl = new URL(wsUrl);
-        const isDev = process.env.NODE_ENV !== 'production';
-        
-        // Verify WebSocket protocol
-        if (!['ws:', 'wss:'].includes(parsedUrl.protocol)) {
-          throw new Error(`Invalid WebSocket protocol: ${parsedUrl.protocol}`);
-        }
+    const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
+    const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
 
-        // Verify hostname and port configuration
-        if (isDev) {
-          if (parsedUrl.hostname !== 'localhost') {
-            throw new Error('Development environment requires localhost');
-          }
-          if (parsedUrl.port !== '9000') {
-            throw new Error('Development environment requires port 9000 for WebSocket server');
-          }
-        }
-
-        // Log connection details
-        console.log('WebSocket connection details:', {
-          url: wsUrl,
-          protocol: parsedUrl.protocol,
-          hostname: parsedUrl.hostname,
-          port: parsedUrl.port,
-          pathname: parsedUrl.pathname,
-          environment: isDev ? 'development' : 'production'
-        });
-
-        return wsUrl;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Invalid URL format';
-        console.error('WebSocket URL validation failed:', errorMessage);
-        throw new Error(`WebSocket URL validation failed: ${errorMessage}`);
-      }
-      
-      const connectWithRetry = () => {
-        console.log('Attempting WebSocket connection...');
-        try {
-          if (this.websocket?.readyState === WebSocket.CONNECTING) {
-            console.log('WebSocket is already connecting');
-            return;
-          }
-
-          // Setup connection timeout
-          const connectionTimeout = setTimeout(() => {
-            if (this.websocket?.readyState === WebSocket.CONNECTING) {
-              this.websocket?.close();
-              const timeoutError = new Error('WebSocket connection timed out');
-              this.handleError(timeoutError);
-              reject(timeoutError);
-            }
-          }, 10000); // 10 second timeout
-          
-          this.websocket = new WebSocket(wsUrl);
-
-          this.websocket.onopen = () => {
-            console.log('WebSocket connection established');
-            clearTimeout(connectionTimeout);
-            this.retryCount = 0;
-            this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTED);
-            
-            // Send an initial ping to verify connection
-            try {
-              this.sendSignalingMessage({
-                type: SignalingMessageType.ROOM_INFO,
-                senderId: this.userId,
-                roomId: this.roomId,
-                payload: { ping: true }
-              });
-            } catch (e) {
-              console.warn('Failed to send initial ping:', e);
-            }
-            
-            resolve();
-          };
-
-          this.websocket.onmessage = (event) => {
-            try {
-              const message = JSON.parse(event.data) as SignalingMessage;
-              this.handleSignalingMessage(message).catch(error => {
-                console.error('Error handling signaling message:', error);
-                this.handleError(error instanceof Error ? error : new Error(String(error)));
-              });
-            } catch (error) {
-              console.error('Error parsing signaling message:', error);
-              this.handleError(new Error('Invalid signaling message format'));
-            }
-          };
-
-          this.websocket.onclose = (event) => {
-            clearTimeout(connectionTimeout);
-            
-            // Handle different close scenarios
-            const closeReason = this.getWebSocketCloseReason(event.code);
-            console.log('WebSocket connection closed:', {
-              code: event.code,
-              reason: event.reason || closeReason,
-              wasClean: event.wasClean
-            });
-            
-            // Don't retry if it was a normal closure or if we're at max retries
-            if (event.code === 1000 || event.code === 1001) {
-              this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.DISCONNECTED);
-              return;
-            }
-            
-            if (this.retryCount < (this.config.maxRetries || 3)) {
-              console.log(`Retrying connection (${this.retryCount + 1}/${this.config.maxRetries || 3})`);
-              setTimeout(() => {
-                this.retryCount++;
-                connectWithRetry();
-              }, this.config.reconnectDelay || 1000);
-            } else {
-              const error = new Error('Failed to connect to signaling server after maximum retries');
-              this.handleError(error);
-              reject(error);
-            }
-          };
-
-          this.websocket.onerror = (event) => {
-            const ws = event.target as WebSocket;
-            
-            // Enhanced error details with connection info
-            const errorDetails = {
-              type: event.type,
-              timeStamp: event.timeStamp,
-              readyState: ws.readyState,
-              url: ws.url,
-              protocol: ws.protocol,
-              binaryType: ws.binaryType,
-              bufferedAmount: ws.bufferedAmount,
-              extensions: ws.extensions,
-              host: new URL(ws.url).host,
-              hostname: new URL(ws.url).hostname,
-              port: new URL(ws.url).port,
-              pathname: new URL(ws.url).pathname
-            };
-            
-            // Log detailed error information with connection diagnosis
-            console.error('WebSocket connection error:', {
-              ...errorDetails,
-              stateDescription: this.getWebSocketStateDescription(ws.readyState),
-              retryCount: this.retryCount,
-              maxRetries: this.config.maxRetries,
-              diagnosis: this.diagnoseWebSocketError(ws)
-            });
-            
-            const errorMessage = `WebSocket connection error - State: ${this.getWebSocketStateDescription(ws.readyState)}, URL: ${ws.url}`;
-            this.handleError(new Error(errorMessage));
-            
-            // Only cleanup if we're not already in a cleanup state
-            if (ws.readyState !== WebSocket.CLOSING && ws.readyState !== WebSocket.CLOSED) {
-              this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED);
-              this.cleanup();
-            }
-            
-            // Implement exponential backoff for retries
-            if (this.retryCount < (this.config.maxRetries || 3)) {
-              const backoffDelay = Math.min(
-                (Math.pow(2, this.retryCount) * 1000) + (Math.random() * 1000),
-                30000 // Max 30 second delay
-              );
-              
-              console.log(`Retrying connection in ${Math.round(backoffDelay/1000)}s (attempt ${this.retryCount + 1}/${this.config.maxRetries})`);
-              
-              setTimeout(() => {
-                this.retryCount++;
-                connectWithRetry();
-              }, backoffDelay);
-            } else {
-              const maxRetriesError = new Error(
-                `Failed to establish WebSocket connection after ${this.config.maxRetries} attempts. ` +
-                `Last state: ${this.getWebSocketStateDescription(ws.readyState)}`
-              );
-              this.handleError(maxRetriesError);
-              reject(maxRetriesError);
-            }
-          };
-        } catch (error) {
-          console.error('Error creating WebSocket connection:', error);
-          this.handleError(error instanceof Error ? error : new Error(String(error)));
-          
-          if (this.retryCount < (this.config.maxRetries || 3)) {
-            console.log(`Retrying connection (${this.retryCount + 1}/${this.config.maxRetries || 3})`);
-            setTimeout(() => {
-              this.retryCount++;
-              connectWithRetry();
-            }, this.config.reconnectDelay || 1000);
-          } else {
-            reject(new Error('Failed to create WebSocket connection after maximum retries'));
-          }
-        }
-      };
-
-      connectWithRetry();
+    const pc = new RTCPeerConnection({
+      iceServers: this.config.iceServers
     });
-  }
+    this.peerConnections.set(this.roomId, pc);
 
-  /**
-   * Handle incoming signaling messages
-   */
-  private async handleSignalingMessage(message: SignalingMessage): Promise<void> {
-    try {
-      switch (message.type) {
-        case SignalingMessageType.JOIN_ROOM: {
-          const joinMessage = message as JoinRoomMessage;
-          if (joinMessage.payload.initiator) {
-            await this.createPeerConnection(message.targetId!, joinMessage.payload.mesh);
-          }
-          break;
-        }
-
-        case SignalingMessageType.ROOM_INFO: {
-          const roomMessage = message as RoomInfoMessage;
-          this.handleRoomInfo(roomMessage.payload);
-          break;
-        }
-
-        case SignalingMessageType.OFFER: {
-          const offerMessage = message as OfferMessage;
-          await this.handleOffer(offerMessage);
-          break;
-        }
-
-        case SignalingMessageType.ANSWER: {
-          const answerMessage = message as AnswerMessage;
-          await this.handleAnswer(answerMessage);
-          break;
-        }
-
-        case SignalingMessageType.ICE_CANDIDATE: {
-          const iceMessage = message as IceCandidateMessage;
-          await this.handleIceCandidate(iceMessage);
-          break;
-        }
-
-        case SignalingMessageType.ERROR: {
-          const errorMessage = message as ErrorMessage;
-          this.handleError(new Error(errorMessage.payload.error));
-          break;
-        }
-      }
-    } catch (error) {
-      this.handleError(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  /**
-   * Handle room information updates
-   */
-  private handleRoomInfo(roomInfo: RoomInfoMessage['payload']): void {
-    // Handle ping messages
-    if (roomInfo.ping) {
-      return;
-    }
-
-    if (!roomInfo.id || !roomInfo.participants) {
-      console.warn('Received invalid room info:', roomInfo);
-      return;
-    }
-
-    const prevParticipants = new Set(this.roomInfo?.participants.keys() || []);
-    const newParticipants = new Set(roomInfo.participants.map(p => p.id));
-
-    // Handle left participants
-    for (const participantId of prevParticipants) {
-      if (!newParticipants.has(participantId)) {
-        this.emit(VoiceRoomEvent.PARTICIPANT_LEFT, participantId);
-        this.cleanupPeerConnection(participantId);
-      }
-    }
-
-    const participantMap = new Map(
-      roomInfo.participants.map(p => [p.id, {
-        ...p,
-        joinedAt: Date.now(),
-      }])
-    );
-
-    for (const participant of roomInfo.participants) {
-      if (!prevParticipants.has(participant.id)) {
-        this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, participant);
-      }
-    }
-
-    this.roomInfo = {
-      id: roomInfo.id,
-      participants: participantMap,
-      createdAt: Date.now(),
-    };
-
-    this.updateTopology(participantMap.size);
-  }
-
-  /**
-   * Create a new peer connection
-   */
-  private async createPeerConnection(targetId: string, mesh: boolean = false): Promise<RTCPeerConnection> {
-    // Cleanup any existing connection
-    this.cleanupPeerConnection(targetId);
-
-    const pc = new RTCPeerConnection(this.config);
-    this.peerConnections.set(targetId, pc);
-
-    // Monitor ICE connection state
-    pc.oniceconnectionstatechange = () => {
-      console.log(`ICE connection state for ${targetId}:`, pc.iceConnectionState);
-      if (pc.iceConnectionState === 'failed') {
-        this.handlePeerConnectionFailure(targetId);
-      }
-    };
-
-    // Monitor connection state
-    pc.onconnectionstatechange = () => {
-      console.log(`Connection state for ${targetId}:`, pc.connectionState);
-      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, pc.connectionState);
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        this.handlePeerConnectionFailure(targetId);
-      }
-    };
-
-    // Add local stream
+    // Attach local audio tracks to peer connection
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
-        this.localStream && pc.addTrack(track, this.localStream);
+        pc.addTrack(track, this.localStream!);
       });
     }
 
-    // Handle ICE candidates
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        const iceMessage: IceCandidateMessage = {
-          type: SignalingMessageType.ICE_CANDIDATE,
-          senderId: this.userId,
-          roomId: this.roomId,
-          targetId,
-          payload: event.candidate.toJSON()
-        };
-        this.sendSignalingMessage(iceMessage);
-      }
-    };
-
-    // Handle connection state changes
-    pc.onconnectionstatechange = () => {
-      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, pc.connectionState);
-      if (pc.connectionState === 'failed') {
-        this.handlePeerConnectionFailure(targetId);
-      }
-    };
-
-    // Handle remote stream
+    // Handle remote track
     pc.ontrack = (event) => {
-      const stream = event.streams[0];
-      this.remoteStreams.set(targetId, stream);
-      this.emit(VoiceRoomEvent.STREAM_ADDED, stream, targetId);
+      console.log('Incoming remote audio track received:', event.streams);
+      if (event.streams && event.streams[0]) {
+        const remoteStream = event.streams[0];
+        const remoteTargetId = this.roomId;
+        this.remoteStreams.set(remoteTargetId, remoteStream);
+        this.emit(VoiceRoomEvent.STREAM_ADDED, remoteStream, remoteTargetId);
+      }
     };
 
-    if (!mesh) {
-      this.createOffer(pc, targetId);
-    }
+    // Monitor connection states
+    pc.onconnectionstatechange = () => {
+      console.log('RTCPeerConnection connectionState:', pc.connectionState);
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, pc.connectionState as any);
+    };
 
-    return pc;
-  }
+    // Determine if Caller or Callee
+    const isCaller = !callSnap.exists() || callSnap.data()?.status === 'ended' || callSnap.data()?.callerId === this.userId;
 
-  /**
-   * Create and send an offer
-   */
-  private async createOffer(pc: RTCPeerConnection, targetId: string): Promise<void> {
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      const offerMessage: OfferMessage = {
-        type: SignalingMessageType.OFFER,
-        senderId: this.userId,
-        roomId: this.roomId,
-        targetId,
-        payload: offer
+    if (isCaller) {
+      console.log('Setting up WebRTC as CALLER for room:', this.roomId);
+
+      // Collect ICE candidates & write to callerCandidates subcollection
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(callerCandidatesCol, event.candidate.toJSON()).catch(console.error);
+        }
       };
-      this.sendSignalingMessage(offerMessage);
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
 
-  /**
-   * Handle incoming offer
-   */
-  private async handleOffer(message: OfferMessage): Promise<void> {
-    const pc = this.peerConnections.get(message.senderId!) ||
-               await this.createPeerConnection(message.senderId!);
+      // Create Offer
+      const offerDescription = await pc.createOffer();
+      await pc.setLocalDescription(offerDescription);
 
-    try {
-      await pc.setRemoteDescription(message.payload);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      const answerMessage: AnswerMessage = {
-        type: SignalingMessageType.ANSWER,
-        senderId: this.userId,
-        roomId: this.roomId,
-        targetId: message.senderId,
-        payload: answer
+      const offer = {
+        sdp: offerDescription.sdp,
+        type: offerDescription.type,
       };
-      this.sendSignalingMessage(answerMessage);
-    } catch (error) {
-      this.handleError(error as Error);
-    }
-  }
 
-  /**
-   * Handle incoming answer
-   */
-  private async handleAnswer(message: AnswerMessage): Promise<void> {
-    const pc = this.peerConnections.get(message.senderId);
-    if (pc) {
-      try {
-        await pc.setRemoteDescription(message.payload);
-      } catch (error) {
-        this.handleError(error as Error);
-      }
-    }
-  }
+      await setDoc(callDocRef, {
+        roomId: this.roomId,
+        callerId: this.userId,
+        offer,
+        status: 'calling',
+        createdAt: serverTimestamp(),
+      });
 
-  /**
-   * Handle incoming ICE candidate
-   */
-  private async handleIceCandidate(message: IceCandidateMessage): Promise<void> {
-    const pc = this.peerConnections.get(message.senderId);
-    if (pc) {
-      try {
-        await pc.addIceCandidate(message.payload);
-      } catch (error) {
-        this.handleError(error as Error);
-      }
-    }
-  }
+      // Listen for Answer
+      const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
+        const data = snapshot.data();
+        if (!data) return;
 
-  /**
-   * Handle peer connection failure
-   */
-  private async handlePeerConnectionFailure(targetId: string) {
-    console.log(`Handling peer connection failure for ${targetId}`);
-    
-    this.cleanupPeerConnection(targetId);
-    
-    if (this.retryCount < (this.config.maxRetries || 3)) {
-      this.retryCount++;
-      this.emit(VoiceRoomEvent.PARTICIPANT_UPDATED, { id: targetId, isMuted: false, joinedAt: Date.now() });
-      
-      try {
-        await new Promise(resolve => setTimeout(resolve, this.config.reconnectDelay || 1000));
-        await this.createPeerConnection(targetId);
-        console.log(`Reconnected to peer ${targetId}`);
-      } catch (error) {
-        console.error(`Failed to reconnect to peer ${targetId}:`, error);
-        this.handleError(new Error(`Failed to reconnect to peer ${targetId}: ${error instanceof Error ? error.message : String(error)}`));
-        this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED);
-      }
+        if (data.status === 'ended') {
+          this.leave();
+          return;
+        }
+
+        if (data.calleeId && data.calleeId !== this.userId) {
+          this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, {
+            id: data.calleeId,
+            joinedAt: Date.now(),
+            isMuted: false,
+            isSpeaking: false,
+          });
+        }
+
+        if (data.answer && !pc.currentRemoteDescription) {
+          console.log('Caller received answer SDP from callee');
+          const answerDescription = new RTCSessionDescription(data.answer);
+          await pc.setRemoteDescription(answerDescription);
+        }
+      });
+      this.unsubscribes.push(unsubCallDoc);
+
+      // Listen for Callee ICE Candidates
+      const unsubCalleeCandidates = onSnapshot(calleeCandidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const candidate = new RTCIceCandidate(change.doc.data());
+            await pc.addIceCandidate(candidate).catch(console.error);
+          }
+        });
+      });
+      this.unsubscribes.push(unsubCalleeCandidates);
+
     } else {
-      console.log(`Max retries reached for peer ${targetId}`);
-      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED);
-      this.handleError(new Error(`Failed to establish connection with peer ${targetId} after maximum retries`));
+      console.log('Setting up WebRTC as CALLEE for room:', this.roomId);
+
+      const callData = callSnap.data();
+
+      // Emit caller participant
+      if (callData?.callerId) {
+        this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, {
+          id: callData.callerId,
+          joinedAt: Date.now(),
+          isMuted: false,
+          isSpeaking: false,
+        });
+      }
+
+      // Collect ICE candidates & write to calleeCandidates subcollection
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(calleeCandidatesCol, event.candidate.toJSON()).catch(console.error);
+        }
+      };
+
+      // Set Remote Description from Caller Offer
+      if (callData?.offer) {
+        await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+      }
+
+      // Create Answer
+      const answerDescription = await pc.createAnswer();
+      await pc.setLocalDescription(answerDescription);
+
+      const answer = {
+        type: answerDescription.type,
+        sdp: answerDescription.sdp,
+      };
+
+      await setDoc(callDocRef, {
+        calleeId: this.userId,
+        answer,
+        status: 'connected',
+      }, { merge: true });
+
+      // Listen for Call Document status changes (e.g. ended)
+      const unsubCallDoc = onSnapshot(callDocRef, (snapshot) => {
+        const data = snapshot.data();
+        if (data?.status === 'ended') {
+          this.leave();
+        }
+      });
+      this.unsubscribes.push(unsubCallDoc);
+
+      // Listen for Caller ICE Candidates
+      const unsubCallerCandidates = onSnapshot(callerCandidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const candidate = new RTCIceCandidate(change.doc.data());
+            await pc.addIceCandidate(candidate).catch(console.error);
+          }
+        });
+      });
+      this.unsubscribes.push(unsubCallerCandidates);
     }
   }
 
-  /**
-   * Update room topology based on participant count
-   */
-  private updateTopology(participantCount: number) {
-    const newTopology = participantCount <= 2 
-      ? VoiceTopology.P2P 
-      : participantCount <= 4 
-        ? VoiceTopology.MESH 
-        : VoiceTopology.SFU;
-
-    if (this.topology !== newTopology) {
-      this.topology = newTopology;
-      // Implement topology switch logic here if needed
-    }
-  }
-
-  /**
-   * Send message to signaling server
-   */
-  private sendSignalingMessage(message: SignalingMessage) {
-    if (this.websocket?.readyState === WebSocket.OPEN) {
-      this.websocket.send(JSON.stringify(message));
-    }
-  }
-
-  /**
-   * Send join room message
-   */
-  private sendJoinRoom() {
-    const joinMessage: JoinRoomMessage = {
-      type: SignalingMessageType.JOIN_ROOM,
-      senderId: this.userId,
-      roomId: this.roomId,
-      payload: {}
-    };
-    this.sendSignalingMessage(joinMessage);
-  }
-
-  /**
-   * Send leave room message
-   */
-  private sendLeaveRoom() {
-    const leaveMessage: LeaveRoomMessage = {
-      type: SignalingMessageType.LEAVE_ROOM,
-      senderId: this.userId,
-      roomId: this.roomId
-    };
-    this.sendSignalingMessage(leaveMessage);
-  }
-
-  /**
-   * Send participant update
-   */
-  private sendParticipantUpdate(update: Partial<ParticipantUpdateMessage['payload']>) {
-    const updateMessage: ParticipantUpdateMessage = {
-      type: SignalingMessageType.PARTICIPANT_UPDATED,
-      senderId: this.userId,
-      roomId: this.roomId,
-      payload: update
-    };
-    this.sendSignalingMessage(updateMessage);
-  }
-
-  /**
-   * Emit event to registered handlers
-   */
-  private emit<E extends VoiceRoomEvent>(event: E, ...args: Parameters<VoiceRoomEventHandler[E]>) {
+  private emit<E extends VoiceRoomEvent>(event: E, ...args: Parameters<VoiceRoomEventHandler[E]>): void {
     const handlers = this.eventHandlers[event];
     if (handlers) {
       handlers.forEach(handler => {
@@ -751,178 +389,45 @@ export class VoiceRoom {
     }
   }
 
-  /**
-   * Handle errors
-   */
-  private handleError(error: Error) {
-    console.error('VoiceRoom error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
+  private handleError(error: Error): void {
+    console.error('VoiceRoom error:', error);
     this.emit(VoiceRoomEvent.ERROR, error);
   }
 
-  /**
-   * Cleanup resources
-   */
-  /**
-   * Clean up a specific peer connection
-   */
-  private cleanupPeerConnection(targetId: string) {
-    const pc = this.peerConnections.get(targetId);
-    if (pc) {
-      // Remove all event listeners
-      pc.onicecandidate = null;
-      pc.ontrack = null;
-      pc.oniceconnectionstatechange = null;
-      pc.onconnectionstatechange = null;
-      pc.onsignalingstatechange = null;
-
-      // Close the connection
-      pc.close();
-      this.peerConnections.delete(targetId);
-
-      // Clean up associated remote stream
-      const remoteStream = this.remoteStreams.get(targetId);
-      if (remoteStream) {
-        remoteStream.getTracks().forEach(track => {
-          track.stop();
-          remoteStream.removeTrack(track);
-        });
-        this.remoteStreams.delete(targetId);
-        this.emit(VoiceRoomEvent.STREAM_REMOVED, targetId);
-      }
-    }
-  }
-
-  /**
-   * Get a human-readable description of WebSocket state
-   */
-  private getWebSocketStateDescription(state: number): string {
-    const states: Record<number, string> = {
-      0: 'CONNECTING',
-      1: 'OPEN',
-      2: 'CLOSING',
-      3: 'CLOSED'
-    };
-    return states[state] || `UNKNOWN(${state})`;
-  }
-
-  /**
-   * Get a human-readable description of WebSocket close codes
-   */
-  private getWebSocketCloseReason(code: number): string {
-    const closeReasons: Record<number, string> = {
-      1000: 'Normal closure',
-      1001: 'Going away',
-      1002: 'Protocol error',
-      1003: 'Unsupported data',
-      1004: 'Reserved',
-      1005: 'No status received',
-      1006: 'Abnormal closure',
-      1007: 'Invalid frame payload data',
-      1008: 'Policy violation',
-      1009: 'Message too big',
-      1010: 'Mandatory extension',
-      1011: 'Internal server error',
-      1012: 'Service restart',
-      1013: 'Try again later',
-      1014: 'Bad gateway',
-      1015: 'TLS handshake'
-    };
-    return closeReasons[code] || `Unknown reason (${code})`;
-  }
-
-  /**
-   * Diagnose WebSocket connection issues
-   */
-  private diagnoseWebSocketError(ws: WebSocket): string[] {
-    const diagnosis: string[] = [];
-    
-    try {
-      const url = new URL(ws.url);
-      
-      // Check URL format
-      if (!url.protocol.match(/^wss?:/)) {
-        diagnosis.push(`Invalid protocol: ${url.protocol}. Must be ws:// or wss://`);
-      }
-
-      // Check port configuration
-      if (url.port) {
-        const port = parseInt(url.port, 10);
-        if (isNaN(port) || port < 1 || port > 65535) {
-          diagnosis.push(`Invalid port number: ${url.port}`);
-        }
-      }
-
-      // Check hostname
-      if (!url.hostname || url.hostname === 'null') {
-        diagnosis.push('Invalid or missing hostname');
-      }
-
-      // Check for common port conflicts
-      if (url.protocol === 'wss:' && url.port === '80') {
-        diagnosis.push('Using insecure port 80 with WSS protocol');
-      }
-      if (url.protocol === 'ws:' && url.port === '443') {
-        diagnosis.push('Using secure port 443 with WS protocol');
-      }
-
-      // Check development environment
-      if (process.env.NODE_ENV === 'development') {
-        if (url.hostname === 'localhost' && !url.port) {
-          diagnosis.push('Missing port in development environment');
-        }
-      }
-
-      // Add readyState information
-      diagnosis.push(`WebSocket state: ${this.getWebSocketStateDescription(ws.readyState)}`);
-
-    } catch (error) {
-      diagnosis.push(`URL parsing error: ${error instanceof Error ? error.message : String(error)}`);
+  private cleanup(): void {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
 
-    return diagnosis;
-  }
-
-  /**
-   * Clean up all resources
-   */
-  private cleanup() {
-    // Clean up audio context and analysis
-    if (this.audioContext?.state !== 'closed') {
-      this.audioContext?.close();
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close().catch(() => {});
     }
     this.audioContext = null;
     this.audioAnalyser = null;
 
-    // Stop and cleanup local stream
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        track.stop();
-      });
+      this.localStream.getTracks().forEach(track => track.stop());
       this.localStream = null;
     }
 
-    // Clean up all peer connections
-    this.peerConnections.forEach((_, targetId) => {
-      this.cleanupPeerConnection(targetId);
+    this.unsubscribes.forEach(unsub => unsub());
+    this.unsubscribes = [];
+
+    this.peerConnections.forEach(pc => {
+      pc.onicecandidate = null;
+      pc.ontrack = null;
+      pc.onconnectionstatechange = null;
+      pc.close();
     });
     this.peerConnections.clear();
 
-    // Close WebSocket connection
-    if (this.websocket?.readyState === WebSocket.OPEN) {
-      this.websocket.close();
-    }
-    this.websocket = null;
+    this.remoteStreams.forEach(stream => {
+      stream.getTracks().forEach(track => track.stop());
+    });
+    this.remoteStreams.clear();
 
-    // Reset all state
-    this.retryCount = 0;
-    this.roomInfo = null;
-    this.topology = VoiceTopology.P2P;
     this.isSpeaking = false;
-
-    this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.DISCONNECTED);
+    this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.DISCONNECTED as any);
   }
 }

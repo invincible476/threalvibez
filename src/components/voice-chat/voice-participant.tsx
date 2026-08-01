@@ -44,18 +44,17 @@ export function VoiceParticipant({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 p-3 rounded-lg transition-all',
-        'bg-background/50 backdrop-blur-sm',
-        isSpeaking && 'bg-accent/50 ring-2 ring-primary/50',
-        'hover:bg-accent/30'
+        'flex items-center gap-3 p-3 rounded-xl transition-all border border-zinc-800/40',
+        'bg-zinc-900/60 backdrop-blur-sm',
+        isSpeaking ? 'bg-violet-950/40 ring-2 ring-violet-500 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'hover:bg-zinc-800/40'
       )}
     >
       <div className="relative">
         <UserAvatar
           user={{ name, photoURL }}
           className={cn(
-            'h-10 w-10 transition-shadow duration-300',
-            speakingAnimation && 'shadow-glow'
+            'h-10 w-10 transition-all duration-300',
+            speakingAnimation && 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950 shadow-[0_0_12px_rgba(52,211,153,0.6)]'
           )}
         />
         <div
