@@ -1,4 +1,22 @@
 /**
+ * Call Invitation Session Data Model
+ */
+export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'ended' | 'cancelled';
+
+export interface CallSession {
+  id?: string;
+  chatId: string;
+  callerId: string;
+  callerName: string;
+  callerAvatar?: string;
+  receiverId: string;
+  status: CallStatus;
+  offer?: RTCSessionDescriptionInit | null;
+  answer?: RTCSessionDescriptionInit | null;
+  createdAt?: any;
+}
+
+/**
  * Voice room participant information
  */
 export interface VoiceRoomParticipant {

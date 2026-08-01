@@ -7,6 +7,7 @@ import {
   VoiceTopology,
   VoiceConnectionState,
   WebRTCMetrics,
+  CallSession,
 } from './types';
 import { db } from '@/lib/firebase';
 import {
@@ -66,16 +67,18 @@ export class VoiceRoom {
   }
 
   /**
-   * Join the voice room via WebRTC SDP & ICE exchange loop
+   * Initiate an outgoing voice call invitation (Caller Flow)
    */
-  public async join(): Promise<void> {
-    console.log(`[Voice] Connected to Room ID: ${this.roomId}`);
+  public async startCall(
+    targetUser: { uid: string; name: string; photoURL?: string },
+    currentUserProfile: { name: string; photoURL?: string }
+  ): Promise<void> {
+    console.log(`[Voice] Starting outgoing call to ${targetUser.name} in Room ID: ${this.roomId}`);
     try {
-      // Set initial UI state to CONNECTING (DO NOT set CONNECTED prematurely)
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
       this.updateMetrics();
 
-      // 1. Request Microphone Access & Setup Local MediaStream
+      // 1. Setup local audio stream
       await this.setupLocalStream();
 
       // 2. Register Local Participant State
@@ -88,7 +91,293 @@ export class VoiceRoom {
       this.participantsMap.set(this.userId, localParticipant);
       this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
 
-      // 3. Setup WebRTC PeerConnection & Firestore Signaling
+      // 3. Initialize Caller RTCPeerConnection & SDP Offer
+      const callDocRef = doc(db, 'calls', this.roomId);
+      const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
+      const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
+
+      const pc = new RTCPeerConnection({
+        iceServers: this.config.iceServers,
+      });
+      this.pc = pc;
+
+      this.attachPeerConnectionListeners(pc);
+
+      // Add local audio track
+      if (this.localStream) {
+        this.localStream.getTracks().forEach((track) => pc.addTrack(track, this.localStream!));
+      }
+
+      // Collect caller ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(callerCandidatesCol, {
+            ...event.candidate.toJSON(),
+            senderId: this.userId,
+            userId: this.userId,
+          }).catch(console.error);
+        }
+      };
+
+      // Create Offer
+      const offerDescription = await pc.createOffer();
+      await pc.setLocalDescription(offerDescription);
+
+      const offer = {
+        sdp: offerDescription.sdp,
+        type: offerDescription.type,
+        senderId: this.userId,
+        userId: this.userId,
+      };
+
+      // Write calls/${roomId} document with status: 'ringing'
+      await setDoc(
+        callDocRef,
+        {
+          chatId: this.roomId,
+          callerId: this.userId,
+          callerName: currentUserProfile.name || 'User',
+          callerAvatar: currentUserProfile.photoURL || '',
+          receiverId: targetUser.uid,
+          participantIds: [this.userId],
+          status: 'ringing',
+          offer,
+          answer: null,
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // Listen for Callee acceptance/answer or decline
+      const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
+        const data = snapshot.data();
+        if (!data) return;
+
+        if (data.status === 'declined' || data.status === 'cancelled' || data.status === 'ended') {
+          this.cleanup();
+          return;
+        }
+
+        if (Array.isArray(data.participantIds)) {
+          this.syncParticipants(data.participantIds);
+        }
+
+        if (
+          data.status === 'accepted' &&
+          data.answer &&
+          data.answer.senderId !== this.userId &&
+          pc.signalingState !== 'stable' &&
+          !pc.currentRemoteDescription
+        ) {
+          console.log('[Voice] Callee accepted call. Received SDP answer:', data.calleeId || 'callee');
+          const answerDescription = new RTCSessionDescription(data.answer);
+          await pc.setRemoteDescription(answerDescription).catch(console.error);
+          this.updateMetrics();
+        }
+      });
+      this.unsubscribes.push(unsubCallDoc);
+
+      // Listen ONLY for Callee ICE Candidates
+      const unsubCalleeCandidates = onSnapshot(calleeCandidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const candidateData = change.doc.data();
+            if (candidateData.senderId === this.userId || candidateData.userId === this.userId) {
+              return;
+            }
+            console.log('[Voice] Received SDP candidate from callee');
+            const candidate = new RTCIceCandidate(candidateData);
+            await pc.addIceCandidate(candidate).catch(console.error);
+          }
+        });
+      });
+      this.unsubscribes.push(unsubCalleeCandidates);
+
+    } catch (error) {
+      const formattedError = error instanceof Error ? error : new Error(String(error));
+      this.handleError(formattedError);
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
+      throw formattedError;
+    }
+  }
+
+  /**
+   * Accept an incoming voice call invitation (Callee Flow)
+   */
+  public async acceptCall(incomingCallData: CallSession): Promise<void> {
+    console.log(`[Voice] Accepting incoming call in Room ID: ${this.roomId}`);
+    try {
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
+      this.updateMetrics();
+
+      // 1. Setup local audio stream
+      await this.setupLocalStream();
+
+      // 2. Register Local Participant State
+      const localParticipant: VoiceRoomParticipant = {
+        id: this.userId,
+        joinedAt: Date.now(),
+        isMuted: this.isMuted,
+        isSpeaking: false,
+      };
+      this.participantsMap.set(this.userId, localParticipant);
+      this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
+
+      // 3. Initialize Callee RTCPeerConnection & SDP Answer
+      const callDocRef = doc(db, 'calls', this.roomId);
+      const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
+      const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
+
+      const pc = new RTCPeerConnection({
+        iceServers: this.config.iceServers,
+      });
+      this.pc = pc;
+
+      this.attachPeerConnectionListeners(pc);
+
+      // Add local audio tracks
+      if (this.localStream) {
+        this.localStream.getTracks().forEach((track) => pc.addTrack(track, this.localStream!));
+      }
+
+      // Collect callee ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(calleeCandidatesCol, {
+            ...event.candidate.toJSON(),
+            senderId: this.userId,
+            userId: this.userId,
+          }).catch(console.error);
+        }
+      };
+
+      // Set Remote Description from Caller Offer
+      if (incomingCallData.offer) {
+        console.log('[Voice] Received SDP offer from caller:', incomingCallData.callerId);
+        await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer)).catch(console.error);
+        this.updateMetrics();
+      }
+
+      // Create Answer
+      const answerDescription = await pc.createAnswer();
+      await pc.setLocalDescription(answerDescription);
+
+      const answer = {
+        type: answerDescription.type,
+        sdp: answerDescription.sdp,
+        senderId: this.userId,
+        userId: this.userId,
+      };
+
+      // Update call document status to 'accepted' and set answer
+      await updateDoc(callDocRef, {
+        calleeId: this.userId,
+        participantIds: arrayUnion(this.userId),
+        answer,
+        status: 'accepted',
+      }).catch(async (err) => {
+        await setDoc(
+          callDocRef,
+          {
+            calleeId: this.userId,
+            participantIds: arrayUnion(this.userId),
+            answer,
+            status: 'accepted',
+          },
+          { merge: true }
+        );
+      });
+
+      // Listen for Call Document status updates
+      const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
+        const data = snapshot.data();
+        if (!data) return;
+
+        if (data.status === 'ended' || data.status === 'cancelled') {
+          this.cleanup();
+          return;
+        }
+
+        if (Array.isArray(data.participantIds)) {
+          this.syncParticipants(data.participantIds);
+        }
+      });
+      this.unsubscribes.push(unsubCallDoc);
+
+      // Listen ONLY for Caller ICE Candidates
+      const unsubCallerCandidates = onSnapshot(callerCandidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            const candidateData = change.doc.data();
+            if (candidateData.senderId === this.userId || candidateData.userId === this.userId) {
+              return;
+            }
+            console.log('[Voice] Received SDP candidate from caller');
+            const candidate = new RTCIceCandidate(candidateData);
+            await pc.addIceCandidate(candidate).catch(console.error);
+          }
+        });
+      });
+      this.unsubscribes.push(unsubCallerCandidates);
+
+    } catch (error) {
+      const formattedError = error instanceof Error ? error : new Error(String(error));
+      this.handleError(formattedError);
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
+      throw formattedError;
+    }
+  }
+
+  /**
+   * Decline an incoming call invitation
+   */
+  public async declineCall(): Promise<void> {
+    try {
+      const callDocRef = doc(db, 'calls', this.roomId);
+      await updateDoc(callDocRef, { status: 'declined' }).catch(async () => {
+        await setDoc(callDocRef, { status: 'declined' }, { merge: true }).catch(() => {});
+      });
+      this.cleanup();
+    } catch (err) {
+      console.error('Error declining call:', err);
+    }
+  }
+
+  /**
+   * Cancel an outgoing call invitation before answer
+   */
+  public async cancelCall(): Promise<void> {
+    try {
+      const callDocRef = doc(db, 'calls', this.roomId);
+      await updateDoc(callDocRef, { status: 'cancelled' }).catch(async () => {
+        await setDoc(callDocRef, { status: 'cancelled' }, { merge: true }).catch(() => {});
+      });
+      this.cleanup();
+    } catch (err) {
+      console.error('Error cancelling call:', err);
+    }
+  }
+
+  /**
+   * Join the voice room via standard setup
+   */
+  public async join(): Promise<void> {
+    console.log(`[Voice] Connected to Room ID: ${this.roomId}`);
+    try {
+      this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
+      this.updateMetrics();
+
+      await this.setupLocalStream();
+
+      const localParticipant: VoiceRoomParticipant = {
+        id: this.userId,
+        joinedAt: Date.now(),
+        isMuted: this.isMuted,
+        isSpeaking: false,
+      };
+      this.participantsMap.set(this.userId, localParticipant);
+      this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
+
       await this.setupFirestoreSignaling();
     } catch (error) {
       const formattedError = error instanceof Error ? error : new Error(String(error));
@@ -96,6 +385,34 @@ export class VoiceRoom {
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
       throw formattedError;
     }
+  }
+
+  private attachPeerConnectionListeners(pc: RTCPeerConnection): void {
+    pc.oniceconnectionstatechange = () => {
+      console.log('[Voice] iceConnectionState:', pc.iceConnectionState);
+      this.updateMetrics();
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log('[Voice] signalingState:', pc.signalingState);
+      this.updateMetrics();
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('[Voice] connectionState:', pc.connectionState);
+      this.updateMetrics();
+    };
+
+    pc.ontrack = (event) => {
+      console.log('[Voice] Incoming remote audio track received:', event.streams);
+      if (event.streams && event.streams[0]) {
+        const remoteStream = event.streams[0];
+        const remoteTargetId = 'remote_peer';
+        this.remoteStreams.set(remoteTargetId, remoteStream);
+        this.updateMetrics();
+        this.emit(VoiceRoomEvent.STREAM_ADDED, remoteStream, remoteTargetId);
+      }
+    };
   }
 
   /**
@@ -115,7 +432,6 @@ export class VoiceRoom {
       hasRemoteTrack,
     });
 
-    // Bind UI status strictly to RTCPeerConnection iceConnectionState
     if (iceState === 'connected' || iceState === 'completed') {
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTED as any);
     } else if (iceState === 'disconnected' || iceState === 'failed' || iceState === 'closed') {
@@ -283,7 +599,6 @@ export class VoiceRoom {
     const uniqueIds = Array.from(new Set(remoteParticipantIds));
     const remoteIdSet = new Set(uniqueIds);
 
-    // Add newly joined participants
     uniqueIds.forEach((pId) => {
       if (!this.participantsMap.has(pId)) {
         const participantObj: VoiceRoomParticipant = {
@@ -297,7 +612,6 @@ export class VoiceRoom {
       }
     });
 
-    // Remove participants who left
     for (const [existingId] of Array.from(this.participantsMap.entries())) {
       if (!remoteIdSet.has(existingId)) {
         this.participantsMap.delete(existingId);
@@ -317,54 +631,24 @@ export class VoiceRoom {
     const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
     const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
 
-    // Create RTCPeerConnection using STUN configuration
     const pc = new RTCPeerConnection({
       iceServers: this.config.iceServers
     });
     this.pc = pc;
 
-    // Monitor WebRTC connection state changes and update live metrics
-    pc.oniceconnectionstatechange = () => {
-      console.log('[Voice] iceConnectionState:', pc.iceConnectionState);
-      this.updateMetrics();
-    };
+    this.attachPeerConnectionListeners(pc);
 
-    pc.onsignalingstatechange = () => {
-      console.log('[Voice] signalingState:', pc.signalingState);
-      this.updateMetrics();
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log('[Voice] connectionState:', pc.connectionState);
-      this.updateMetrics();
-    };
-
-    // Attach local audio tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         pc.addTrack(track, this.localStream!);
       });
     }
 
-    // Handle incoming remote stream tracks
-    pc.ontrack = (event) => {
-      console.log('[Voice] Incoming remote audio track received:', event.streams);
-      if (event.streams && event.streams[0]) {
-        const remoteStream = event.streams[0];
-        const remoteTargetId = 'remote_peer';
-        this.remoteStreams.set(remoteTargetId, remoteStream);
-        this.updateMetrics();
-        this.emit(VoiceRoomEvent.STREAM_ADDED, remoteStream, remoteTargetId);
-      }
-    };
-
-    // Caller vs Callee joining logic
     const isCaller = !callSnap || !callSnap.exists() || callData?.status === 'ended' || callData?.callerId === this.userId;
 
     if (isCaller) {
       console.log('[Voice] Setting up WebRTC as CALLER for room:', this.roomId);
 
-      // Collect ICE candidates & write to callerCandidates subcollection
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           addDoc(callerCandidatesCol, {
@@ -375,7 +659,6 @@ export class VoiceRoom {
         }
       };
 
-      // Create Offer
       const offerDescription = await pc.createOffer();
       await pc.setLocalDescription(offerDescription);
 
@@ -387,7 +670,7 @@ export class VoiceRoom {
       };
 
       await setDoc(callDocRef, {
-        roomId: this.roomId,
+        chatId: this.roomId,
         callerId: this.userId,
         participantIds: [this.userId],
         offer,
@@ -395,12 +678,11 @@ export class VoiceRoom {
         createdAt: serverTimestamp(),
       }, { merge: true });
 
-      // Listen for Answer and live participant sync
       const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
         const data = snapshot.data();
         if (!data) return;
 
-        if (data.status === 'ended') {
+        if (data.status === 'ended' || data.status === 'declined' || data.status === 'cancelled') {
           this.cleanup();
           return;
         }
@@ -409,7 +691,6 @@ export class VoiceRoom {
           this.syncParticipants(data.participantIds);
         }
 
-        // Listen for callee's SDP Answer on caller device
         if (
           data.answer &&
           data.answer.senderId !== this.userId &&
@@ -425,7 +706,6 @@ export class VoiceRoom {
       });
       this.unsubscribes.push(unsubCallDoc);
 
-      // Listen ONLY for Callee ICE Candidates
       const unsubCalleeCandidates = onSnapshot(calleeCandidatesCol, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
@@ -444,7 +724,6 @@ export class VoiceRoom {
     } else {
       console.log('[Voice] Setting up WebRTC as CALLEE for room:', this.roomId);
 
-      // Collect ICE candidates & write to calleeCandidates subcollection
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           addDoc(calleeCandidatesCol, {
@@ -455,7 +734,6 @@ export class VoiceRoom {
         }
       };
 
-      // Set Remote Description from Caller Offer
       if (
         callData?.offer &&
         callData.offer.senderId !== this.userId &&
@@ -466,7 +744,6 @@ export class VoiceRoom {
         this.updateMetrics();
       }
 
-      // Create Answer
       const answerDescription = await pc.createAnswer();
       await pc.setLocalDescription(answerDescription);
 
@@ -481,22 +758,21 @@ export class VoiceRoom {
         calleeId: this.userId,
         participantIds: arrayUnion(this.userId),
         answer,
-        status: 'connected',
+        status: 'accepted',
       }).catch(async (err) => {
         await setDoc(callDocRef, {
           calleeId: this.userId,
           participantIds: arrayUnion(this.userId),
           answer,
-          status: 'connected',
+          status: 'accepted',
         }, { merge: true });
       });
 
-      // Listen for Call Document status changes & live participant sync
       const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
         const data = snapshot.data();
         if (!data) return;
 
-        if (data.status === 'ended') {
+        if (data.status === 'ended' || data.status === 'cancelled') {
           this.cleanup();
           return;
         }
@@ -529,7 +805,6 @@ export class VoiceRoom {
       });
       this.unsubscribes.push(unsubCallDoc);
 
-      // Listen ONLY for Caller ICE Candidates
       const unsubCallerCandidates = onSnapshot(callerCandidatesCol, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {

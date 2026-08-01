@@ -34,6 +34,8 @@ import { useTheme } from 'next-themes';
 import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
 import { safeGetMillis } from '@/lib/utils';
 import { debouncedUpdateTypingStatus, debouncedMarkAsRead, trimMessagePayload } from '@/lib/firebase/chat';
+import { IncomingCallModal } from './incoming-call-modal';
+import type { CallSession } from '@/lib/voice/types';
 
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
@@ -2206,6 +2208,68 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
   usePresence(isAuthRoute ? undefined : chatData.currentUser);
   useOnlineStatus(isAuthRoute ? undefined : chatData.currentUser);
 
+  const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+
+  // App-Wide Incoming Call Listener for currentUser
+  useEffect(() => {
+    if (isAuthRoute || !chatData.currentUser?.uid) return;
+
+    const callsQuery = query(
+      collection(db, 'calls'),
+      where('receiverId', '==', chatData.currentUser.uid),
+      where('status', '==', 'ringing')
+    );
+
+    const unsub = onSnapshot(callsQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const docSnap = snapshot.docs[0];
+        const data = docSnap.data();
+        setIncomingCall({
+          id: docSnap.id,
+          chatId: data.chatId || docSnap.id,
+          callerId: data.callerId,
+          callerName: data.callerName || 'User',
+          callerAvatar: data.callerAvatar || '',
+          receiverId: data.receiverId,
+          status: data.status,
+          offer: data.offer,
+          answer: data.answer,
+        });
+      } else {
+        setIncomingCall(null);
+      }
+    });
+
+    return () => unsub();
+  }, [chatData.currentUser?.uid, isAuthRoute]);
+
+  const handleAcceptIncomingCall = async (call: CallSession) => {
+    try {
+      const callDocRef = doc(db, 'calls', call.chatId);
+      await updateDoc(callDocRef, { status: 'accepted' }).catch(async () => {
+        await setDoc(callDocRef, { status: 'accepted' }, { merge: true });
+      });
+      setIncomingCall(null);
+      if (call.chatId) {
+        chatData.handleChatSelect(call.chatId);
+      }
+    } catch (err) {
+      console.error('Error accepting incoming call:', err);
+    }
+  };
+
+  const handleDeclineIncomingCall = async (call: CallSession) => {
+    try {
+      const callDocRef = doc(db, 'calls', call.chatId);
+      await updateDoc(callDocRef, { status: 'declined' }).catch(async () => {
+        await setDoc(callDocRef, { status: 'declined' }, { merge: true });
+      });
+      setIncomingCall(null);
+    } catch (err) {
+      console.error('Error declining incoming call:', err);
+    }
+  };
+
   return (
     <AppShellContext.Provider value={chatData}>
       <StoriesContext.Provider value={{
@@ -2222,6 +2286,14 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
             {children}
           </div>
         </div>
+
+        {!isAuthRoute && incomingCall && (
+          <IncomingCallModal
+            incomingCall={incomingCall}
+            onAccept={handleAcceptIncomingCall}
+            onDecline={handleDeclineIncomingCall}
+          />
+        )}
 
         {!isAuthRoute && chatData.previewStoryFile && (
           <ImagePreviewDialog

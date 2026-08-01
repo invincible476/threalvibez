@@ -39,6 +39,7 @@ import { Timestamp } from 'firebase/firestore';
 import { useAppShell } from './app-shell';
 import { useVoiceChat } from '@/hooks/voice/use-voice-chat';
 import { VoiceChat } from '@/components/voice-chat/voice-chat';
+import { OutgoingCallModal } from './outgoing-call-modal';
 import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
 import { useRouter } from 'next/navigation';
 
@@ -80,6 +81,8 @@ const ChatViewComponent = ({
     return chat.id;
   }, [chat?.id]);
 
+  const [isOutgoingCalling, setIsOutgoingCalling] = useState(false);
+
   const {
     isConnected: isVoiceConnected,
     isMuted,
@@ -88,6 +91,8 @@ const ChatViewComponent = ({
     connectionState,
     metrics,
     join: joinVoice,
+    startCall,
+    cancelCall,
     leave: leaveVoice,
     toggleMute,
   } = useVoiceChat({
@@ -100,6 +105,7 @@ const ChatViewComponent = ({
         description: error.message,
         variant: 'destructive',
       });
+      setIsOutgoingCalling(false);
     },
   });
 
@@ -448,11 +454,21 @@ const ChatViewComponent = ({
               onClick={async () => {
                 if (!currentUser?.uid || !chat?.id) return;
                 try {
-                  if (joinVoice) await joinVoice();
+                  const targetUserId = chat.participants?.find((id) => id !== currentUser.uid) || '';
+                  const targetUser = usersCache.get(targetUserId);
+                  setIsOutgoingCalling(true);
+                  if (startCall) {
+                    await startCall(
+                      { uid: targetUserId, name: targetUser?.name || 'User', photoURL: targetUser?.photoURL || undefined },
+                      { name: currentUser.name, photoURL: currentUser.photoURL || undefined }
+                    );
+                  } else {
+                    await joinVoice();
+                  }
                   setIsVoiceEnabled(true);
-                  toast({ title: 'Voice Call', description: 'Joined voice call.' });
                 } catch (error) {
                   toast({ title: 'Voice Call Error', description: 'Could not connect.', variant: 'destructive' });
+                  setIsOutgoingCalling(false);
                 }
               }}
             >
@@ -508,6 +524,17 @@ const ChatViewComponent = ({
       {/* Main Messages View */}
       <div className="flex flex-1 flex-col min-h-0 relative w-full max-w-full">
         <div className="flex-1 min-h-0 relative w-full overflow-hidden">
+        {isOutgoingCalling && !isVoiceConnected && (
+          <OutgoingCallModal
+            receiverName={otherParticipant?.name || 'User'}
+            receiverAvatar={otherParticipant?.photoURL || undefined}
+            onCancel={() => {
+              if (cancelCall) cancelCall();
+              setIsOutgoingCalling(false);
+              setIsVoiceEnabled(false);
+            }}
+          />
+        )}
         {(isVoiceEnabled || isVoiceConnected) && (
           <VoiceChat
             participants={voiceParticipants}
@@ -519,6 +546,7 @@ const ChatViewComponent = ({
             onMuteToggle={toggleMute}
             onLeave={() => {
               leaveVoice();
+              setIsOutgoingCalling(false);
               setIsVoiceEnabled(false);
             }}
             className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border/40"

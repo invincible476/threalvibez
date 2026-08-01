@@ -5,6 +5,7 @@ import {
   VoiceRoomEvent,
   VoiceConnectionState,
   WebRTCMetrics,
+  CallSession,
 } from '@/lib/voice/types';
 
 export interface UseVoiceChatOptions {
@@ -123,7 +124,7 @@ export function useVoiceChat({
     };
   }, [userId, roomId, onError]);
 
-  // Join voice room
+  // Join voice room directly
   const join = useCallback(async () => {
     if (!isValid) {
       const error = new Error('Cannot join voice chat: Invalid userId or roomId');
@@ -144,6 +145,40 @@ export function useVoiceChat({
       onError?.(new Error('Voice chat not initialized'));
     }
   }, [isValid, userId, roomId, onError]);
+
+  // Start Outgoing Call (Caller)
+  const startCall = useCallback(
+    async (
+      targetUser: { uid: string; name: string; photoURL?: string },
+      currentUserProfile: { name: string; photoURL?: string }
+    ) => {
+      if (voiceRoomRef.current) {
+        await voiceRoomRef.current.startCall(targetUser, currentUserProfile);
+      }
+    },
+    []
+  );
+
+  // Accept Incoming Call (Callee)
+  const acceptCall = useCallback(async (incomingCallData: CallSession) => {
+    if (voiceRoomRef.current) {
+      await voiceRoomRef.current.acceptCall(incomingCallData);
+    }
+  }, []);
+
+  // Decline Call
+  const declineCall = useCallback(async () => {
+    if (voiceRoomRef.current) {
+      await voiceRoomRef.current.declineCall();
+    }
+  }, []);
+
+  // Cancel Outgoing Call
+  const cancelCall = useCallback(async () => {
+    if (voiceRoomRef.current) {
+      await voiceRoomRef.current.cancelCall();
+    }
+  }, []);
 
   // Leave voice room
   const leave = useCallback(() => {
@@ -172,6 +207,10 @@ export function useVoiceChat({
     connectionState,
     metrics,
     join,
+    startCall,
+    acceptCall,
+    declineCall,
+    cancelCall,
     leave,
     toggleMute,
   };
