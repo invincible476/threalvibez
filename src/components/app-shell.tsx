@@ -1556,7 +1556,7 @@ function useChatData() {
 
   const handleMessageAction = useCallback(async (
     messageId: string,
-    action: 'react' | 'delete',
+    action: 'react' | 'delete' | 'pin' | 'edit',
     data?: unknown
   ): Promise<void> => {
     if (!selectedChat || !currentUser) return;
@@ -1627,7 +1627,6 @@ function useChatData() {
         });
       } catch (error) {
         console.error("Error deleting message", error);
-        // Revert optimistic updates on error
         setMessages(prevMessages => prevMessages.map(msg => 
           msg.id === messageToDelete.id ? messageToDelete : msg
         ));
@@ -1637,6 +1636,23 @@ function useChatData() {
             lastMessage: selectedChat.lastMessage
           } : convo
         ));
+      }
+    } else if (action === 'edit') {
+      const newText = data as string;
+      if (!newText) return;
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText } : m));
+      const messageRef = doc(db, 'conversations', selectedChat.id, 'messages', messageId);
+      try {
+        await updateDoc(messageRef, { text: newText, editedAt: serverTimestamp() });
+      } catch (err) {
+        console.error("Error editing message", err);
+      }
+    } else if (action === 'pin') {
+      const convoRef = doc(db, 'conversations', selectedChat.id);
+      try {
+        await updateDoc(convoRef, { pinnedMessageId: messageId });
+      } catch (err) {
+        console.error("Error pinning message", err);
       }
     } else if (action === 'react') {
       const emoji = data as string;
@@ -1688,6 +1704,7 @@ function useChatData() {
           }
           
           const finalReactions = reactions.filter(r => r.count > 0);
+          transaction.update(messageRef, { reactions: finalReactions });
         });
       } catch (error) {
         console.error("Error reacting to message", error);
@@ -2105,7 +2122,7 @@ interface AppShellContextType {
   activeSendMessage: (messageText: string, replyTo?: Message['replyTo']) => Promise<string>;
   activeSendFile: (file: File, message: string) => Promise<string>;
   activeSendBase64File: (base64: string, fileType: string, fileName: string, caption: string) => Promise<string | undefined>;
-  handleMessageAction: (messageId: string, action: 'react' | 'delete', data?: unknown) => Promise<void>;
+  handleMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: unknown) => Promise<void>;
   cancelUpload: (messageId: string) => void;
   handleCreateChat: (targetUser: User) => Promise<string>;
   handleCreateGroupChat: (groupName: string, selectedUsers: User[]) => Promise<string>;

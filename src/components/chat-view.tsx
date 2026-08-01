@@ -1,7 +1,6 @@
-
 'use client';
 import type { Conversation as ConversationType, User, Message as MessageType } from '@/lib/types';
-import { MoreVertical, Phone, Video, Bot, X, Reply, ArrowLeft, Trash2, ArrowDown } from 'lucide-react';
+import { MoreVertical, Phone, Bot, X, Reply, ArrowLeft, Trash2, ArrowDown, Info } from 'lucide-react';
 import { geminiService } from '@/lib/gemini-service';
 import { Button } from './ui/button';
 import { UserAvatar } from './user-avatar';
@@ -41,6 +40,7 @@ import { useAppShell } from './app-shell';
 import { useVoiceChat } from '@/hooks/voice/use-voice-chat';
 import { VoiceChat } from '@/components/voice-chat/voice-chat';
 import { useMobileKeyboardHeight } from '@/hooks/use-mobile-keyboard-height';
+import { useRouter } from 'next/navigation';
 
 const AI_USER_ID = 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
 
@@ -66,6 +66,7 @@ const ChatViewComponent = ({
     isLoadingMore
 }: ChatViewProps) => {
   const { toast } = useToast();
+  const router = useRouter();
   const { viewportHeight } = useMobileKeyboardHeight();
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
@@ -95,17 +96,6 @@ const ChatViewComponent = ({
     },
   });
 
-  // Debug check for voice chat initialization
-  useEffect(() => {
-    if (chat && currentUser && !isAIChat) {
-      console.log('Voice chat availability:', {
-        chatId: chat.id,
-        userId: currentUser.uid,
-        isVoiceConnected,
-        hookInitialized: Boolean(joinVoice)
-      });
-    }
-  }, [chat, currentUser, isAIChat, isVoiceConnected, joinVoice]);
   const [replyToMessage, setReplyToMessage] = useState<MessageType | null>(null);
   const { chatBackground } = useAppearance();
   const { isMobileView } = useMobileDesign();
@@ -114,7 +104,7 @@ const ChatViewComponent = ({
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [newMessagesCount, setNewMessagesCount] = useState(0);
 
-  // Deduplicate messages (capped to last 50) using clientTempId or id key
+  // Deduplicate messages
   const displayMessages = React.useMemo(() => {
     const confirmed = messages.length > 50 ? messages.slice(-50) : messages;
     const uniqueMap = new Map<string, MessageType>();
@@ -172,29 +162,22 @@ const ChatViewComponent = ({
   }, []);
 
   useEffect(() => {
-    if (!chat || !currentUser) {
-      return;
-    }
+    if (!chat || !currentUser) return;
     const messageList = messageListRef.current;
     if (messageList) {
         const handleScroll = () => {
             const { scrollTop, scrollHeight, clientHeight } = messageList;
             const atBottom = scrollHeight - scrollTop - clientHeight < 100;
             setIsAtBottom(atBottom);
-            if (atBottom) {
-                setNewMessagesCount(0);
-            }
+            if (atBottom) setNewMessagesCount(0);
         };
         messageList.addEventListener('scroll', handleScroll);
         return () => messageList.removeEventListener('scroll', handleScroll);
     }
   }, [chat, currentUser, messageListRef]);
 
-
   useLayoutEffect(() => {
-    if (!chat || !currentUser) {
-      return;
-    }
+    if (!chat || !currentUser) return;
     const newCount = displayMessages.length - prevMessagesLength.current;
     const newMessagesAdded = newCount > 0;
 
@@ -205,7 +188,7 @@ const ChatViewComponent = ({
     }
     
     prevMessagesLength.current = displayMessages.length;
-}, [displayMessages, isAtBottom, chat, currentUser]);
+  }, [displayMessages, isAtBottom, chat, currentUser]);
   
   const handleFileSelect = async (file: File) => {
     const isImage = file.type.startsWith("image/");
@@ -214,11 +197,7 @@ const ChatViewComponent = ({
     try {
       if (isImage) {
         setPreviewFile(file);
-      } else if (isVideo) {
-        // Send video directly to Cloudinary flow
-        await activeSendFile(file, "");
       } else {
-        // Other files like audio, docs etc.
         await activeSendFile(file, "");
       }
     } catch (error) {
@@ -244,11 +223,9 @@ const ChatViewComponent = ({
     setPreviewFile(null);
   };
 
-
   const handleSendMessageWithReply = (messageText: string) => {
     if (!messageText.trim() || !chat || !currentUser) return;
     
-    // Build reply context and clear reply state immediately for instant UI feedback
     const messageReply = replyToMessage?.replyTo || (replyToMessage ? {
         messageId: replyToMessage.id,
         messageText: replyToMessage.text || (replyToMessage.file ? 'Attachment' : ''),
@@ -256,7 +233,6 @@ const ChatViewComponent = ({
     } : undefined);
     setReplyToMessage(null);
 
-    // Fire addDoc in the background — do NOT await before updating UI
     activeSendMessage(messageText, messageReply).catch((e) => {
       console.error('Error sending message:', e);
       toast({
@@ -266,7 +242,6 @@ const ChatViewComponent = ({
       });
     });
 
-    // Check if the message mentions @gemini and process it
     if (messageText.includes('@gemini')) {
         geminiService.processMessage({
             id: crypto.randomUUID(),
@@ -275,16 +250,9 @@ const ChatViewComponent = ({
             timestamp: new Date(),
             status: 'sent'
         }, chat.id).then((aiResponse) => {
-            if (aiResponse) {
-                activeSendMessage(aiResponse);
-            }
+            if (aiResponse) activeSendMessage(aiResponse);
         }).catch((error) => {
             console.error('AI error:', error);
-            toast({
-                title: 'AI Response Error',
-                description: 'Could not get a response from Gemini. Please try again.',
-                variant: 'destructive',
-            });
         });
     }
   };
@@ -294,18 +262,21 @@ const ChatViewComponent = ({
         new File([Buffer.from(base64.split(',')[1], 'base64')], fileName, { type: fileType }),
         caption
       );
-  }
+  };
 
+  const navigateToChatInfo = () => {
+    if (chat?.id && !isAIChat) {
+      router.push(`/chat/${chat.id}/info`);
+    } else {
+      setIsProfileSheetOpen(true);
+    }
+  };
 
   const getStatusText = () => {
     if (isAiReplying) return 'typing...';
     if (typingUsers.length > 0) {
-      if (typingUsers.length === 1) {
-        return `${typingUsers[0]} is typing...`;
-      }
-      if (typingUsers.length === 2) {
-        return `${typingUsers[0]} and ${typingUsers[1]} are typing...`;
-      }
+      if (typingUsers.length === 1) return `${typingUsers[0]} is typing...`;
+      if (typingUsers.length === 2) return `${typingUsers[0]} and ${typingUsers[1]} are typing...`;
       return 'several people are typing...';
     }
     if (isAIChat) return 'Online';
@@ -325,7 +296,7 @@ const ChatViewComponent = ({
         });
     }
     setNewMessagesCount(0);
-  }
+  };
 
   if (!chat || !currentUser) {
     return (
@@ -341,13 +312,10 @@ const ChatViewComponent = ({
                 <p className="mt-2">Select a chat to start messaging</p>
              </div>
         </div>
-    )
+    );
   }
-  
-  // Chat type flags are now declared at the top of the component
 
   const participantForProfile = isAIChat ? usersCache.get(AI_USER_ID) : otherParticipant;
-
   const displayName = chat.name;
   const displayAvatar = chat.avatar;
   const displayStatus = getStatusText();
@@ -360,25 +328,24 @@ const ChatViewComponent = ({
     photoURL: displayAvatar 
   });
 
-
   return (
     <div 
       className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden w-full bg-transparent"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
+      {/* Top Header */}
       <header className="flex items-center justify-between border-b border-zinc-800/40 bg-zinc-950/80 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
         <div className="flex items-center gap-3">
             {isMobileView && onBack ? (
-              <Button variant="ghost" size="icon" className="h-9 w-9 p-2 rounded-full text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100 border-none outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 shrink-0 select-none" onClick={onBack}>
+              <Button variant="ghost" size="icon" className="h-9 w-9 p-2 rounded-full text-zinc-300 hover:bg-zinc-800/60 shrink-0 select-none" onClick={onBack}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             ) : (
                <SidebarTrigger className="md:hidden text-zinc-300 hover:text-zinc-100" />
             )}
           <button 
-            className="flex items-center gap-3 text-left disabled:cursor-default"
-            onClick={() => setIsProfileSheetOpen(true)}
-            disabled={!participantForProfile && !isGroupChat}
+            className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
+            onClick={navigateToChatInfo}
           >
             <UserAvatar user={headerAvatarUser} className="h-10 w-10"/>
             <div>
@@ -390,103 +357,64 @@ const ChatViewComponent = ({
             </div>
           </button>
         </div>
+
         <div className={cn("flex items-center gap-2", isAIChat && "hidden")}>
-          {/* Voice Chat Buttons */}
+          {/* Voice Call Button — Icon Only Control */}
           {!isVoiceConnected && !isAIChat && (
-            <>
-              {/* Voice Call Button — icon only */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100"
-                onClick={async () => {
-                  console.log('Voice call button clicked', {
-                    currentUser,
-                    chatId: chat?.id,
-                    isVoiceConnected,
-                    joinVoiceFunction: Boolean(joinVoice)
-                  });
-
-                  if (!currentUser?.uid || !chat?.id) {
-                    console.error('Missing required data:', { userId: currentUser?.uid, chatId: chat?.id });
-                    toast({
-                      title: 'Voice Chat Error',
-                      description: 'Cannot start voice chat: missing user or chat information.',
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-
-                  try {
-                    console.log('Attempting to join voice chat:', { 
-                      userId: currentUser.uid, 
-                      roomId: chat.id,
-                      chatType: chat.type 
-                    });
-
-                    if (!joinVoice) {
-                      throw new Error('Voice chat join function not initialized');
-                    }
-
-                    await joinVoice();
-                    console.log('Join voice call successful');
-                    setIsVoiceEnabled(true);
-                    toast({
-                      title: 'Voice Chat',
-                      description: 'Joined voice chat successfully.',
-                    });
-                  } catch (error) {
-                    console.error('Voice chat join error:', error);
-                    toast({
-                      title: 'Voice Chat Error',
-                      description: error instanceof Error 
-                        ? error.message 
-                        : 'Could not join voice chat. Please check your microphone permissions.',
-                      variant: 'destructive',
-                    });
-                  }
-                }}
-              >
-                <Phone className="h-4 w-4" />
-                <span className="sr-only">{chat.type === 'private' ? 'Voice Call' : 'Join Voice'}</span>
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-9 h-9 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-300"
+              onClick={async () => {
+                if (!currentUser?.uid || !chat?.id) return;
+                try {
+                  if (joinVoice) await joinVoice();
+                  setIsVoiceEnabled(true);
+                  toast({ title: 'Voice Call', description: 'Joined voice call.' });
+                } catch (error) {
+                  toast({ title: 'Voice Call Error', description: 'Could not connect.', variant: 'destructive' });
+                }
+              }}
+            >
+              <Phone className="h-4 w-4" />
+              <span className="sr-only">Voice Call</span>
+            </Button>
           )}
+
+          {/* 3-dots Menu Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800/60">
+                <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full text-zinc-300 hover:bg-zinc-800 flex items-center justify-center">
                     <MoreVertical className="h-5 w-5" />
                     <span className="sr-only">More options</span>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsProfileSheetOpen(true)}>
-                    View Profile
+            <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-100">
+                <DropdownMenuItem onClick={navigateToChatInfo}>
+                    <Info className="mr-2 h-4 w-4 text-violet-400" />
+                    Chat Info
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsProfileSheetOpen(true)}>
+                    View Profile Sheet
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-zinc-800" />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-destructive"
-                    >
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-400 focus:text-red-300">
                       <Trash2 className="mr-2 h-4 w-4" />
                       Clear Chat
                     </DropdownMenuItem>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete all messages in this conversation. This action cannot be undone.
+                      <AlertDialogDescription className="text-zinc-400">
+                        This will permanently delete all messages in this conversation.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleClearChat(chat.id)}
-                        className="bg-destructive hover:bg-destructive/90"
-                      >
+                      <AlertDialogCancel className="bg-zinc-800 text-zinc-200 border-none">Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleClearChat(chat.id)} className="bg-red-600 text-white">
                         Clear Chat
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -497,7 +425,7 @@ const ChatViewComponent = ({
         </div>
       </header>
 
-      {/* FIXED THIS WRAPPER: Changed h-full to flex-1 and added relative */}
+      {/* Main Messages View */}
       <div className="flex flex-1 flex-col min-h-0 relative w-full max-w-full">
         <div className="flex-1 min-h-0 relative w-full overflow-hidden">
         {(isVoiceEnabled || isVoiceConnected) && (
@@ -508,7 +436,6 @@ const ChatViewComponent = ({
             isMuted={isMuted}
             onMuteToggle={toggleMute}
             onLeave={() => {
-              console.log('Leaving voice chat');
               leaveVoice();
               setIsVoiceEnabled(false);
             }}
@@ -517,15 +444,9 @@ const ChatViewComponent = ({
         )}
          {chatBackground && (
           <div className="absolute inset-0 opacity-15 pointer-events-none z-0">
-             {chatBackground && !chatBackground.startsWith('data:image') && (
-                <Image 
-                    src={chatBackground}
-                    fill
-                    style={{objectFit:"cover"}}
-                    alt="Chat background"
-                />
-            )}
-             {chatBackground && chatBackground.startsWith('data:image') && (
+             {!chatBackground.startsWith('data:image') ? (
+                <Image src={chatBackground} fill style={{objectFit:"cover"}} alt="Chat background" />
+            ) : (
                 <div style={{ backgroundImage: `url(${chatBackground})`}} className="h-full w-full bg-cover bg-center" />
              )}
           </div>
@@ -556,17 +477,21 @@ const ChatViewComponent = ({
         </div>
       )}
     </div>
+
+    {/* Quoted Message Reply Banner & Input Container */}
     <div className="flex-none shrink-0 p-3 bg-zinc-950/90 backdrop-blur-md border-t border-zinc-800/40 z-20 w-full pb-safe">
       {replyToMessage && (
-        <div className="p-2 px-4 border-t border-border/50 bg-background/50 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Reply className="h-4 w-4 text-muted-foreground" />
-            <div className="text-sm">
-              <p className="font-semibold">{replyToMessage.senderId === currentUser.uid ? "You" : usersCache.get(replyToMessage.senderId)?.name}</p>
-              <p className="text-muted-foreground truncate max-w-xs">{replyToMessage.text}</p>
+        <div className="p-2 px-4 mb-2 bg-zinc-900/90 rounded-xl border border-violet-500/30 flex justify-between items-center animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <Reply className="h-4 w-4 text-violet-400 shrink-0" />
+            <div className="text-xs overflow-hidden">
+              <p className="font-medium text-violet-400">
+                {replyToMessage.senderId === currentUser.uid ? "Replying to yourself" : usersCache.get(replyToMessage.senderId)?.name || "Replying to message"}
+              </p>
+              <p className="text-zinc-300 truncate max-w-xs">{replyToMessage.text || 'Attachment'}</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setReplyToMessage(null)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => setReplyToMessage(null)}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -601,7 +526,6 @@ const ChatViewComponent = ({
           onMuteToggle={handleMuteToggle}
         />
       ) : null}
-
 
       {previewFile && (
         <ImagePreviewDialog

@@ -31,7 +31,7 @@ interface MessageListProps {
     usersCache: Map<string, User>;
     uploadProgress: Map<string, number>;
     onCancelUpload: (messageId: string) => void;
-    onMessageAction: (messageId: string, action: 'react' | 'delete', data?: any) => void;
+    onMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: any) => void;
     onReply: (message: Message) => void;
     isAiReplying: boolean;
     otherParticipantLastRead?: Timestamp;

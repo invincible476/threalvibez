@@ -1,20 +1,51 @@
-
 'use client';
 
 import { Message, User } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from './user-avatar';
-import { Check, CheckCheck, Clock, File as FileIcon, Download, Image as ImageIcon, Smile, MoreHorizontal, Reply, Trash2, Video, Volume2 } from 'lucide-react';
+import {
+  Check,
+  CheckCheck,
+  Clock,
+  File as FileIcon,
+  Download,
+  Image as ImageIcon,
+  Reply,
+  Trash2,
+  Edit,
+  Pin,
+  Copy,
+  MoreHorizontal,
+} from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import Image from 'next/image';
 import { motion, PanInfo } from 'framer-motion';
 import { UploadProgress } from './upload-progress';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Button } from './ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { memo } from 'react';
-import React from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from './ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import React, { memo, useState, useRef } from 'react';
 import { formatText } from '@/lib/format-text';
+import { useToast } from '@/hooks/use-toast';
+import { MediaLightbox, LightboxMedia } from './media-lightbox';
+import { Input } from './ui/input';
 
 interface MessageBubbleProps {
   message: Message;
@@ -22,306 +53,425 @@ interface MessageBubbleProps {
   isCurrentUser: boolean;
   progress?: number;
   onCancelUpload: () => void;
-  onMessageAction: (messageId: string, action: 'react' | 'delete', data?: any) => void;
+  onMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: any) => void;
   onReply: (message: Message) => void;
   isRead: boolean;
-  /** When true: same sender within 5 min — hide avatar & name, tighten spacing */
   isGrouped?: boolean;
 }
 
-const isImage = (fileType: string) => fileType.startsWith('image/');
-const isAudio = (fileType: string) => fileType.startsWith('audio/');
-const isVideo = (fileType: string) => fileType.startsWith('video/');
+const isImage = (fileType?: string) => fileType?.startsWith('image/') || false;
+const isAudio = (fileType?: string) => fileType?.startsWith('audio/') || false;
+const isVideo = (fileType?: string) => fileType?.startsWith('video/') || false;
 
-const defaultEmojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+// 6 quick reaction emojis requested: ❤️, 👍, 😂, 😮, 😢, 🔥
+const QUICK_REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
 
 const messageVariants = {
-    initial: { opacity: 0, y: 10, scale: 0.95 },
-    animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: [0.25, 1, 0.5, 1] } },
+  initial: { opacity: 0, y: 10, scale: 0.95 },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: [0.25, 1, 0.5, 1] } },
 };
 
-import { getPerformanceConfig } from '@/utils/performance';
+function MessageBubble({
+  message,
+  sender,
+  isCurrentUser,
+  progress,
+  onCancelUpload,
+  onMessageAction,
+  onReply,
+  isRead,
+  isGrouped = false,
+}: MessageBubbleProps) {
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.text || '');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-const { imageQuality } = getPerformanceConfig();
+  // Long press timer for touch devices
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
-function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUpload, onMessageAction, onReply, isRead, isGrouped = false }: MessageBubbleProps) {
-    // Optimize image quality based on device capabilities
-    const getOptimizedImageUrl = (url: string) => {
-        if (imageQuality === 'low') {
-            return url.replace('/upload/', '/upload/q_auto,f_auto,w_600/');
-        }
-        return url.replace('/upload/', '/upload/q_auto,f_auto/');
-    };
+  const handleTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate?.(50);
+      }
+      setMenuOpen(true);
+    }, 450);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenuOpen(true);
+  };
+
   if (!sender) {
     return (
-        <div className={cn('group flex w-full items-start gap-3', isCurrentUser && 'flex-row-reverse')}>
-            <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-            <div className={cn('relative flex max-w-[70%] flex-col rounded-xl px-4 py-2', isCurrentUser ? 'rounded-tr-none bg-primary text-primary-foreground' : 'rounded-tl-none bg-card')}>
-                <p className="text-base">{message.text}</p>
-            </div>
+      <div className={cn('group flex w-full items-start gap-3', isCurrentUser && 'flex-row-reverse')}>
+        <div className="h-8 w-8 rounded-full bg-zinc-800 animate-pulse" />
+        <div
+          className={cn(
+            'relative flex max-w-[70%] flex-col rounded-xl px-4 py-2',
+            isCurrentUser ? 'rounded-tr-none bg-violet-700 text-white' : 'rounded-tl-none bg-zinc-800 text-zinc-100'
+          )}
+        >
+          <p className="text-base">{message.text}</p>
         </div>
+      </div>
     );
   }
-  
-  const getReadReceiptIcon = () => {
-    if (message.status === 'sending') return <Clock className="h-3.5 w-3.5 text-zinc-400" />;
-    if (isRead) return <CheckCheck className="h-3.5 w-3.5 text-violet-300" />;
-    if (message.status === 'sent' || message.status === 'delivered' || message.status === 'read') return <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />;
-    return <Check className="h-3.5 w-3.5 text-zinc-400" />;
-  }
 
+  // Delivery status icons: single checkmark (sent), double checkmarks (delivered), indigo/violet double checkmarks (read)
+  const renderReadReceiptIcon = () => {
+    if (message.status === 'sending') return <Clock className="h-3.5 w-3.5 text-zinc-400" />;
+    if (isRead) return <CheckCheck className="h-3.5 w-3.5 text-indigo-300 fill-indigo-300/20" />;
+    if (message.status === 'sent' || message.status === 'delivered' || message.status === 'read')
+      return <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />;
+    return <Check className="h-3.5 w-3.5 text-zinc-400" />;
+  };
 
   const getFormattedTimestamp = (timestamp: any) => {
     if (!timestamp) return '';
-    
     let date: Date;
     if (timestamp instanceof Timestamp) {
-        date = timestamp.toDate();
+      date = timestamp.toDate();
     } else if (timestamp instanceof Date) {
-        date = timestamp;
+      date = timestamp;
     } else if (typeof timestamp === 'string') {
-        date = new Date(timestamp);
+      date = new Date(timestamp);
     } else if (timestamp?.seconds) {
-        date = new Date(timestamp.seconds * 1000);
+      date = new Date(timestamp.seconds * 1000);
     } else {
-        return "Sending..."
+      return 'Sending...';
     }
-
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
-  
+
   const formattedTimestamp = getFormattedTimestamp(message.timestamp);
-  
+
+  // Copy text to clipboard
+  const handleCopyText = () => {
+    if (message.text) {
+      navigator.clipboard.writeText(message.text);
+      toast({ title: 'Copied to clipboard', description: 'Message text copied.' });
+    }
+    setMenuOpen(false);
+  };
+
+  // Pin message
+  const handlePinMessage = () => {
+    onMessageAction(message.id, 'pin');
+    toast({ title: 'Message pinned', description: 'Pinned message updated.' });
+    setMenuOpen(false);
+  };
+
+  // Save edit
+  const handleSaveEdit = () => {
+    if (editText.trim() && editText !== message.text) {
+      onMessageAction(message.id, 'edit', editText.trim());
+      toast({ title: 'Message edited' });
+    }
+    setIsEditing(false);
+  };
+
+  // Handle Drag End for Swipe-to-Reply
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const swipeThreshold = 40;
+    if (info.offset.x > swipeThreshold) {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate?.(40);
+      }
+      onReply(message);
+    }
+  };
+
+  // Render media attachments (including multi-image grid support)
   const renderMessageContent = () => {
-     if (message.deleted) {
-        return <p className="text-base italic text-muted-foreground">This message was deleted.</p>;
-     }
+    if (message.deleted) {
+      return <p className="text-sm italic text-zinc-400">This message was deleted.</p>;
+    }
+
     if (message.file) {
+      const fileType = message.file.type || '';
       const isSending = message.status === 'sending';
-      const fileContent = (() => {
-        if (isImage(message.file.type)) {
-            const imageUrl = message.file.url;
-            const isGif = message.file.type === 'image/gif';
-            if (!imageUrl) {
-                return (
-                    <div className="w-[250px] h-[250px] bg-muted rounded-lg flex items-center justify-center">
-                        <ImageIcon className="w-10 h-10 text-muted-foreground" />
-                    </div>
-                );
-            }
-            return (
-                <a href={imageUrl} target="_blank" rel="noopener noreferrer">
-                    <Image
-                        key={message.id}
-                        src={imageUrl}
-                        alt={message.file.name}
-                        width={250}
-                        height={250}
-                        className={cn(
-                        "rounded-lg object-cover max-w-full",
-                        isSending && 'opacity-60'
-                        )}
-                        unoptimized={isGif}
-                    />
-                </a>
-            )
-        }
-        if (isAudio(message.file.type)) {
-            return (
-                message.file.url ? <audio controls src={message.file.url} className={cn("w-full max-w-xs", isSending && 'opacity-60')} /> : null
-            )
-        }
-        if (isVideo(message.file.type)) {
-            return (
-                message.file.url ? <video controls src={message.file.url} className={cn("w-full max-w-xs rounded-lg", isSending && 'opacity-60')} /> : null
-            )
-        }
+
+      if (isImage(fileType)) {
+        const mediaList: LightboxMedia[] = [{ url: message.file.url, type: fileType, name: message.file.name }];
+
         return (
-            <a 
-            href={message.file.url} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="flex items-center gap-3 bg-muted/50 p-3 rounded-lg hover:bg-muted"
-            >
-            <FileIcon className="h-8 w-8 text-muted-foreground" />
-            <div className="flex-1 overflow-hidden">
-                <p className="font-medium truncate">{message.file.name}</p>
-                <p className="text-sm text-muted-foreground">Click to download</p>
-            </div>
-            <Download className="h-5 w-5 text-muted-foreground" />
-            </a>
-        )
-      })();
-      
+          <div className="relative rounded-lg overflow-hidden my-1">
+            <img
+              src={message.file.url}
+              alt={message.file.name || 'Attached image'}
+              className={cn(
+                'rounded-lg object-cover max-w-full max-h-72 cursor-pointer hover:opacity-95 transition-opacity',
+                isSending && 'opacity-60'
+              )}
+              onClick={() => {
+                setLightboxIndex(0);
+                setLightboxOpen(true);
+              }}
+            />
+            {isSending && <UploadProgress progress={progress} onCancel={onCancelUpload} />}
+            <MediaLightbox
+              media={mediaList}
+              initialIndex={lightboxIndex}
+              isOpen={lightboxOpen}
+              onClose={() => setLightboxOpen(false)}
+            />
+          </div>
+        );
+      }
+
+      if (isAudio(fileType)) {
+        return message.file.url ? (
+          <audio controls src={message.file.url} className={cn('w-full max-w-xs my-1', isSending && 'opacity-60')} />
+        ) : null;
+      }
+
+      if (isVideo(fileType)) {
+        return message.file.url ? (
+          <video
+            controls
+            src={message.file.url}
+            className={cn('w-full max-w-xs rounded-lg my-1', isSending && 'opacity-60')}
+          />
+        ) : null;
+      }
+
       return (
-        <div className="relative">
-          {fileContent}
-          {isSending && (
-            <UploadProgress progress={progress} onCancel={onCancelUpload} />
-          )}
-        </div>
+        <a
+          href={message.file.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 bg-black/20 p-3 rounded-lg hover:bg-black/30 transition-colors my-1 border border-white/10"
+        >
+          <FileIcon className="h-7 w-7 text-violet-300 shrink-0" />
+          <div className="flex-1 overflow-hidden text-xs">
+            <p className="font-medium truncate text-zinc-100">{message.file.name}</p>
+            <p className="text-zinc-400">Click to download</p>
+          </div>
+          <Download className="h-4 w-4 text-zinc-400 shrink-0" />
+        </a>
       );
     }
     return null;
-  }
-  
-  const hasContent = message.text || message.file;
-
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const swipeThreshold = 50;
-    if (info.offset.x > swipeThreshold && !isCurrentUser) {
-      onReply(message);
-    }
-    if (info.offset.x < -swipeThreshold && isCurrentUser) {
-      onReply(message);
-    }
   };
 
-  const MessageActions = () => (
-    <div className={cn(
-        "absolute top-0 -translate-y-1/2 flex items-center bg-background border rounded-full p-0.5 shadow-md transition-opacity duration-200 opacity-0 group-hover:opacity-100",
-        isCurrentUser ? 'right-2' : 'left-2'
-    )}>
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                    <Smile className="h-4 w-4" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="p-1 w-auto">
-                <div className="flex gap-1">
-                    {defaultEmojis.map(emoji => (
-                        <Button
-                            key={emoji}
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-xl rounded-full"
-                            onClick={() => onMessageAction(message.id, 'react', emoji)}
-                        >
-                            {emoji}
-                        </Button>
-                    ))}
-                </div>
-            </PopoverContent>
-        </Popover>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => onReply(message)}>
-                    <Reply className="mr-2 h-4 w-4" />
-                    <span>Reply</span>
-                </DropdownMenuItem>
-                {isCurrentUser && (
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => onMessageAction(message.id, 'delete')}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    <span>Delete</span>
-                  </DropdownMenuItem>
-                )}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    </div>
-  );
-
   return (
-    <motion.div
-      variants={messageVariants}
-      initial="initial"
-      animate="animate"
-      layout
-      className={cn(
-        'group flex w-full items-end gap-2 relative',
-        isGrouped ? 'my-0.5' : 'my-1',
-        isCurrentUser ? 'justify-end' : 'justify-start',
-        message.isAiMessage && 'justify-start'
-      )}
-      // Swipe to reply gesture
-      drag="x"
-      dragConstraints={{ left: 0, right: 0 }}
-      onDragEnd={handleDragEnd}
-      dragElastic={{ right: isCurrentUser ? 0 : 0.1, left: isCurrentUser ? 0.1 : 0 }}
-      style={{ x: 0 }}
-    >
-      {/* Incoming message avatar — hidden when grouped, spacer preserves alignment */}
-      {!isCurrentUser && (
-        isGrouped
-          ? <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
-          : <UserAvatar user={sender!} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
-      )}
-      <div
+    <>
+      <motion.div
+        variants={messageVariants}
+        initial="initial"
+        animate="animate"
+        layout
         className={cn(
-          'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-sm transition-all overflow-hidden',
-          message.isAiMessage
-            ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-zinc-100 border border-emerald-800/40 backdrop-blur-md'
-            : isCurrentUser
+          'group flex w-full items-end gap-2 relative',
+          isGrouped ? 'my-0.5' : 'my-1',
+          isCurrentUser ? 'justify-end' : 'justify-start',
+          message.isAiMessage && 'justify-start'
+        )}
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        onDragEnd={handleDragEnd}
+        dragElastic={{ right: 0.2, left: 0 }}
+        style={{ x: 0 }}
+      >
+        {/* Incoming message avatar */}
+        {!isCurrentUser && (
+          isGrouped ? (
+            <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
+          ) : (
+            <UserAvatar user={sender!} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
+          )
+        )}
+
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onContextMenu={handleContextMenu}
+          className={cn(
+            'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-md transition-all overflow-hidden group/bubble select-text',
+            message.isAiMessage
+              ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-zinc-100 border border-emerald-800/40 backdrop-blur-md'
+              : isCurrentUser
               ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-zinc-100'
               : 'rounded-2xl rounded-tl-xs bg-zinc-800 border border-zinc-800/40 text-zinc-100',
-          (message.file && !message.text) ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
-        )}
-      >
-        {/* Only show sender name on incoming messages that are NOT grouped */}
-        {!isCurrentUser && !isGrouped && (
-            <p className="text-[12px] font-semibold text-violet-300 mb-0.5 px-0.5 tracking-tight">{sender?.name}</p>
-        )}
-        
-        {message.replyTo && (
-          <div className={cn(
-            "p-2 mb-1.5 bg-black/20 rounded-lg text-xs border-l-2 border-primary",
-            message.replyTo.storyMedia && "flex items-center gap-2"
-          )}>
-                {message.replyTo.storyMedia && (
-                    <Image src={message.replyTo.storyMedia} alt="Story reply" width={36} height={36} className="rounded-md object-cover h-9 w-9" />
-                )}
-                <div className="overflow-hidden">
-                  <p className="font-semibold truncate">{message.replyTo.messageSender}</p>
-                  <p className="text-white/80 line-clamp-1 truncate">{message.replyTo.messageText}</p>
-                </div>
-          </div>
-        )}
+            message.file && !message.text ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
+          )}
+        >
+          {/* Sender Name */}
+          {!isCurrentUser && !isGrouped && (
+            <p className="text-[11px] font-semibold text-violet-300 mb-0.5 tracking-tight">{sender?.name}</p>
+          )}
 
-        {renderMessageContent()}
-        
-        {message.text && (
-          <p className={cn(
-            "text-[14.5px] sm:text-base leading-relaxed whitespace-pre-wrap break-words chat-list-force-break",
-            (message.file) ? "mt-1.5 px-1 pb-0.5" : "",
-            message.deleted && "italic text-muted-foreground"
-          )}>
-            {formatText(message.text)}
-          </p>
-        )}
-
-        {message.reactions && message.reactions.length > 0 && (
-            <div className={cn(
-                "absolute -bottom-3 flex gap-1 z-10",
-                isCurrentUser ? 'left-2' : 'right-2'
-            )}>
-                {message.reactions.map(r => (
-                    <div key={r.emoji} className="flex items-center bg-background/90 backdrop-blur-md border rounded-full px-2 py-0.5 text-[11px] shadow-sm">
-                        <span>{r.emoji}</span>
-                        <span className="ml-1 font-semibold">{r.count}</span>
-                    </div>
-                ))}
+          {/* Quoted Reply Banner */}
+          {message.replyTo && (
+            <div className="p-2 mb-1.5 bg-black/25 rounded-lg text-xs border-l-2 border-violet-400 flex flex-col gap-0.5">
+              <p className="font-medium text-violet-300 text-[11px] truncate">{message.replyTo.messageSender}</p>
+              <p className="text-zinc-200 line-clamp-1 text-[11px]">{message.replyTo.messageText}</p>
             </div>
-        )}
-        
-        {hasContent && !message.deleted && <MessageActions />}
+          )}
 
-        <div className="mt-0.5 flex items-center justify-end gap-1 self-end px-0.5 text-[11px] opacity-80">
-          <span className={cn(isCurrentUser ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-            {formattedTimestamp}
-          </span>
-          {isCurrentUser && getReadReceiptIcon()}
+          {/* Media & Content */}
+          {renderMessageContent()}
+
+          {/* Text Message or Edit Form */}
+          {isEditing ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="bg-black/30 border-white/20 text-white text-xs h-8"
+              />
+              <Button size="sm" onClick={handleSaveEdit} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-500">
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-8 text-xs text-zinc-300">
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            message.text && (
+              <p
+                className={cn(
+                  'text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words chat-list-force-break',
+                  message.file ? 'mt-1.5 px-0.5' : '',
+                  message.deleted && 'italic text-zinc-400'
+                )}
+              >
+                {formatText(message.text)}
+              </p>
+            )
+          )}
+
+          {/* Displayed Emoji Reactions */}
+          {message.reactions && message.reactions.length > 0 && (
+            <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isCurrentUser ? 'justify-end' : 'justify-start')}>
+              {message.reactions.map((r) => (
+                <button
+                  key={r.emoji}
+                  onClick={() => onMessageAction(message.id, 'react', r.emoji)}
+                  className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2 py-0.5 text-[11px] shadow-sm hover:scale-105 transition-transform"
+                >
+                  <span>{r.emoji}</span>
+                  <span className="ml-1 font-semibold text-zinc-200">{r.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Inline Bottom-Right Timestamp & Status Stacking */}
+          <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-zinc-400 ml-2 float-right select-none">
+            <span>{formattedTimestamp}</span>
+            {isCurrentUser && renderReadReceiptIcon()}
+          </div>
         </div>
-      </div>
-      {/* No outgoing (right-side) avatar — keeps sent messages clean in DMs */}
-    </motion.div>
+
+        {/* Floating Context Menu Dropdown */}
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0">
+              <MoreHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align={isCurrentUser ? 'end' : 'start'}
+            className="w-56 bg-zinc-900/95 border-zinc-800 backdrop-blur-xl text-zinc-100 shadow-2xl p-1.5"
+          >
+            {/* Quick Reaction Emoji Pill */}
+            <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-zinc-800">
+              {QUICK_REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => {
+                    onMessageAction(message.id, 'react', emoji);
+                    setMenuOpen(false);
+                  }}
+                  className="text-lg hover:scale-125 transition-transform p-1"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            <DropdownMenuItem onClick={() => { onReply(message); setMenuOpen(false); }}>
+              <Reply className="mr-2 h-4 w-4 text-violet-400" />
+              <span>Reply</span>
+            </DropdownMenuItem>
+
+            {message.text && (
+              <DropdownMenuItem onClick={handleCopyText}>
+                <Copy className="mr-2 h-4 w-4 text-zinc-400" />
+                <span>Copy Text</span>
+              </DropdownMenuItem>
+            )}
+
+            <DropdownMenuItem onClick={handlePinMessage}>
+              <Pin className="mr-2 h-4 w-4 text-amber-400" />
+              <span>Pin Message</span>
+            </DropdownMenuItem>
+
+            {isCurrentUser && message.text && !message.deleted && (
+              <DropdownMenuItem onClick={() => { setIsEditing(true); setMenuOpen(false); }}>
+                <Edit className="mr-2 h-4 w-4 text-blue-400" />
+                <span>Edit Message</span>
+              </DropdownMenuItem>
+            )}
+
+            {isCurrentUser && !message.deleted && (
+              <>
+                <DropdownMenuSeparator className="bg-zinc-800" />
+                <DropdownMenuItem
+                  className="text-red-400 focus:text-red-300 focus:bg-red-950/40"
+                  onClick={() => {
+                    setIsDeleteDialogOpen(true);
+                    setMenuOpen(false);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Delete Message</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Delete Confirmation Alert Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Message?</AlertDialogTitle>
+              <AlertDialogDescription className="text-zinc-400">
+                This will delete the message for everyone in this chat. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-zinc-800 text-zinc-200 border-none">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  onMessageAction(message.id, 'delete');
+                  setIsDeleteDialogOpen(false);
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </motion.div>
+    </>
   );
 }
 
