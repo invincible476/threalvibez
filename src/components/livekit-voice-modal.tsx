@@ -22,7 +22,7 @@ interface LiveKitVoiceModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_WS_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://omegaone-7kb381s3.livekit.cloud';
+const DEFAULT_WS_URL = "wss://omegaone-7kb381s3.livekit.cloud";
 
 export function LiveKitVoiceModal({
   isOpen,
@@ -40,12 +40,27 @@ export function LiveKitVoiceModal({
   const [retryCount, setRetryCount] = useState<number>(0);
   const { toast } = useToast();
 
-  const fetchToken = useCallback(async () => {
+  const initVoiceConnection = useCallback(async () => {
     if (!roomId || !userId) return;
 
     setLoading(true);
     setError(null);
+    setToken('');
 
+    // 1. Explicit Microphone Permission Pre-fetch
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    } catch (err: any) {
+      console.error('[LiveKit] Microphone permission denied:', err);
+      setError('Microphone access is required to join the call.');
+      setLoading(false);
+      return;
+    }
+
+    // 2. Token Fetching from Server Route
     try {
       const res = await fetch(
         `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(
@@ -69,7 +84,7 @@ export function LiveKitVoiceModal({
       }
       setLoading(false);
     } catch (err: any) {
-      console.error('[LiveKit] Token fetch error:', err);
+      console.error('[LiveKit] Connection setup error:', err);
       setError(err.message || 'Failed to connect to LiveKit voice room');
       setLoading(false);
       toast({
@@ -82,19 +97,21 @@ export function LiveKitVoiceModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    fetchToken();
-  }, [isOpen, fetchToken, retryCount]);
+    initVoiceConnection();
+  }, [isOpen, initVoiceConnection, retryCount]);
 
   if (!isOpen) return null;
 
-  const serverUrl = wsUrl || DEFAULT_WS_URL;
+  const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || wsUrl || DEFAULT_WS_URL;
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] w-[94vw] max-w-md rounded-3xl bg-zinc-950/95 border border-emerald-500/30 p-5 shadow-2xl backdrop-blur-xl text-zinc-100 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
-      {loading ? (
+      {loading || !token ? (
         <div className="flex flex-col items-center justify-center py-6 space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-          <p className="text-sm font-medium text-emerald-300">Connecting to LiveKit Voice Room...</p>
+          <p className="text-sm font-medium text-emerald-300 text-center">
+            {error ? error : 'Requesting media permissions & joining call...'}
+          </p>
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-4 space-y-3 text-center">
