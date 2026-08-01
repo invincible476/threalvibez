@@ -134,7 +134,7 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
         <ScrollArea className="h-full w-full" viewportRef={ref as React.RefObject<HTMLDivElement>}>
             <motion.div 
                 ref={viewportRef}
-                className="px-3 py-4 sm:px-4 space-y-4 sm:space-y-6"
+                className="px-3 py-4 sm:px-4"
                 variants={messageListVariants}
                 initial="initial"
                 animate="animate"
@@ -179,6 +179,18 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
                             }
                         }
 
+                        // Grouping: same sender within 5-minute window collapses avatar/name
+                        const prevMessage = index > 0 ? visibleMessages[index - 1] : null;
+                        const isGrouped = (() => {
+                            if (!prevMessage) return false;
+                            if (prevMessage.senderId !== message.senderId) return false;
+                            if (dateSeparator) return false; // new day resets grouping
+                            const prevDate = convertToDate(prevMessage.timestamp);
+                            const currDate = convertToDate(message.timestamp);
+                            if (!prevDate || !currDate) return false;
+                            return (currDate.getTime() - prevDate.getTime()) < 5 * 60 * 1000;
+                        })();
+
                         return (
                             <Fragment key={message.id || message.clientTempId}>
                                 {dateSeparator && (
@@ -196,6 +208,7 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
                                     onMessageAction={onMessageAction}
                                     onReply={onReply}
                                     isRead={isRead}
+                                    isGrouped={isGrouped}
                                 />
                             </Fragment>
                         );

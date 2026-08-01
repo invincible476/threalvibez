@@ -187,9 +187,9 @@ export default function AppearancePage() {
                     {theme === 'dark' && (
                         <CardContent className="pt-0">
                             <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-zinc-800/40 border border-zinc-800/50">
-                                <Label htmlFor="amoled-mode" className="flex flex-col space-y-0.5">
+                                <Label htmlFor="amoled-mode" className="flex flex-col space-y-0.5 flex-1 min-w-0 pr-2">
                                     <span className="text-sm font-medium text-zinc-100">AMOLED True Black</span>
-                                    <span className="text-xs text-zinc-400">
+                                    <span className="text-xs text-zinc-400 break-words">
                                         Uses pure #000000 background for maximum OLED battery savings.
                                     </span>
                                 </Label>
@@ -209,9 +209,9 @@ export default function AppearancePage() {
                     </CardHeader>
                     <CardContent className="pt-0">
                         <div className="flex items-center justify-between py-3 px-4 border-b border-zinc-800/40">
-                            <Label htmlFor="glass-enabled" className="flex flex-col space-y-0.5">
+                            <Label htmlFor="glass-enabled" className="flex flex-col space-y-0.5 flex-1 min-w-0 pr-2">
                                 <span className="text-sm font-medium text-zinc-100">Enable Frosted Glass Effect</span>
-                                <span className="text-xs text-zinc-400">
+                                <span className="text-xs text-zinc-400 break-words">
                                     Applies dynamic backdrop blur and glass translucency to UI cards.
                                 </span>
                             </Label>

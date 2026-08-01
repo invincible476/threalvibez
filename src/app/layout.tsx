@@ -87,7 +87,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className="h-full">
       <body
         className={cn(
-          'h-full min-h-screen bg-background font-sans antialiased overflow-hidden',
+          'h-full min-h-screen w-full max-w-md mx-auto overflow-x-hidden bg-background font-sans antialiased',
           fontPoppins.variable,
           fontPtSans.variable
         )}
@@ -105,7 +105,7 @@ export default function RootLayout({
                 <FriendsProvider>
                   <MobileProvider>
                     <AppShell>
-                      <main className="relative flex-1 z-10 h-full w-full overflow-hidden flex flex-col min-h-0">{children}</main>
+                      <main className="relative flex-1 z-10 h-full w-full min-w-0 overflow-x-hidden flex flex-col min-h-0">{children}</main>
                     </AppShell>
                     <Toaster />
                   </MobileProvider>

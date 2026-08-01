@@ -394,11 +394,11 @@ const ChatViewComponent = ({
           {/* Voice Chat Buttons */}
           {!isVoiceConnected && !isAIChat && (
             <>
-              {/* Voice Call Button */}
+              {/* Voice Call Button — icon only */}
               <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full hover:bg-zinc-800"
                 onClick={async () => {
                   console.log('Voice call button clicked', {
                     currentUser,
@@ -448,7 +448,7 @@ const ChatViewComponent = ({
                 }}
               >
                 <Phone className="h-4 w-4" />
-                {chat.type === 'private' ? 'Voice Call' : 'Join Voice'}
+                <span className="sr-only">{chat.type === 'private' ? 'Voice Call' : 'Join Voice'}</span>
               </Button>
             </>
           )}

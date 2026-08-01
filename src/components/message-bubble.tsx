@@ -25,6 +25,8 @@ interface MessageBubbleProps {
   onMessageAction: (messageId: string, action: 'react' | 'delete', data?: any) => void;
   onReply: (message: Message) => void;
   isRead: boolean;
+  /** When true: same sender within 5 min — hide avatar & name, tighten spacing */
+  isGrouped?: boolean;
 }
 
 const isImage = (fileType: string) => fileType.startsWith('image/');
@@ -42,7 +44,7 @@ import { getPerformanceConfig } from '@/utils/performance';
 
 const { imageQuality } = getPerformanceConfig();
 
-function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUpload, onMessageAction, onReply, isRead }: MessageBubbleProps) {
+function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUpload, onMessageAction, onReply, isRead, isGrouped = false }: MessageBubbleProps) {
     // Optimize image quality based on device capabilities
     const getOptimizedImageUrl = (url: string) => {
         if (imageQuality === 'low') {
@@ -234,7 +236,8 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
       animate="animate"
       layout
       className={cn(
-        'group flex w-full items-end gap-2 relative my-1',
+        'group flex w-full items-end gap-2 relative',
+        isGrouped ? 'my-0.5' : 'my-1',
         isCurrentUser ? 'justify-end' : 'justify-start',
         message.isAiMessage && 'justify-start'
       )}
@@ -245,8 +248,11 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
       dragElastic={{ right: isCurrentUser ? 0 : 0.1, left: isCurrentUser ? 0.1 : 0 }}
       style={{ x: 0 }}
     >
+      {/* Incoming message avatar — hidden when grouped, spacer preserves alignment */}
       {!isCurrentUser && (
-        <UserAvatar user={sender} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
+        isGrouped
+          ? <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
+          : <UserAvatar user={sender!} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
       )}
       <div
         className={cn(
@@ -259,8 +265,9 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
           (message.file && !message.text) ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
         )}
       >
-        {!isCurrentUser && (
-            <p className="text-[12px] font-semibold text-primary/90 mb-0.5 px-0.5 tracking-tight">{sender.name}</p>
+        {/* Only show sender name on incoming messages that are NOT grouped */}
+        {!isCurrentUser && !isGrouped && (
+            <p className="text-[12px] font-semibold text-primary/90 mb-0.5 px-0.5 tracking-tight">{sender?.name}</p>
         )}
         
         {message.replyTo && (
@@ -313,9 +320,7 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
           {isCurrentUser && getReadReceiptIcon()}
         </div>
       </div>
-      {isCurrentUser && (
-        <UserAvatar user={sender} className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 flex-shrink-0 mb-0.5" />
-      )}
+      {/* No outgoing (right-side) avatar — keeps sent messages clean in DMs */}
     </motion.div>
   );
 }

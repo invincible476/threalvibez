@@ -6,7 +6,6 @@ import { doc, setDoc, onSnapshot, collection, query, limit, arrayUnion, arrayRem
 import { db } from '@/lib/firebase';
 import { User } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +15,7 @@ import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { useAppShell } from '@/components/app-shell';
 import { normalizeUser, matchesUserSearch, searchUsers, fetchMissingUsers, sortSearchResults } from '@/lib/user-service';
+import { cn } from '@/lib/utils';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -24,26 +24,17 @@ const cardVariants = {
 
 function FriendsPageSkeleton() {
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-4xl mx-auto">
-             <Card>
-                <CardContent className="p-4">
-                    <div className="h-10 bg-muted rounded-md animate-pulse w-full max-w-md mx-auto" />
-                    <div className="mt-6 space-y-4">
-                        {[...Array(3)].map((_, i) => (
-                            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 animate-pulse">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-12 w-12 rounded-full bg-muted" />
-                                    <div>
-                                        <div className="h-5 w-24 bg-muted rounded-md"/>
-                                        <div className="h-4 w-32 bg-muted rounded-md mt-1"/>
-                                    </div>
-                                </div>
-                                <div className="h-8 w-20 bg-muted rounded-md"/>
-                            </div>
-                        ))}
+        <div className="space-y-3 pt-4">
+            {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <div className="h-10 w-10 rounded-full bg-zinc-800 animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="h-4 w-28 bg-zinc-800 rounded animate-pulse" />
+                        <div className="h-3 w-40 bg-zinc-800 rounded animate-pulse" />
                     </div>
-                </CardContent>
-            </Card>
+                    <div className="h-8 w-20 bg-zinc-800 rounded-lg animate-pulse shrink-0" />
+                </div>
+            ))}
         </div>
     );
 }
@@ -196,7 +187,7 @@ export default function FriendsPage() {
         });
     }, [activeUser?.friends, activeUser?.friendRequestsReceived, activeUser?.friendRequestsSent]);
 
-    // Debounced remote search effect (depends ONLY on searchQuery and authUser.uid)
+    // Debounced remote search effect
     useEffect(() => {
         const clean = searchQuery.trim().replace(/^@/, '');
         if (!clean) {
@@ -227,14 +218,12 @@ export default function FriendsPage() {
 
         const map = new Map<string, User>();
 
-        // 1. Instant local matches from pool
         userPool.forEach(u => {
             if (matchesUserSearch(u, clean, authUser?.uid)) {
                 map.set(u.uid, u);
             }
         });
 
-        // 2. Direct remote query matches (essential for Vercel when local pool is limited)
         remoteResults.forEach(u => {
             if (matchesUserSearch(u, clean, authUser?.uid)) {
                 map.set(u.uid, u);
@@ -327,236 +316,268 @@ export default function FriendsPage() {
         return <FriendsPageSkeleton />;
     }
 
+    const isSearchActive = searchQuery.trim().length > 0;
+
     return (
         <motion.div 
-          className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto"
+          className="flex flex-col w-full min-w-0 pb-20"
           initial="initial"
           animate="animate"
-          variants={{ animate: { transition: { staggerChildren: 0.1 } }}}
+          variants={{ animate: { transition: { staggerChildren: 0.07 } }}}
         >
-            <motion.div variants={cardVariants}>
-                <Card className="border border-border/60 shadow-lg backdrop-blur-xl bg-card/75">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-2xl font-bold font-heading">
-                            <Search className="h-6 w-6 text-primary" />
-                            Find & Add Friends
-                        </CardTitle>
-                        <CardDescription>
-                            Type any letter, name, username, or email to search registered users in real time.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                placeholder="Type to search by name, username, or email..."
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="none"
-                                spellCheck={false}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-10 h-11 text-base bg-background/50"
-                            />
-                            {isSearching && (
-                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-primary" />
-                            )}
-                        </div>
-
-                        {/* Instant Live Search Results */}
-                        {searchQuery.trim().length > 0 && (
-                            <div className="mt-4 space-y-2 border-t pt-4">
-                                {searchResults.length > 0 ? (
-                                    searchResults.map(user => {
-                                        const isFriend = activeUser?.friends?.includes(user.uid);
-                                        const hasSent = activeUser?.friendRequestsSent?.includes(user.uid);
-                                        const hasReceived = activeUser?.friendRequestsReceived?.includes(user.uid);
-
-                                        return (
-                                            <div 
-                                                key={user.uid} 
-                                                className="flex items-center justify-between p-3 rounded-xl border bg-background/50 hover:bg-muted/40 transition-colors"
-                                            >
-                                                <div 
-                                                    className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-                                                    onClick={() => router.push(`/friends/${user.uid}`)}
-                                                >
-                                                    <UserAvatar user={user} isFriend={isFriend} className="h-11 w-11" />
-                                                    <div className="truncate">
-                                                        <p className="font-semibold truncate">{user.name}</p>
-                                                        <p className="text-sm text-muted-foreground truncate">
-                                                            {user.username ? `@${user.username}` : user.email}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-2">
-                                                    {isFriend && (
-                                                        <Button size="sm" variant="secondary" disabled={startingChatUserId === user.uid} onClick={() => handleMessageUser(user)}>
-                                                            {startingChatUserId === user.uid ? (
-                                                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <MessageSquare className="mr-1.5 h-4 w-4" />
-                                                            )}
-                                                            Message
-                                                        </Button>
-                                                    )}
-
-                                                    {!isFriend && !hasSent && !hasReceived && (
-                                                        <Button size="sm" onClick={() => handleFriendAction(user.uid, 'sendRequest')}>
-                                                            <UserPlus className="mr-1.5 h-4 w-4" />
-                                                            Add Friend
-                                                        </Button>
-                                                    )}
-
-                                                    {hasSent && (
-                                                        <Button size="sm" variant="outline" onClick={() => handleFriendAction(user.uid, 'cancelRequest')}>
-                                                            <Ban className="mr-1.5 h-4 w-4" />
-                                                            Request Sent
-                                                        </Button>
-                                                    )}
-
-                                                    {hasReceived && (
-                                                        <Button size="sm" variant="default" onClick={() => handleFriendAction(user.uid, 'acceptRequest')}>
-                                                            <Check className="mr-1.5 h-4 w-4" />
-                                                            Accept Request
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <p className="text-center text-muted-foreground py-6">
-                                        {isSearching ? 'Searching registered users...' : `No users found matching "${searchQuery}".`}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            {/* Search Bar — clean, borderless, full-width */}
+            <motion.div variants={cardVariants} className="px-4 pt-4 pb-2">
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+                    <Input
+                        type="search"
+                        placeholder="Search friends or usernames..."
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 pr-9 h-10 w-full truncate border-none bg-zinc-900/80 rounded-xl text-sm"
+                    />
+                    {isSearching && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-violet-400" />
+                    )}
+                </div>
             </motion.div>
 
-            <motion.div variants={cardVariants}>
-            <Tabs defaultValue="friends">
-                <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto">
-                    <TabsTrigger value="friends">
-                        My Friends ({friends.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="requests">
-                        Requests {requests.length > 0 && `(${requests.length})`}
-                    </TabsTrigger>
-                    <TabsTrigger value="sent">
-                        Sent ({sentRequests.length})
-                    </TabsTrigger>
-                </TabsList>
+            {/* Search results */}
+            {isSearchActive && (
+                <motion.div variants={cardVariants} className="flex flex-col w-full min-w-0">
+                    {searchResults.length > 0 ? (
+                        searchResults.map(user => {
+                            const isFriend = activeUser?.friends?.includes(user.uid);
+                            const hasSent = activeUser?.friendRequestsSent?.includes(user.uid);
+                            const hasReceived = activeUser?.friendRequestsReceived?.includes(user.uid);
 
-                <TabsContent value="friends">
-                    <Card className="mt-4">
-                        <CardContent className="p-4">
+                            return (
+                                <div
+                                    key={user.uid}
+                                    className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40 w-full min-w-0 overflow-x-hidden"
+                                >
+                                    <div
+                                        className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                                        onClick={() => router.push(`/friends/${user.uid}`)}
+                                    >
+                                        <UserAvatar user={user} isFriend={!!isFriend} className="h-10 w-10 shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-sm text-zinc-100 truncate">{user.name}</p>
+                                            <p className="text-xs text-zinc-400 truncate">
+                                                {user.username ? `@${user.username}` : user.email}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {isFriend && (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                className="px-3 py-1.5 h-8 text-xs shrink-0"
+                                                disabled={startingChatUserId === user.uid}
+                                                onClick={() => handleMessageUser(user)}
+                                            >
+                                                {startingChatUserId === user.uid ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <MessageSquare className="h-3.5 w-3.5" />
+                                                )}
+                                            </Button>
+                                        )}
+                                        {!isFriend && !hasSent && !hasReceived && (
+                                            <Button
+                                                size="sm"
+                                                className="px-3 py-1.5 h-8 text-xs shrink-0"
+                                                onClick={() => handleFriendAction(user.uid, 'sendRequest')}
+                                            >
+                                                <UserPlus className="h-3.5 w-3.5" />
+                                            </Button>
+                                        )}
+                                        {hasSent && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="px-3 py-1.5 h-8 text-xs border-zinc-700 shrink-0"
+                                                onClick={() => handleFriendAction(user.uid, 'cancelRequest')}
+                                            >
+                                                <Ban className="h-3.5 w-3.5" />
+                                            </Button>
+                                        )}
+                                        {hasReceived && (
+                                            <Button
+                                                size="sm"
+                                                className="px-3 py-1.5 h-8 text-xs shrink-0"
+                                                onClick={() => handleFriendAction(user.uid, 'acceptRequest')}
+                                            >
+                                                <Check className="h-3.5 w-3.5" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <p className="text-center text-xs text-zinc-400 py-8 px-4">
+                            {isSearching
+                                ? 'Searching...'
+                                : `No users found for "${searchQuery}".`}
+                        </p>
+                    )}
+                </motion.div>
+            )}
+
+            {/* Tabs: friends / requests / sent — hidden during search */}
+            {!isSearchActive && (
+                <motion.div variants={cardVariants} className="px-4 pt-2">
+                    <Tabs defaultValue="friends">
+                        <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="friends" className="text-xs">
+                                Friends ({friends.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="requests" className="text-xs">
+                                Requests {requests.length > 0 && `(${requests.length})`}
+                            </TabsTrigger>
+                            <TabsTrigger value="sent" className="text-xs">
+                                Sent ({sentRequests.length})
+                            </TabsTrigger>
+                        </TabsList>
+
+                        {/* MY FRIENDS */}
+                        <TabsContent value="friends" className="mt-3">
                             {friends.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden">
                                     {friends.map(friend => (
-                                        <div key={friend.uid} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                                            <div 
-                                                className="flex items-center gap-3 cursor-pointer"
+                                        <div
+                                            key={friend.uid}
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors w-full min-w-0 overflow-x-hidden"
+                                        >
+                                            <div
+                                                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                                 onClick={() => router.push(`/friends/${friend.uid}`)}
                                             >
-                                                <UserAvatar user={friend} isFriend={true} className="h-12 w-12"/>
-                                                <div>
-                                                    <p className="font-semibold">{friend.name}</p>
-                                                    <p className="text-sm text-muted-foreground">{friend.email}</p>
+                                                <UserAvatar user={friend} isFriend={true} className="h-10 w-10 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-sm text-zinc-100 truncate">{friend.name}</p>
+                                                    <p className="text-xs text-zinc-400 truncate">{friend.email}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button size="sm" variant="outline" disabled={startingChatUserId === friend.uid} onClick={() => handleMessageUser(friend)}>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="px-3 py-1.5 h-8 text-xs border-zinc-700 shrink-0"
+                                                    disabled={startingChatUserId === friend.uid}
+                                                    onClick={() => handleMessageUser(friend)}
+                                                >
                                                     {startingChatUserId === friend.uid ? (
-                                                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                     ) : (
-                                                        <MessageSquare className="mr-1.5 h-4 w-4" />
+                                                        <MessageSquare className="h-3.5 w-3.5" />
                                                     )}
-                                                    Message
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleFriendAction(friend.uid, 'removeFriend')}>
-                                                    <UserX className="h-5 w-5"/>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="w-8 h-8 p-0 flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-400/10 shrink-0"
+                                                    onClick={() => handleFriendAction(friend.uid, 'removeFriend')}
+                                                >
+                                                    <UserX className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-center text-muted-foreground py-8">You haven't added any friends yet. Use the search bar above to find friends!</p>
+                                <p className="text-center text-xs text-zinc-400 py-10">
+                                    No friends yet. Use the search bar above to find people!
+                                </p>
                             )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                        </TabsContent>
 
-                <TabsContent value="requests">
-                     <Card className="mt-4">
-                        <CardContent className="p-4">
-                             {requests.length > 0 ? (
-                                <div className="space-y-2">
+                        {/* INCOMING REQUESTS */}
+                        <TabsContent value="requests" className="mt-3">
+                            {requests.length > 0 ? (
+                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden">
                                     {requests.map(requestUser => (
-                                        <div key={requestUser.uid} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                                            <div 
-                                                className="flex items-center gap-3 cursor-pointer"
+                                        <div
+                                            key={requestUser.uid}
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors w-full min-w-0 overflow-x-hidden"
+                                        >
+                                            <div
+                                                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                                 onClick={() => router.push(`/friends/${requestUser.uid}`)}
                                             >
-                                                <UserAvatar user={requestUser} className="h-12 w-12"/>
-                                                <div>
-                                                    <p className="font-semibold">{requestUser.name}</p>
-                                                    <p className="text-sm text-muted-foreground">{requestUser.email}</p>
+                                                <UserAvatar user={requestUser} className="h-10 w-10 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-sm text-zinc-100 truncate">{requestUser.name}</p>
+                                                    <p className="text-xs text-zinc-400 truncate">{requestUser.email}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <Button variant="default" size="sm" onClick={() => handleFriendAction(requestUser.uid, 'acceptRequest')}>
-                                                    <Check className="mr-1 h-4 w-4"/>
-                                                    Accept
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 px-3 text-xs shrink-0"
+                                                    onClick={() => handleFriendAction(requestUser.uid, 'acceptRequest')}
+                                                >
+                                                    <Check className="h-3.5 w-3.5" />
                                                 </Button>
-                                                <Button variant="outline" size="sm" onClick={() => handleFriendAction(requestUser.uid, 'declineRequest')}>
-                                                    <X className="mr-1 h-4 w-4"/>
-                                                    Decline
+                                                <Button
+                                                    variant="ghost"
+                                                    className="w-8 h-8 p-0 flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-400/10 shrink-0"
+                                                    onClick={() => handleFriendAction(requestUser.uid, 'declineRequest')}
+                                                >
+                                                    <X className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                            ) : <p className="text-center text-muted-foreground py-8">No pending friend requests.</p>}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                            ) : (
+                                <p className="text-center text-xs text-zinc-400 py-10">No pending friend requests.</p>
+                            )}
+                        </TabsContent>
 
-                <TabsContent value="sent">
-                    <Card className="mt-4">
-                        <CardContent className="p-4">
+                        {/* SENT REQUESTS */}
+                        <TabsContent value="sent" className="mt-3">
                             {sentRequests.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden">
                                     {sentRequests.map(sentRequestUser => (
-                                        <div key={sentRequestUser.uid} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                                            <div 
-                                                className="flex items-center gap-3 cursor-pointer"
+                                        <div
+                                            key={sentRequestUser.uid}
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors w-full min-w-0 overflow-x-hidden"
+                                        >
+                                            <div
+                                                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                                                 onClick={() => router.push(`/friends/${sentRequestUser.uid}`)}
                                             >
-                                                <UserAvatar user={sentRequestUser} className="h-12 w-12"/>
-                                                <div>
-                                                    <p className="font-semibold">{sentRequestUser.name}</p>
-                                                    <p className="text-sm text-muted-foreground">{sentRequestUser.email}</p>
+                                                <UserAvatar user={sentRequestUser} className="h-10 w-10 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-sm text-zinc-100 truncate">{sentRequestUser.name}</p>
+                                                    <p className="text-xs text-zinc-400 truncate">{sentRequestUser.email}</p>
                                                 </div>
                                             </div>
-                                            <Button variant="outline" size="sm" onClick={() => handleFriendAction(sentRequestUser.uid, 'cancelRequest')}>
-                                                <Ban className="mr-2 h-4 w-4" />
-                                                Cancel Request
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 px-3 text-xs border-zinc-700 shrink-0"
+                                                onClick={() => handleFriendAction(sentRequestUser.uid, 'cancelRequest')}
+                                            >
+                                                <Ban className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
                                     ))}
                                 </div>
-                            ) : <p className="text-center text-muted-foreground py-8">You haven't sent any friend requests.</p>}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-            </motion.div>
+                            ) : (
+                                <p className="text-center text-xs text-zinc-400 py-10">No sent friend requests.</p>
+                            )}
+                        </TabsContent>
+                    </Tabs>
+                </motion.div>
+            )}
         </motion.div>
     );
 }

@@ -226,7 +226,7 @@ export function ChatList() {
 
   return (
     <>
-    <div className="flex flex-col h-full min-h-0 w-full max-w-[22rem] flex-1 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
+    <div className="flex flex-col h-full min-h-0 w-full min-w-0 flex-1 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
     <div className="flex-none p-4 border-b border-border/50 flex justify-between items-center gap-2">
          <VibezLogo className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden" />
          <div className="flex-1 flex justify-center group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
@@ -250,7 +250,7 @@ export function ChatList() {
             autoCorrect="off"
             autoCapitalize="none"
             spellCheck={false}
-            className="pl-10 border-none bg-zinc-900/80 rounded-xl text-sm py-2.5 group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
+            className="pl-10 bg-zinc-900 border-none rounded-xl text-sm py-2.5 w-full group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -505,11 +505,11 @@ const ChatItem = React.memo(
           <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
               <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap">{conversation.name}</p>
+                      <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-zinc-100">{conversation.name}</p>
                       {conversation.isFavorite && !isAiChat && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 shrink-0" />}
                       {isAiChat && <Bot className="h-3.5 w-3.5 text-primary shrink-0" />}
                   </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
+                  <div className="flex flex-col items-end gap-1 shrink-0 min-w-[50px]">
                       <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
                       {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
                           <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
@@ -518,31 +518,29 @@ const ChatItem = React.memo(
                       ) : <span className="h-4" />}
                   </div>
               </div>
-              <div className="flex items-center gap-2 min-w-0 max-w-full mt-0.5">
-                  <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full chat-list-force-break">
+              <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
+                  <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
                       {text}
                   </p>
-              </div>
-          </div>
-          <div className="shrink-0 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
-              <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/chat-item:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                  </DropdownMenuTrigger>
                   {!isAiChat && (
-                    <ContextMenuContent>
-                        {canSendRequest && <DropdownMenuItem onClick={handleFriendRequest}><UserPlus className="mr-2 h-4 w-4" /><span>Add Friend</span></DropdownMenuItem>}
-                        {isFriend && <DropdownMenuItem disabled><UserCheck className="mr-2 h-4 w-4" /><span>Friends</span></DropdownMenuItem>}
-                        {hasSentRequest && <DropdownMenuItem disabled><UserCheck className="mr-2 h-4 w-4" /><span>Request Sent</span></DropdownMenuItem>}
-                        {hasReceivedRequest && <DropdownMenuItem onClick={() => { if (otherParticipant) onFriendAction(otherParticipant.uid, 'acceptRequest'); }}><UserPlus className="mr-2 h-4 w-4" /><span>Accept Request</span></DropdownMenuItem>}
-                        <DropdownMenuItem onClick={() => handleAction('toggleFavorite')}><Star className="mr-2 h-4 w-4" /><span>{conversation.isFavorite ? 'Unfavorite' : 'Favorite'}</span></DropdownMenuItem>
-                        {conversation.isArchived ? <DropdownMenuItem onClick={() => handleAction('unarchive')}><ArchiveRestore className="mr-2 h-4 w-4" /><span>Unarchive</span></DropdownMenuItem> : <DropdownMenuItem onClick={() => handleAction('archive')}><Archive className="mr-2 h-4 w-4" /><span>Archive</span></DropdownMenuItem>}
-                        {isFriend && <DropdownMenuItem className="text-destructive" onClick={() => { if(otherParticipant) onFriendAction(otherParticipant.uid, 'removeFriend'); }}><UserX className="mr-2 h-4 w-4" /><span>Remove Friend</span></DropdownMenuItem>}
-                    </ContextMenuContent>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 opacity-0 group-hover/chat-item:opacity-100 transition-opacity p-0" onClick={(e) => e.stopPropagation()}>
+                                  <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                              </Button>
+                          </DropdownMenuTrigger>
+                          <ContextMenuContent>
+                              {canSendRequest && <DropdownMenuItem onClick={handleFriendRequest}><UserPlus className="mr-2 h-4 w-4" /><span>Add Friend</span></DropdownMenuItem>}
+                              {isFriend && <DropdownMenuItem disabled><UserCheck className="mr-2 h-4 w-4" /><span>Friends</span></DropdownMenuItem>}
+                              {hasSentRequest && <DropdownMenuItem disabled><UserCheck className="mr-2 h-4 w-4" /><span>Request Sent</span></DropdownMenuItem>}
+                              {hasReceivedRequest && <DropdownMenuItem onClick={() => { if (otherParticipant) onFriendAction(otherParticipant.uid, 'acceptRequest'); }}><UserPlus className="mr-2 h-4 w-4" /><span>Accept Request</span></DropdownMenuItem>}
+                              <DropdownMenuItem onClick={() => handleAction('toggleFavorite')}><Star className="mr-2 h-4 w-4" /><span>{conversation.isFavorite ? 'Unfavorite' : 'Favorite'}</span></DropdownMenuItem>
+                              {conversation.isArchived ? <DropdownMenuItem onClick={() => handleAction('unarchive')}><ArchiveRestore className="mr-2 h-4 w-4" /><span>Unarchive</span></DropdownMenuItem> : <DropdownMenuItem onClick={() => handleAction('archive')}><Archive className="mr-2 h-4 w-4" /><span>Archive</span></DropdownMenuItem>}
+                              {isFriend && <DropdownMenuItem className="text-destructive" onClick={() => { if(otherParticipant) onFriendAction(otherParticipant.uid, 'removeFriend'); }}><UserX className="mr-2 h-4 w-4" /><span>Remove Friend</span></DropdownMenuItem>}
+                          </ContextMenuContent>
+                      </DropdownMenu>
                   )}
-              </DropdownMenu>
+              </div>
           </div>
         </div>
       </motion.li>
