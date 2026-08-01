@@ -402,7 +402,7 @@ export default function FriendsPage() {
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                className="px-3 py-1.5 h-8 text-xs border-zinc-700 shrink-0"
+                                                className="px-3 py-1.5 h-8 text-xs border-border shrink-0"
                                                 onClick={() => handleFriendAction(user.uid, 'cancelRequest')}
                                             >
                                                 <Ban className="h-3.5 w-3.5" />
@@ -470,7 +470,7 @@ export default function FriendsPage() {
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="px-3 py-1.5 h-8 text-xs border-zinc-700 shrink-0"
+                                                    className="px-3 py-1.5 h-8 text-xs border-border shrink-0"
                                                     disabled={startingChatUserId === friend.uid}
                                                     onClick={() => handleMessageUser(friend)}
                                                 >
@@ -563,7 +563,7 @@ export default function FriendsPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-8 px-3 text-xs border-zinc-700 shrink-0"
+                                                className="h-8 px-3 text-xs border-border shrink-0"
                                                 onClick={() => handleFriendAction(sentRequestUser.uid, 'cancelRequest')}
                                             >
                                                 <Ban className="h-3.5 w-3.5" />

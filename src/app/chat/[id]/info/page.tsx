@@ -735,7 +735,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                           checked={isSelected}
                           onCheckedChange={() => toggleFriendSelection(friend.uid)}
                           onClick={(e) => e.stopPropagation()}
-                          className="data-[state=checked]:bg-violet-700 data-[state=checked]:border-violet-700 border-zinc-600"
+                          className="data-[state=checked]:bg-violet-700 data-[state=checked]:border-violet-700 border-border"
                         />
                         <UserAvatar user={friend} isFriend={true} className="h-9 w-9 flex-shrink-0" />
                         <div className="flex-1 min-w-0">

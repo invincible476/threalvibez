@@ -108,7 +108,7 @@ export default function BackgroundsPage() {
                         <div key={bg.id} className="relative" onClick={() => handleBackgroundSelect(bg.id)}>
                             <div className={cn(
                                 "w-full aspect-video rounded-lg cursor-pointer transition-all border",
-                                appBackground === bg.id ? "ring-1 ring-violet-500 border-violet-500/50" : "border-border/50 hover:border-zinc-600"
+                                appBackground === bg.id ? "ring-1 ring-violet-500 border-violet-500/50" : "border-border/50 hover:border-border"
                             )}>
                                 <div className={`h-full w-full rounded-md bg-preview-${bg.id}`} />
                             </div>

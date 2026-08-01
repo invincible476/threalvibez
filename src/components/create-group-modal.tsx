@@ -204,7 +204,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                 <p className="text-sm text-muted-foreground">
                   You don't have any accepted friends yet.
                 </p>
-                <Button asChild size="sm" variant="outline" className="border-zinc-700 text-foreground/80 hover:bg-muted">
+                <Button asChild size="sm" variant="outline" className="border-border text-foreground/80 hover:bg-muted">
                   <Link href="/friends" onClick={() => setIsOpen(false)}>
                     <UserPlus className="mr-2 h-4 w-4 text-violet-400" />
                     Find & Add Friends
@@ -234,7 +234,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                         checked={isSelected}
                         onCheckedChange={() => toggleFriendSelection(friend.uid || friend.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="data-[state=checked]:bg-violet-700 data-[state=checked]:border-violet-700 border-zinc-600"
+                        className="data-[state=checked]:bg-violet-700 data-[state=checked]:border-violet-700 border-border"
                       />
                       <UserAvatar user={friend} isFriend={true} className="h-9 w-9 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
