@@ -153,6 +153,7 @@ export function LiveKitVoiceModal({
             audio={true}
             token={token}
             serverUrl={LIVEKIT_WS_URL}
+            connect={true}
             data-lk-theme="default"
             onError={(err: any) => {
               console.error('[LiveKit Error]:', err);
