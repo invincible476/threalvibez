@@ -276,119 +276,122 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
         </div>
       )}
 
-      {/* Input Controls Bar */}
+      {/* Input Controls Bar - Unified Pill Layout */}
       <div className="flex items-end gap-2 w-full">
-        {!isAiChat && recordingStatus === 'idle' && (
-          <>
-            {/* Hidden File Inputs */}
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*" multiple />
-            <input type="file" ref={docInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx,.txt,.zip,.rar" multiple />
-            <input type="file" ref={cameraInputRef} onChange={handleFileChange} className="hidden" accept="image/*" capture="environment" />
+        {/* Unified Input Pill Container */}
+        <div className="flex flex-1 items-center gap-1 sm:gap-1.5 rounded-full bg-card/90 border border-border/60 px-3 py-1 min-h-[44px] shadow-sm transition-all focus-within:border-violet-500/60 focus-within:ring-1 focus-within:ring-violet-500/30">
+          {!isAiChat && recordingStatus === 'idle' && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              {/* Hidden File Inputs */}
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*" multiple />
+              <input type="file" ref={docInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx,.txt,.zip,.rar" multiple />
+              <input type="file" ref={cameraInputRef} onChange={handleFileChange} className="hidden" accept="image/*" capture="environment" />
 
-            {/* Attachment Picker Sheet / Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:bg-muted">
-                  <Paperclip className="h-5 w-5" />
-                  <span className="sr-only">Attach File</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-card border-border text-foreground w-44">
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2">
-                  <ImageIcon className="h-4 w-4 text-violet-400" />
-                  Photo / Video
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => docInputRef.current?.click()} className="gap-2">
-                  <FileText className="h-4 w-4 text-blue-400" />
-                  Document
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => cameraInputRef.current?.click()} className="gap-2">
-                  <Camera className="h-4 w-4 text-emerald-400" />
-                  Camera
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* Attachment Picker Sheet / Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground">
+                    <Paperclip className="h-4 w-4" />
+                    <span className="sr-only">Attach File</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="bg-card border-border text-foreground w-44">
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2">
+                    <ImageIcon className="h-4 w-4 text-violet-400" />
+                    Photo / Video
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => docInputRef.current?.click()} className="gap-2">
+                    <FileText className="h-4 w-4 text-blue-400" />
+                    Document
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => cameraInputRef.current?.click()} className="gap-2">
+                    <Camera className="h-4 w-4 text-emerald-400" />
+                    Camera
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            {/* Emoji Picker Toggle Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("shrink-0 text-muted-foreground hover:bg-muted", showEmojiPicker && "bg-muted text-violet-400")}
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            >
-              <Smile className="h-5 w-5" />
-              <span className="sr-only">Toggle Emoji Picker</span>
-            </Button>
-
-            {/* GIF Picker Modal Button */}
-            {onSelectGif && (
-              <GifPicker onSelectGif={onSelectGif}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 text-muted-foreground hover:bg-muted font-bold text-xs"
-                  title="Search and send GIF"
-                >
-                  <span className="px-1 py-0.5 rounded border border-current text-[10px] font-extrabold leading-none tracking-tight">GIF</span>
-                  <span className="sr-only">Open GIF Picker</span>
-                </Button>
-              </GifPicker>
-            )}
-          </>
-        )}
-
-        {/* Textarea or Recording Display */}
-        <div className="flex-1 relative">
-          {recordingStatus === 'recording' ? (
-            <div className="flex-1 flex items-center justify-between bg-card border border-border rounded-2xl px-4 py-2 h-10">
-              <div className="flex items-center gap-2 text-red-500 font-medium text-sm">
-                <Mic className="h-5 w-5 animate-pulse" />
-                <span>{formatDuration(recordingDuration)}</span>
-              </div>
-              <Button variant="destructive" size="icon" className="rounded-full shrink-0 h-8 w-8" onClick={handleStopRecording}>
-                <StopCircle className="h-4 w-4" />
+              {/* Emoji Picker Toggle Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-8 w-8 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground", showEmojiPicker && "bg-muted text-violet-400")}
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              >
+                <Smile className="h-4 w-4" />
+                <span className="sr-only">Toggle Emoji Picker</span>
               </Button>
+
+              {/* GIF Picker Modal Button */}
+              {onSelectGif && (
+                <GifPicker onSelectGif={onSelectGif}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground font-bold text-xs"
+                    title="Search and send GIF"
+                  >
+                    <span className="px-1 py-0.5 rounded border border-current text-[10px] font-extrabold leading-none tracking-tight">GIF</span>
+                    <span className="sr-only">Open GIF Picker</span>
+                  </Button>
+                </GifPicker>
+              )}
             </div>
-          ) : recordingStatus === 'recorded' && recordedAudio ? (
-            <div className="flex-1 flex items-center justify-between bg-card border border-border rounded-2xl px-4 py-2 h-10">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="shrink-0 text-red-500 hover:text-red-600 h-8 w-8" onClick={cancelRecording}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <audio ref={reviewAudioRef} src={recordedAudio.url} className="hidden" />
-                <Button variant="outline" size="icon" className="h-8 w-8 border-border" onClick={() => reviewAudioRef.current?.play()}>
-                  <Play className="h-4 w-4 text-foreground" />
-                </Button>
-                <span className="text-xs text-muted-foreground">{formatDuration(recordingDuration)}</span>
-              </div>
-              <Button size="icon" className="rounded-full shrink-0 h-8 w-8 bg-violet-700 hover:bg-violet-600 text-white" onClick={handleSendRecording}>
-                <SendHorizonal className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={handleTypingChange}
-              placeholder="Type a message..."
-              className="flex-1 resize-none rounded-2xl border-border bg-card/90 py-2.5 px-4 pr-10 min-h-[40px] max-h-32 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-violet-500 transition-[border-color,box-shadow] duration-150"
-              rows={1}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-            />
           )}
+
+          {/* Textarea or Recording Display */}
+          <div className="flex-1 relative flex items-center min-w-0">
+            {recordingStatus === 'recording' ? (
+              <div className="flex-1 flex items-center justify-between px-2 py-1">
+                <div className="flex items-center gap-2 text-red-500 font-medium text-sm">
+                  <Mic className="h-4 w-4 animate-pulse" />
+                  <span>{formatDuration(recordingDuration)}</span>
+                </div>
+                <Button variant="destructive" size="icon" className="rounded-full shrink-0 h-7 w-7" onClick={handleStopRecording}>
+                  <StopCircle className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : recordingStatus === 'recorded' && recordedAudio ? (
+              <div className="flex-1 flex items-center justify-between px-2 py-1">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" className="shrink-0 text-red-500 hover:text-red-600 h-7 w-7" onClick={cancelRecording}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <audio ref={reviewAudioRef} src={recordedAudio.url} className="hidden" />
+                  <Button variant="outline" size="icon" className="h-7 w-7 border-border" onClick={() => reviewAudioRef.current?.play()}>
+                    <Play className="h-3.5 w-3.5 text-foreground" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground">{formatDuration(recordingDuration)}</span>
+                </div>
+                <Button size="icon" className="rounded-full shrink-0 h-7 w-7 bg-violet-700 hover:bg-violet-600 text-white" onClick={handleSendRecording}>
+                  <SendHorizonal className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Textarea
+                ref={textareaRef}
+                value={message}
+                onChange={handleTypingChange}
+                placeholder="Type a message..."
+                className="w-full resize-none border-0 border-none bg-transparent py-1 px-1.5 min-h-[32px] max-h-32 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none shadow-none"
+                rows={1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Dynamic Send Arrow / Voice Mic Button */}
+        {/* Dynamic Send Arrow / Voice Mic Button outside on far right */}
         {(message.trim() || selectedFiles.length > 0) && recordingStatus === 'idle' ? (
           <Button
             type="button"
             size="icon"
-            className="rounded-full shrink-0 bg-violet-700 hover:bg-violet-600 text-white h-10 w-10"
+            className="rounded-full shrink-0 bg-violet-700 hover:bg-violet-600 text-white h-11 w-11 shadow-md transition-transform active:scale-95 flex items-center justify-center"
             onClick={handleSend}
           >
             <SendHorizonal className="h-5 w-5" />
@@ -397,7 +400,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
         ) : recordingStatus === 'idle' && !isAiChat ? (
           <Button
             size="icon"
-            className="rounded-full shrink-0 bg-violet-700 hover:bg-violet-600 text-white h-10 w-10"
+            className="rounded-full shrink-0 bg-violet-700 hover:bg-violet-600 text-white h-11 w-11 shadow-md transition-transform active:scale-95 flex items-center justify-center"
             onClick={startRecording}
             disabled={isSending}
           >

@@ -216,6 +216,8 @@ function MessageBubble({
     }
   };
 
+  const isMediaOnly = (message.type === 'gif' || Boolean(message.gifUrl) || Boolean(message.file && (isImage(message.file.type) || isVideo(message.file.type)))) && !message.text;
+
   // Render media attachments (including multi-image grid support)
   const renderMessageContent = () => {
     if (message.deleted) {
@@ -237,7 +239,7 @@ function MessageBubble({
       return (
         <div
           className={cn(
-            'relative rounded-xl overflow-hidden my-1 bg-muted/40 max-w-[260px] max-h-[320px] w-auto h-auto',
+            'relative rounded-2xl overflow-hidden bg-muted/40 max-w-[260px] max-h-[320px] w-fit h-auto',
             isSending && 'opacity-80'
           )}
           style={message.aspectRatio ? { aspectRatio: message.aspectRatio } : undefined}
@@ -249,14 +251,14 @@ function MessageBubble({
               loop
               muted
               playsInline
-              className="rounded-xl max-w-[260px] max-h-[320px] w-auto h-auto object-cover"
+              className="rounded-2xl max-w-[260px] max-h-[320px] w-auto h-auto object-cover block"
             />
           ) : (
             <img
               src={gifUrl}
               alt="GIF"
               loading="lazy"
-              className="rounded-xl max-w-[260px] max-h-[320px] w-auto h-auto object-cover"
+              className="rounded-2xl max-w-[260px] max-h-[320px] w-auto h-auto object-cover block"
             />
           )}
           {isSending && (
@@ -264,6 +266,11 @@ function MessageBubble({
               <div className="h-5 w-5 border-2 border-white/80 border-t-transparent rounded-full animate-spin text-white" />
             </div>
           )}
+          {/* Overlay timestamp on media */}
+          <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white/90 flex items-center gap-1 z-10 select-none shadow-sm">
+            <span>{formattedTimestamp}</span>
+            {isOutgoing && renderReadReceiptIcon()}
+          </div>
         </div>
       );
     }
@@ -276,7 +283,7 @@ function MessageBubble({
         const mediaList: LightboxMedia[] = [{ url: message.file.url, type: fileType, name: message.file.name }];
 
         return (
-          <div className="relative rounded-lg overflow-hidden my-1 bg-muted animate-pulse">
+          <div className="relative rounded-2xl overflow-hidden bg-muted animate-pulse max-w-[260px] max-h-[320px]">
             <img
               src={message.file.url}
               alt={message.file.name || 'Attached image'}
@@ -285,7 +292,7 @@ function MessageBubble({
                 if (parent) parent.classList.remove('animate-pulse');
               }}
               className={cn(
-                'rounded-lg object-cover max-w-full max-h-72 cursor-pointer hover:opacity-95 transition-opacity',
+                'rounded-2xl object-cover max-w-full max-h-72 cursor-pointer hover:opacity-95 transition-opacity block',
                 isSending && 'opacity-60'
               )}
               onClick={() => {
@@ -300,6 +307,13 @@ function MessageBubble({
               isOpen={lightboxOpen}
               onClose={() => setLightboxOpen(false)}
             />
+            {/* Overlay timestamp for media only */}
+            {isMediaOnly && (
+              <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white/90 flex items-center gap-1 z-10 select-none shadow-sm">
+                <span>{formattedTimestamp}</span>
+                {isOutgoing && renderReadReceiptIcon()}
+              </div>
+            )}
           </div>
         );
       }
@@ -312,11 +326,19 @@ function MessageBubble({
 
       if (isVideo(fileType)) {
         return message.file.url ? (
-          <video
-            controls
-            src={message.file.url}
-            className={cn('w-full max-w-xs rounded-lg my-1', isSending && 'opacity-60')}
-          />
+          <div className="relative rounded-2xl overflow-hidden max-w-[260px] max-h-[320px]">
+            <video
+              controls
+              src={message.file.url}
+              className={cn('w-full max-w-[260px] max-h-[320px] rounded-2xl block', isSending && 'opacity-60')}
+            />
+            {isMediaOnly && (
+              <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white/90 flex items-center gap-1 z-10 select-none shadow-sm pointer-events-none">
+                <span>{formattedTimestamp}</span>
+                {isOutgoing && renderReadReceiptIcon()}
+              </div>
+            )}
+          </div>
         ) : null;
       }
 
@@ -325,7 +347,7 @@ function MessageBubble({
           href={message.file.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3 bg-black/20 p-3 rounded-lg hover:bg-black/30 transition-colors my-1 border border-white/10"
+          className="flex items-center gap-3 bg-black/20 p-3 rounded-xl hover:bg-black/30 transition-colors my-1 border border-white/10"
         >
           <FileIcon className="h-7 w-7 text-violet-300 shrink-0" />
           <div className="flex-1 overflow-hidden text-xs">
@@ -377,11 +399,11 @@ function MessageBubble({
               : isOutgoing
               ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-white'
               : 'rounded-2xl rounded-tl-xs bg-muted border border-border/40 text-foreground',
-            message.file && !message.text ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
+            isMediaOnly ? 'p-0 w-fit rounded-2xl bg-transparent border-0 shadow-none' : 'px-4 py-2.5'
           )}
         >
           {/* Sender Name in Group Chat */}
-          {!isOutgoing && isGroupChat && !isGrouped && (
+          {!isOutgoing && isGroupChat && !isGrouped && !isMediaOnly && (
             <p className="text-[11px] font-semibold text-violet-300 mb-0.5 tracking-tight">{sender?.name}</p>
           )}
 
@@ -427,7 +449,7 @@ function MessageBubble({
 
           {/* Displayed Emoji Reactions */}
           {message.reactions && message.reactions.length > 0 && (
-            <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isOutgoing ? 'justify-end' : 'justify-start')}>
+            <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isOutgoing ? 'justify-end' : 'justify-start', isMediaOnly && 'p-1 bg-black/40 rounded-xl')}>
               {message.reactions.map((r) => (
                 <motion.button
                   key={r.emoji}
@@ -443,11 +465,13 @@ function MessageBubble({
             </div>
           )}
 
-          {/* Inline Bottom-Right Timestamp & Status Stacking */}
-          <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-muted-foreground ml-2 float-right select-none">
-            <span>{formattedTimestamp}</span>
-            {isOutgoing && renderReadReceiptIcon()}
-          </div>
+          {/* Inline Bottom-Right Timestamp & Status Stacking (only for text/non-media-only messages) */}
+          {!isMediaOnly && (
+            <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-muted-foreground ml-2 float-right select-none">
+              <span>{formattedTimestamp}</span>
+              {isOutgoing && renderReadReceiptIcon()}
+            </div>
+          )}
         </div>
 
         {/* Floating Context Menu Dropdown - Absolute Positioned */}
