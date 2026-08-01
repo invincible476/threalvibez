@@ -59,6 +59,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { addGroupMembers } from '@/lib/firebase/chat';
+import { useAppShell } from '@/components/app-shell';
 
 interface ChatInfoPageProps {
   params: Promise<{ id: string }> | { id: string };
