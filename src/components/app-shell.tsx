@@ -2212,6 +2212,7 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
   useOnlineStatus(isAuthRoute ? undefined : chatData.currentUser);
 
   const {
+    callStatus,
     incomingCall,
     acceptCall: managerAcceptCall,
     declineCall: managerDeclineCall,
@@ -2257,11 +2258,14 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
           </div>
         </div>
 
-        {!isAuthRoute && incomingCall && (
+        {!isAuthRoute && (callStatus === 'ringing' || incomingCall !== null) && (
           <IncomingCallModal
+            call={incomingCall}
             incomingCall={incomingCall}
+            callStatus={callStatus}
             onAccept={handleAcceptIncomingCall}
             onDecline={handleDeclineIncomingCall}
+            user={chatData.currentUser}
           />
         )}
 

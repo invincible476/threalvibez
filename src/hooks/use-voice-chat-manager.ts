@@ -14,6 +14,7 @@ import { callTelemetry, checkMicrophonePermission, logVoiceError } from '@/lib/v
 
 export function useVoiceChatManager(currentUserId?: string) {
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+  const [callStatus, setCallStatus] = useState<string>('idle');
   const [showMicPermissionModal, setShowMicPermissionModal] = useState(false);
 
   // 1. Stabilize currentUserId reference using a persistent useRef & cached state
@@ -26,6 +27,11 @@ export function useVoiceChatManager(currentUserId?: string) {
   // 2. Store active call listener unsubscribe function in a ref to prevent duplicate subscriptions
   const listenerUnsubRef = useRef<(() => void) | null>(null);
   const subscribedUserIdRef = useRef<string | undefined>(undefined);
+
+  // Debug rendering check logging inside hook
+  useEffect(() => {
+    console.log('[VoiceHook] Rendering Check -> Status:', callStatus, 'CallData:', incomingCall, 'User:', activeUserId);
+  }, [callStatus, incomingCall, activeUserId]);
 
   // Real-time Firestore snapshot listener for incoming calls
   useEffect(() => {
@@ -65,8 +71,10 @@ export function useVoiceChatManager(currentUserId?: string) {
           const docSnap = snapshot.docs[0];
           const data = docSnap.data();
 
-          // Auth desync guard check
-          if (data.receiverId !== activeUserId) {
+          // Auth desync guard check with safe receiver ID evaluation
+          const isReceiver = data.receiverId === activeUserId;
+          if (!isReceiver) {
+            console.warn('[VoiceUI] Call target mismatch! Expected:', data.receiverId, 'Actual User:', activeUserId);
             logVoiceError(201, {
               reason: 'Receiver ID mismatch in call doc snapshot',
               docReceiverId: data.receiverId,
@@ -98,43 +106,37 @@ export function useVoiceChatManager(currentUserId?: string) {
             const callRef = doc(db, 'calls', docSnap.id);
             updateDoc(callRef, { status: 'cancelled' }).catch(() => {});
             setIncomingCall(null);
+            setCallStatus('cancelled');
             callTelemetry.reset();
             return;
           }
 
-          // 3. GUARD state updates: DO NOT reset incomingCall state to null if the document is updated
-          // with new metadata (like candidates or offer timestamps).
-          // ONLY update/maintain incomingCall state when status is explicitly 'ringing'.
+          // Atomic state update: Whenever status is 'ringing', incomingCall MUST be guaranteed to be a valid object
           if (data.status === 'ringing') {
+            const newCallData: CallSession = {
+              id: docSnap.id,
+              chatId: data.chatId || docSnap.id,
+              callerId: data.callerId,
+              callerName: data.callerName && data.callerName.trim() !== '' ? data.callerName : 'Incoming Call...',
+              callerAvatar: data.callerAvatar || '',
+              receiverId: data.receiverId,
+              status: 'ringing',
+              offer: data.offer,
+              answer: data.answer,
+              createdAt: data.createdAt,
+            };
+
+            setIncomingCall(newCallData);
+            setCallStatus('ringing');
+
             callTelemetry.update({
               status: 'ringing',
               currentStep: 'Incoming Call Ringing',
               errorCode: null,
             });
-
-            setIncomingCall((prevCall) => {
-              const newCallData: CallSession = {
-                id: docSnap.id,
-                chatId: data.chatId || docSnap.id,
-                callerId: data.callerId,
-                callerName: data.callerName && data.callerName.trim() !== '' ? data.callerName : 'Incoming Call...',
-                callerAvatar: data.callerAvatar || '',
-                receiverId: data.receiverId,
-                status: data.status,
-                offer: data.offer,
-                answer: data.answer,
-                createdAt: data.createdAt,
-              };
-
-              // Merge metadata smoothly without triggering UI flicker
-              if (prevCall && prevCall.chatId === newCallData.chatId) {
-                return { ...prevCall, ...newCallData };
-              }
-              return newCallData;
-            });
           } else if (['ended', 'declined', 'cancelled', 'failed'].includes(data.status)) {
-            // ONLY set incomingCall to null if status explicitly changes to ended/declined/cancelled/failed
             setIncomingCall(null);
+            setCallStatus(data.status);
             callTelemetry.update({
               status: data.status,
               currentStep: `Call ${data.status}`,
@@ -143,6 +145,7 @@ export function useVoiceChatManager(currentUserId?: string) {
         } else {
           // Document was deleted or status changed away from ringing -> reset incomingCall
           setIncomingCall(null);
+          setCallStatus('idle');
         }
       },
       (err) => {
@@ -173,6 +176,7 @@ export function useVoiceChatManager(currentUserId?: string) {
         await setDoc(callRef, { status: 'cancelled' }, { merge: true }).catch(() => {});
       });
       setIncomingCall(null);
+      setCallStatus('cancelled');
       callTelemetry.reset();
     }, 30000);
 
@@ -196,7 +200,6 @@ export function useVoiceChatManager(currentUserId?: string) {
     // Direct getUserMedia test to ensure microphone can be accessed
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Stop temporary track right after test since VoiceRoom will manage the actual media stream
       stream.getTracks().forEach((track) => track.stop());
     } catch (micErr: any) {
       logVoiceError(101, micErr);
@@ -215,6 +218,7 @@ export function useVoiceChatManager(currentUserId?: string) {
         await setDoc(callDocRef, { status: 'accepted' }, { merge: true });
       });
       setIncomingCall(null);
+      setCallStatus('accepted');
       return true;
     } catch (err: any) {
       logVoiceError('ACCEPT_ERR', err);
@@ -234,6 +238,7 @@ export function useVoiceChatManager(currentUserId?: string) {
         await setDoc(callDocRef, { status: 'declined' }, { merge: true });
       });
       setIncomingCall(null);
+      setCallStatus('declined');
       callTelemetry.reset();
     } catch (err) {
       logVoiceError('DECLINE_ERR', err);
@@ -241,6 +246,7 @@ export function useVoiceChatManager(currentUserId?: string) {
   }, []);
 
   return {
+    callStatus,
     incomingCall,
     acceptCall,
     declineCall,
