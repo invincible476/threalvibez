@@ -298,7 +298,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
                   </div>
                   
                   <div className="flex items-center gap-2">
-                      <Button size="icon" className="rounded-full shrink-0 h-8 w-8" onClick={handleSendRecording}>
+                      <Button size="icon" className="rounded-full shrink-0 h-8 w-8 bg-violet-700 hover:bg-violet-600 text-white" onClick={handleSendRecording}>
                           <SendHorizonal className="h-4 w-4" />
                           <span className="sr-only">Send voice message</span>
                       </Button>
@@ -310,7 +310,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
                     value={message}
                     onChange={handleTypingChange}
                     placeholder="Type a message..."
-                    className="flex-1 resize-none self-center rounded-2xl border-input bg-background/50 py-2.5 px-4 pr-12 min-h-0 h-10 max-h-24"
+                    className="flex-1 resize-none self-center rounded-2xl border-zinc-800 bg-zinc-900/80 py-2.5 px-4 pr-12 min-h-0 h-10 max-h-24 text-zinc-100 placeholder:text-zinc-500"
                     rows={1}
                     onKeyDown={(e) => {
                         if(e.key === 'Enter' && !e.shiftKey) {
@@ -326,14 +326,14 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
             <Button
               type="button"
               size="icon"
-              className="rounded-full shrink-0"
+              className="rounded-full shrink-0 bg-violet-700 hover:bg-violet-600 text-white"
               onClick={handleSend}
             >
                 <SendHorizonal className="h-5 w-5" />
                 <span className="sr-only">Send message</span>
             </Button>
         ) : recordingStatus === 'idle' && !isAiChat ? (
-            <Button size="icon" className="rounded-full shrink-0" onClick={startRecording} disabled={isSending}>
+            <Button size="icon" className="rounded-full shrink-0 bg-violet-700 hover:bg-violet-600 text-white" onClick={startRecording} disabled={isSending}>
                 <Mic className="h-5 w-5" />
                 <span className="sr-only">Record voice message</span>
             </Button>

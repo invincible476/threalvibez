@@ -64,10 +64,10 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
   }
   
   const getReadReceiptIcon = () => {
-    if (message.status === 'sending') return <Clock className="h-4 w-4 text-primary-foreground/70" />;
-    if (isRead) return <CheckCheck className="h-4 w-4 text-blue-400" />;
-    if (message.status === 'sent' || message.status === 'delivered' || message.status === 'read') return <CheckCheck className="h-4 w-4 text-primary-foreground/70" />;
-    return <Check className="h-4 w-4 text-primary-foreground/70" />;
+    if (message.status === 'sending') return <Clock className="h-3.5 w-3.5 text-zinc-400" />;
+    if (isRead) return <CheckCheck className="h-3.5 w-3.5 text-violet-300" />;
+    if (message.status === 'sent' || message.status === 'delivered' || message.status === 'read') return <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />;
+    return <Check className="h-3.5 w-3.5 text-zinc-400" />;
   }
 
 
@@ -258,16 +258,16 @@ function MessageBubble({ message, sender, isCurrentUser, progress, onCancelUploa
         className={cn(
           'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-sm transition-all overflow-hidden',
           message.isAiMessage
-            ? 'rounded-2xl rounded-tl-xs bg-green-500/10 text-foreground border border-green-500/30 backdrop-blur-md'
+            ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-zinc-100 border border-emerald-800/40 backdrop-blur-md'
             : isCurrentUser
-              ? 'rounded-2xl rounded-tr-xs bg-gradient-to-br from-primary via-primary/90 to-accent text-primary-foreground'
-              : 'rounded-2xl rounded-tl-xs bg-card/90 border border-border/50 text-foreground backdrop-blur-md',
+              ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-zinc-100'
+              : 'rounded-2xl rounded-tl-xs bg-zinc-800 border border-zinc-800/40 text-zinc-100',
           (message.file && !message.text) ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
         )}
       >
         {/* Only show sender name on incoming messages that are NOT grouped */}
         {!isCurrentUser && !isGrouped && (
-            <p className="text-[12px] font-semibold text-primary/90 mb-0.5 px-0.5 tracking-tight">{sender?.name}</p>
+            <p className="text-[12px] font-semibold text-violet-300 mb-0.5 px-0.5 tracking-tight">{sender?.name}</p>
         )}
         
         {message.replyTo && (

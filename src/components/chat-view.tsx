@@ -366,14 +366,14 @@ const ChatViewComponent = ({
       className="h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden w-full bg-transparent"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
-      <header className="flex items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
+      <header className="flex items-center justify-between border-b border-zinc-800/40 bg-zinc-950/80 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
         <div className="flex items-center gap-3">
             {isMobileView && onBack ? (
-              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={onBack}>
-                <ArrowLeft className="h-6 w-6" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 p-2 rounded-full text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100 border-none outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 shrink-0 select-none" onClick={onBack}>
+                <ArrowLeft className="h-5 w-5" />
               </Button>
             ) : (
-               <SidebarTrigger className="md:hidden" />
+               <SidebarTrigger className="md:hidden text-zinc-300 hover:text-zinc-100" />
             )}
           <button 
             className="flex items-center gap-3 text-left disabled:cursor-default"
@@ -382,9 +382,9 @@ const ChatViewComponent = ({
           >
             <UserAvatar user={headerAvatarUser} className="h-10 w-10"/>
             <div>
-              <p className="font-semibold font-heading">{displayName}</p>
-              <p className="text-sm text-muted-foreground capitalize flex items-center gap-1">
-                  {isAIChat && !isAiReplying && <Bot className="h-3 w-3" />}
+              <p className="font-semibold font-heading text-zinc-100">{displayName}</p>
+              <p className="text-xs text-zinc-400 capitalize flex items-center gap-1">
+                  {isAIChat && !isAiReplying && <Bot className="h-3 w-3 text-violet-400" />}
                   {displayStatus}
               </p>
             </div>
@@ -398,7 +398,7 @@ const ChatViewComponent = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full hover:bg-zinc-800"
+                className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100"
                 onClick={async () => {
                   console.log('Voice call button clicked', {
                     currentUser,
@@ -454,7 +454,7 @@ const ChatViewComponent = ({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800/60">
                     <MoreVertical className="h-5 w-5" />
                     <span className="sr-only">More options</span>
                 </Button>
@@ -512,11 +512,11 @@ const ChatViewComponent = ({
               leaveVoice();
               setIsVoiceEnabled(false);
             }}
-            className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border/50"
+            className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40"
           />
         )}
          {chatBackground && (
-          <div className="absolute inset-0 opacity-20 dark:opacity-10">
+          <div className="absolute inset-0 opacity-15 pointer-events-none z-0">
              {chatBackground && !chatBackground.startsWith('data:image') && (
                 <Image 
                     src={chatBackground}
@@ -549,14 +549,14 @@ const ChatViewComponent = ({
       />
       {newMessagesCount > 0 && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-          <Button onClick={scrollToBottom} className="rounded-full shadow-lg">
+          <Button onClick={scrollToBottom} className="rounded-full shadow-lg bg-violet-700 hover:bg-violet-600 text-white">
             <ArrowDown className="mr-2 h-4 w-4"/>
             {newMessagesCount} New Message{newMessagesCount > 1 && 's'}
           </Button>
         </div>
       )}
     </div>
-    <div className="flex-none shrink-0 p-3 bg-black/90 backdrop-blur-md border-t border-purple-500/20 z-20 w-full pb-safe">
+    <div className="flex-none shrink-0 p-3 bg-zinc-950/90 backdrop-blur-md border-t border-zinc-800/40 z-20 w-full pb-safe">
       {replyToMessage && (
         <div className="p-2 px-4 border-t border-border/50 bg-background/50 flex justify-between items-center">
           <div className="flex items-center gap-2">

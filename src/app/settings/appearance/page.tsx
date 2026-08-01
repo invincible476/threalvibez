@@ -136,18 +136,18 @@ export default function AppearancePage() {
                                         className={cn(
                                             "w-full h-20 px-4 py-3 flex items-center justify-start gap-3 text-left border transition-all",
                                             isSelected 
-                                                ? "ring-1 ring-violet-500 bg-zinc-900 border-violet-500/50 text-zinc-100" 
+                                                ? "ring-1 ring-violet-700 bg-zinc-900 border-violet-700/50 text-zinc-100" 
                                                 : "border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/40 hover:border-zinc-700"
                                         )}
                                     >
                                         <div className={cn(
                                             "p-2.5 rounded-lg shrink-0",
-                                            isSelected ? "bg-violet-500/20 text-violet-300" : "bg-zinc-800 text-zinc-400"
+                                            isSelected ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-zinc-800 text-zinc-400"
                                         )}>
                                             <Icon className="h-5 w-5" />
                                         </div>
                                         <div className="flex-1 min-w-0 overflow-hidden pr-2">
-                                            <p className="font-medium text-sm truncate">{style.label}</p>
+                                            <p className="font-medium text-sm truncate text-zinc-100">{style.label}</p>
                                             <p className="text-xs text-zinc-400 break-words">{style.description}</p>
                                         </div>
                                     </Button>
@@ -174,8 +174,8 @@ export default function AppearancePage() {
                                     className={cn(
                                         "w-full h-20 flex flex-col gap-2 items-center justify-center transition-colors",
                                         theme === t.value 
-                                            ? "ring-1 ring-violet-500 bg-zinc-900 border-violet-500/50 text-violet-300" 
-                                            : "border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/40"
+                                            ? "ring-1 ring-violet-700 bg-zinc-900 border-violet-700/50 text-zinc-100" 
+                                            : "border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/40 text-zinc-400"
                                     )}
                                 >
                                     <t.icon className="h-5 w-5"/>

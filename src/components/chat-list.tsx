@@ -242,7 +242,7 @@ export function ChatList() {
 
     <div className="flex-none px-3 py-2 border-b border-border/50">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
           <Input 
             type="search"
             placeholder="Search existing chats..." 
@@ -250,7 +250,7 @@ export function ChatList() {
             autoCorrect="off"
             autoCapitalize="none"
             spellCheck={false}
-            className="pl-10 bg-zinc-900 border-none rounded-xl text-sm py-2.5 w-full group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
+            className="pl-10 bg-zinc-900 border-none rounded-xl text-sm py-2.5 w-full text-zinc-100 placeholder:text-zinc-500 group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -506,20 +506,20 @@ const ChatItem = React.memo(
               <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-zinc-100">{conversation.name}</p>
-                      {conversation.isFavorite && !isAiChat && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500 shrink-0" />}
-                      {isAiChat && <Bot className="h-3.5 w-3.5 text-primary shrink-0" />}
+                      {conversation.isFavorite && !isAiChat && <Star className="h-3.5 w-3.5 text-amber-400/80 fill-amber-400/80 shrink-0" />}
+                      {isAiChat && <Bot className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0 min-w-[50px]">
-                      <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
+                      <p className="text-[11px] text-zinc-400 leading-none">{timestamp}</p>
                       {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
-                          <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                          <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-violet-700 text-[10px] font-semibold text-white">
                               {conversation.unreadCount}
                           </span>
                       ) : <span className="h-4" />}
                   </div>
               </div>
               <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
-                  <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
+                  <p className="text-xs text-zinc-400 line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
                       {text}
                   </p>
                   {!isAiChat && (

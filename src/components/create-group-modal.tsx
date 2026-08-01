@@ -146,7 +146,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
       <DialogContent className="sm:max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold font-heading text-zinc-100">
-            <Users className="h-5 w-5 text-purple-400" />
+            <Users className="h-5 w-5 text-violet-400" />
             Create Group Chat
           </DialogTitle>
         </DialogHeader>
@@ -163,7 +163,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
               placeholder="e.g. Weekend Vibez, Dev Squad"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="w-full bg-zinc-900 text-zinc-100 placeholder:text-zinc-500 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+              className="w-full bg-zinc-900 text-zinc-100 placeholder:text-zinc-500 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-700/50 transition-all"
               autoComplete="off"
             />
           </div>
@@ -190,7 +190,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                   placeholder="Filter friends by name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-zinc-900/80 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 text-sm h-9"
+                  className="pl-9 bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 text-sm h-9"
                   autoComplete="off"
                 />
               </div>
@@ -206,7 +206,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                 </p>
                 <Button asChild size="sm" variant="outline" className="border-zinc-700 text-zinc-200 hover:bg-zinc-800">
                   <Link href="/friends" onClick={() => setIsOpen(false)}>
-                    <UserPlus className="mr-2 h-4 w-4 text-purple-400" />
+                    <UserPlus className="mr-2 h-4 w-4 text-violet-400" />
                     Find & Add Friends
                   </Link>
                 </Button>
@@ -225,7 +225,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                       onClick={() => toggleFriendSelection(friend.uid || friend.id)}
                       className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
                         isSelected
-                          ? 'bg-purple-950/40 border border-purple-800/50'
+                          ? 'bg-violet-950/40 border border-violet-800/50'
                           : 'hover:bg-zinc-800/50 border border-transparent'
                       }`}
                     >
@@ -234,7 +234,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                         checked={isSelected}
                         onCheckedChange={() => toggleFriendSelection(friend.uid || friend.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 border-zinc-600"
+                        className="data-[state=checked]:bg-violet-700 data-[state=checked]:border-violet-700 border-zinc-600"
                       />
                       <UserAvatar user={friend} isFriend={true} className="h-9 w-9 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -263,7 +263,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
           <Button
             onClick={handleCreateGroup}
             disabled={!groupName.trim() || selectedFriendIds.length === 0 || isSubmitting}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-lg shadow-purple-950/50 disabled:opacity-50"
+            className="bg-violet-700 hover:bg-violet-600 text-white font-semibold shadow-lg disabled:opacity-50"
           >
             {isSubmitting ? (
               <>

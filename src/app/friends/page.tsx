@@ -328,7 +328,7 @@ export default function FriendsPage() {
             {/* Search Bar — clean, borderless, full-width */}
             <motion.div variants={cardVariants} className="px-4 pt-4 pb-2">
                 <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
                     <Input
                         type="search"
                         placeholder="Search friends or usernames..."
@@ -338,7 +338,7 @@ export default function FriendsPage() {
                         spellCheck={false}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 pr-9 h-10 w-full truncate border-none bg-zinc-900/80 rounded-xl text-sm"
+                        className="pl-9 pr-9 h-10 w-full truncate border-none bg-zinc-900 rounded-xl text-sm text-zinc-100 placeholder:text-zinc-500"
                     />
                     {isSearching && (
                         <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-violet-400" />

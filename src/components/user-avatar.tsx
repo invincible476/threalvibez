@@ -49,8 +49,7 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
   return (
     <div className="relative shrink-0 flex-shrink-0 select-none">
       <Avatar className={cn(
-        'border-2 border-background rounded-full overflow-hidden shrink-0 flex-shrink-0', 
-        isFriend && 'border-green-500',
+        'border border-zinc-800/40 rounded-full overflow-hidden shrink-0 flex-shrink-0', 
         className
       )}>
         {canDisplayImage ? (
@@ -70,17 +69,17 @@ export function UserAvatar({ user, className, isFriend }: UserAvatarProps) {
               onLoad={handleImageLoad}
             />
             {isImageLoading && (
-              <AvatarFallback className="rounded-full animate-pulse">
+              <AvatarFallback className="rounded-full animate-pulse bg-zinc-800 text-zinc-200">
                 {fallback}
               </AvatarFallback>
             )}
           </>
         ) : (
-          <AvatarFallback className="rounded-full">{fallback}</AvatarFallback>
+          <AvatarFallback className="rounded-full bg-zinc-800 text-zinc-200">{fallback}</AvatarFallback>
         )}
       </Avatar>
       {status === 'online' && (
-        <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 border-2 border-card" />
+        <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
       )}
     </div>
   );
