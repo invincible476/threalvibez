@@ -20,7 +20,11 @@ import {
   Loader2,
   Check,
   Users,
+  MoreHorizontal,
+  Ban,
+  Shield,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
@@ -374,39 +378,80 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-3xl w-full mx-auto p-4 space-y-6">
+      <main className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* Profile Card */}
-        <div className="flex flex-col items-center justify-center p-6 bg-card/60 rounded-2xl border border-border/60 backdrop-blur-sm text-center space-y-3">
-          <UserAvatar
-            user={{
-              name: chat?.name || 'Group',
-              photoURL: chat?.avatar || (chat as any)?.avatarUrl || null,
-              isGroup: isGroup,
-              type: isGroup ? 'group' : 'private',
-            }}
-            isGroup={isGroup}
-            className="w-24 h-24 text-3xl shadow-xl ring-2 ring-violet-500/20"
-          />
-          <div>
-            <h2 className="text-2xl font-bold font-heading text-foreground">{chat?.name}</h2>
-            {isGroup ? (
-              <p className="text-xs text-muted-foreground mt-1">
-                Group · {chat?.participants?.length || 0} members
-              </p>
-            ) : (
-              <div className="space-y-1 mt-1">
-                <p className="text-xs text-muted-foreground">Direct Message</p>
-                {(() => {
-                  const targetUser = participantsDetails.find((p) => p.uid !== authUser?.uid);
-                  if (!targetUser) return null;
-                  return (
-                    <div className="pt-2 flex flex-col items-center gap-2">
-                      {targetUser.about && (
-                        <p className="text-xs text-muted-foreground max-w-xs text-center italic">
-                          "{targetUser.about}"
+        <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl shadow-xl backdrop-blur-md text-center space-y-4">
+          {(() => {
+            const targetUser = !isGroup ? participantsDetails.find((p) => p.uid !== authUser?.uid) : null;
+            const isOnline = targetUser?.status === 'online';
+
+            return (
+              <>
+                <div className="relative group">
+                  <UserAvatar
+                    user={{
+                      name: chat?.name || 'Group',
+                      photoURL: chat?.avatar || (chat as any)?.avatarUrl || targetUser?.photoURL || (targetUser as any)?.avatarUrl || null,
+                      status: targetUser?.status || 'offline',
+                      isGroup: isGroup,
+                      type: isGroup ? 'group' : 'private',
+                    }}
+                    isGroup={isGroup}
+                    className="w-28 h-28 text-4xl shadow-2xl ring-4 ring-zinc-800/80 transition-transform duration-300 group-hover:scale-105"
+                  />
+                  {!isGroup && targetUser && (
+                    <span
+                      className={cn(
+                        "absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-zinc-900 shadow-md",
+                        isOnline ? "bg-emerald-500" : "bg-zinc-500"
+                      )}
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-1.5 max-w-md">
+                  <div className="flex items-center justify-center gap-2">
+                    <h2 className="text-2xl sm:text-3xl font-bold font-heading text-white tracking-tight">
+                      {chat?.name}
+                    </h2>
+                    {!isGroup && targetUser?.isPrivate && (
+                      <span title="Private Account">
+                        <Shield className="h-5 w-5 text-zinc-400" />
+                      </span>
+                    )}
+                  </div>
+
+                  {isGroup ? (
+                    <Badge className="bg-zinc-800 text-zinc-300 border-zinc-700/60 text-xs px-3 py-1 font-medium rounded-full">
+                      Group · {chat?.participants?.length || 0} members
+                    </Badge>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      {targetUser && (
+                        <p className="text-sm text-zinc-400 font-mono">
+                          {targetUser.username ? `@${targetUser.username}` : (targetUser.email || 'Direct Message')}
                         </p>
                       )}
-                      {(targetUser.instagramUrl || targetUser.instagramHandle || (targetUser as any).instagram) && (
+                      {targetUser && (
+                        <Badge
+                          className={cn(
+                            "text-xs px-2.5 py-0.5 font-medium rounded-full border mt-1",
+                            isOnline
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                              : "bg-zinc-800/60 text-zinc-400 border-zinc-700/50"
+                          )}
+                        >
+                          {isOnline ? '● Active now' : '● Offline'}
+                        </Badge>
+                      )}
+
+                      {targetUser?.about && (
+                        <div className="mt-3 bg-zinc-800/40 border border-zinc-800/80 rounded-2xl p-3.5 text-xs sm:text-sm text-zinc-300 italic text-center max-w-sm">
+                          "{targetUser.about}"
+                        </div>
+                      )}
+
+                      {targetUser && (targetUser.instagramUrl || targetUser.instagramHandle || (targetUser as any).instagram) && (
                         <a
                           href={
                             targetUser.instagramUrl && targetUser.instagramUrl.startsWith('http')
@@ -415,7 +460,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-medium transition-colors"
+                          className="mt-2 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/50 text-zinc-200 text-xs font-medium transition-all hover:scale-105"
                         >
                           <svg className="h-3.5 w-3.5 shrink-0 text-pink-500" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.897 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.897-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/>
@@ -426,59 +471,73 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                                 ? `@${targetUser.instagramUrl.match(/instagram\.com\/([^/?#]+)/i)?.[1] || 'profile'}`
                                 : targetUser.instagramUrl
                                 ? `@${targetUser.instagramUrl.replace(/^@/, '').trim()}`
-                                : 'View Instagram Profile')}
+                                : 'Instagram')}
                           </span>
                         </a>
                       )}
                     </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
 
-          {/* Action Quick Toggles */}
-          <div className="flex items-center gap-2 pt-2 flex-wrap justify-center">
-            <Button
-              variant={isMuted ? 'secondary' : 'outline'}
-              size="sm"
-              className="rounded-full gap-2 border-border bg-muted/50 hover:bg-muted text-foreground/80"
-              onClick={handleToggleMute}
-            >
-              {isMuted ? <BellOff className="h-4 w-4 text-amber-400" /> : <Bell className="h-4 w-4" />}
-              {isMuted ? 'Muted' : 'Mute'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full gap-2 border-border bg-muted/50 hover:bg-muted text-foreground/80"
-              onClick={() => setIsSearchActive(!isSearchActive)}
-            >
-              <Search className="h-4 w-4" />
-              Search
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full gap-2 border-border bg-muted/50 hover:bg-muted text-foreground/80"
-              onClick={handleExportChat}
-            >
-              <Download className="h-4 w-4" />
-              Export Chat
-            </Button>
-          </div>
+                {/* Redesigned Quick Action Buttons */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 w-full pt-3 max-w-md">
+                  <button
+                    onClick={handleToggleMute}
+                    className="bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+                  >
+                    {isMuted ? <BellOff className="h-5 w-5 text-amber-400" /> : <Bell className="h-5 w-5 text-zinc-300" />}
+                    <span className="text-xs font-medium">{isMuted ? 'Muted' : 'Mute'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsSearchActive(!isSearchActive)}
+                    className="bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+                  >
+                    <Search className="h-5 w-5 text-zinc-300" />
+                    <span className="text-xs font-medium">Search</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportChat}
+                    className="bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+                  >
+                    <Download className="h-5 w-5 text-zinc-300" />
+                    <span className="text-xs font-medium">Export</span>
+                  </button>
+
+                  {isGroup ? (
+                    <button
+                      onClick={openAddMemberModal}
+                      className="bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer col-span-3 sm:col-span-1"
+                    >
+                      <UserPlus className="h-5 w-5 text-violet-400" />
+                      <span className="text-xs font-medium">Add</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsSearchActive(!isSearchActive)}
+                      className="bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm hover:scale-[1.03] active:scale-[0.98] cursor-pointer col-span-3 sm:col-span-1"
+                    >
+                      <MoreHorizontal className="h-5 w-5 text-zinc-300" />
+                      <span className="text-xs font-medium">More</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Search Drawer / Input */}
         {isSearchActive && (
-          <div className="p-4 bg-card/80 rounded-xl border border-border/60 space-y-3 animate-in fade-in duration-200">
+          <div className="p-4 bg-zinc-900/80 rounded-3xl border border-zinc-800/80 space-y-3 animate-in fade-in duration-200 shadow-xl backdrop-blur-md">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
               <Input
                 placeholder="Search messages in this chat..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-background border-border text-foreground focus-visible:ring-violet-500"
+                className="pl-10 bg-zinc-950/60 border-zinc-800 text-white placeholder:text-zinc-500 rounded-2xl focus-visible:ring-violet-500"
               />
             </div>
             {searchQuery.trim() && (
@@ -487,16 +546,16 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   filteredMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className="p-2.5 bg-background/60 rounded-lg border border-border text-xs flex flex-col gap-1"
+                      className="p-3 bg-zinc-950/40 rounded-xl border border-zinc-800/60 text-xs flex flex-col gap-1"
                     >
                       <span className="font-semibold text-violet-400">
                         {participantsDetails.find((p) => p.uid === msg.senderId)?.name || 'User'}
                       </span>
-                      <p className="text-foreground/80">{msg.text}</p>
+                      <p className="text-zinc-200">{msg.text}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center py-2">No matching messages found.</p>
+                  <p className="text-xs text-zinc-400 text-center py-3">No matching messages found.</p>
                 )}
               </div>
             )}
@@ -504,20 +563,20 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
         )}
 
         {/* Media & Shared Files Tabs */}
-        <div className="bg-card/60 rounded-2xl border border-border/60 p-4 space-y-4">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="bg-zinc-900/80 rounded-3xl border border-zinc-800/80 p-5 sm:p-6 space-y-4 shadow-xl backdrop-blur-md">
+          <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
             Shared Media & Links
           </h3>
 
           <Tabs defaultValue="photos" className="w-full">
-            <TabsList className="w-full bg-background border border-border p-1 rounded-xl grid grid-cols-3">
-              <TabsTrigger value="photos" className="data-[state=active]:bg-violet-700 data-[state=active]:text-white rounded-lg text-xs">
+            <TabsList className="w-full bg-zinc-950/60 border border-zinc-800/60 p-1.5 rounded-2xl grid grid-cols-3 gap-1">
+              <TabsTrigger value="photos" className="data-[state=active]:bg-violet-600 data-[state=active]:text-white font-semibold rounded-xl text-xs py-2 transition-all">
                 Photos / Videos ({mediaItems.length})
               </TabsTrigger>
-              <TabsTrigger value="documents" className="data-[state=active]:bg-violet-700 data-[state=active]:text-white rounded-lg text-xs">
+              <TabsTrigger value="documents" className="data-[state=active]:bg-violet-600 data-[state=active]:text-white font-semibold rounded-xl text-xs py-2 transition-all">
                 Documents ({documentItems.length})
               </TabsTrigger>
-              <TabsTrigger value="links" className="data-[state=active]:bg-violet-700 data-[state=active]:text-white rounded-lg text-xs">
+              <TabsTrigger value="links" className="data-[state=active]:bg-violet-600 data-[state=active]:text-white font-semibold rounded-xl text-xs py-2 transition-all">
                 Links ({linkItems.length})
               </TabsTrigger>
             </TabsList>
@@ -525,11 +584,11 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
             {/* Photos & Videos Tab */}
             <TabsContent value="photos" className="pt-4">
               {mediaItems.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
                   {mediaItems.map((item, idx) => (
                     <div
                       key={idx}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-background border border-border/80 cursor-pointer group"
+                      className="relative aspect-square rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800/80 cursor-pointer group shadow-sm"
                       onClick={() => {
                         setLightboxIndex(idx);
                         setLightboxOpen(true);
@@ -539,10 +598,10 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         <img
                           src={item.url}
                           alt={item.name || 'Media'}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-card text-violet-400">
+                        <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-violet-400">
                           <VideoIcon className="h-8 w-8" />
                         </div>
                       )}
@@ -550,7 +609,13 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">No photos or videos shared yet.</p>
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-2">
+                  <div className="p-3.5 bg-zinc-800/50 rounded-2xl border border-zinc-700/40 text-zinc-400 mb-1">
+                    <ImageIcon className="h-8 w-8 text-zinc-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-zinc-200">No Photos or Videos</h4>
+                  <p className="text-xs text-zinc-400 max-w-xs">Photos and videos shared in this chat will appear here</p>
+                </div>
               )}
             </TabsContent>
 
@@ -560,17 +625,17 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                 documentItems.map((msg) => (
                   <div
                     key={msg.id}
-                    className="flex items-center justify-between p-3 bg-background/80 rounded-xl border border-border hover:border-border transition-colors"
+                    className="flex items-center justify-between p-3.5 bg-zinc-950/40 rounded-2xl border border-zinc-800/60 hover:border-zinc-700/60 transition-colors"
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="p-2.5 bg-violet-950/50 rounded-lg text-violet-400 border border-violet-800/40">
+                      <div className="p-2.5 bg-violet-950/60 rounded-xl text-violet-400 border border-violet-800/50">
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="overflow-hidden">
-                        <p className="font-medium text-sm text-foreground truncate">
+                        <p className="font-medium text-sm text-zinc-100 truncate">
                           {msg.file?.name || 'Document'}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-zinc-400">
                           {msg.file?.type || 'File'}
                         </p>
                       </div>
@@ -581,7 +646,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         target="_blank"
                         rel="noopener noreferrer"
                         download
-                        className="p-2 text-muted-foreground hover:text-violet-300"
+                        className="p-2 text-zinc-400 hover:text-violet-300"
                       >
                         <Download className="h-5 w-5" />
                       </a>
@@ -589,7 +654,13 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">No documents shared yet.</p>
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-2">
+                  <div className="p-3.5 bg-zinc-800/50 rounded-2xl border border-zinc-700/40 text-zinc-400 mb-1">
+                    <FileText className="h-8 w-8 text-zinc-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-zinc-200">No Documents Shared</h4>
+                  <p className="text-xs text-zinc-400 max-w-xs">Files and documents shared in this chat will appear here</p>
+                </div>
               )}
             </TabsContent>
 
@@ -602,19 +673,25 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between p-3 bg-background/80 rounded-xl border border-border hover:border-border transition-colors"
+                    className="flex items-center justify-between p-3.5 bg-zinc-950/40 rounded-2xl border border-zinc-800/60 hover:border-zinc-700/60 transition-colors"
                   >
                     <div className="overflow-hidden space-y-1">
                       <div className="flex items-center gap-1.5 text-xs text-violet-400 font-medium">
                         <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{link.domain}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate max-w-md">{link.url}</p>
+                      <p className="text-xs text-zinc-400 truncate max-w-md">{link.url}</p>
                     </div>
                   </a>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">No links shared yet.</p>
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center space-y-2">
+                  <div className="p-3.5 bg-zinc-800/50 rounded-2xl border border-zinc-700/40 text-zinc-400 mb-1">
+                    <ExternalLink className="h-8 w-8 text-zinc-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-zinc-200">No Links Shared</h4>
+                  <p className="text-xs text-zinc-400 max-w-xs">Web links shared in this chat will appear here</p>
+                </div>
               )}
             </TabsContent>
           </Tabs>
