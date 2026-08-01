@@ -282,9 +282,9 @@ function MessageBubble({
         animate="animate"
         layout
         className={cn(
-          'group flex w-full items-end gap-2 relative',
+          'group flex w-full items-end relative',
           isGrouped ? 'my-0.5' : 'my-1',
-          isOutgoing ? 'justify-end ml-auto' : 'justify-start mr-auto'
+          isOutgoing ? 'justify-end' : 'justify-start gap-2'
         )}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
@@ -385,76 +385,78 @@ function MessageBubble({
           </div>
         </div>
 
-        {/* Floating Context Menu Dropdown */}
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0">
-              <MoreHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align={isCurrentUser ? 'end' : 'start'}
-            className="w-56 bg-zinc-900/95 border-zinc-800 backdrop-blur-xl text-zinc-100 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150"
-          >
-            {/* Quick Reaction Emoji Pill */}
-            <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-zinc-800">
-              {QUICK_REACTION_EMOJIS.map((emoji) => (
-                <motion.button
-                  key={emoji}
-                  whileTap={{ scale: 1.25 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                  onClick={() => {
-                    onMessageAction(message.id, 'react', emoji);
-                    setMenuOpen(false);
-                  }}
-                  className="text-lg hover:scale-125 active:scale-125 transition-transform p-1 select-none"
-                >
-                  {emoji}
-                </motion.button>
-              ))}
-            </div>
+        {/* Floating Context Menu Dropdown - Absolute Positioned */}
+        <div className={cn('absolute top-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto', isOutgoing ? '-left-7' : '-right-7')}>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0">
+                <MoreHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align={isCurrentUser ? 'end' : 'start'}
+              className="w-56 bg-zinc-900/95 border-zinc-800 backdrop-blur-xl text-zinc-100 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 pointer-events-auto"
+            >
+              {/* Quick Reaction Emoji Pill */}
+              <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-zinc-800">
+                {QUICK_REACTION_EMOJIS.map((emoji) => (
+                  <motion.button
+                    key={emoji}
+                    whileTap={{ scale: 1.25 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                    onClick={() => {
+                      onMessageAction(message.id, 'react', emoji);
+                      setMenuOpen(false);
+                    }}
+                    className="text-lg hover:scale-125 active:scale-125 transition-transform p-1 select-none"
+                  >
+                    {emoji}
+                  </motion.button>
+                ))}
+              </div>
 
-            <DropdownMenuItem onClick={() => { onReply(message); setMenuOpen(false); }}>
-              <Reply className="mr-2 h-4 w-4 text-violet-400" />
-              <span>Reply</span>
-            </DropdownMenuItem>
-
-            {message.text && (
-              <DropdownMenuItem onClick={handleCopyText}>
-                <Copy className="mr-2 h-4 w-4 text-zinc-400" />
-                <span>Copy Text</span>
+              <DropdownMenuItem onClick={() => { onReply(message); setMenuOpen(false); }}>
+                <Reply className="mr-2 h-4 w-4 text-violet-400" />
+                <span>Reply</span>
               </DropdownMenuItem>
-            )}
 
-            <DropdownMenuItem onClick={handlePinMessage}>
-              <Pin className="mr-2 h-4 w-4 text-amber-400" />
-              <span>Pin Message</span>
-            </DropdownMenuItem>
-
-            {isCurrentUser && message.text && !message.deleted && (
-              <DropdownMenuItem onClick={() => { setIsEditing(true); setMenuOpen(false); }}>
-                <Edit className="mr-2 h-4 w-4 text-blue-400" />
-                <span>Edit Message</span>
-              </DropdownMenuItem>
-            )}
-
-            {isCurrentUser && !message.deleted && (
-              <>
-                <DropdownMenuSeparator className="bg-zinc-800" />
-                <DropdownMenuItem
-                  className="text-red-400 focus:text-red-300 focus:bg-red-950/40"
-                  onClick={() => {
-                    setIsDeleteDialogOpen(true);
-                    setMenuOpen(false);
-                  }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>Delete Message</span>
+              {message.text && (
+                <DropdownMenuItem onClick={handleCopyText}>
+                  <Copy className="mr-2 h-4 w-4 text-zinc-400" />
+                  <span>Copy Text</span>
                 </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              )}
+
+              <DropdownMenuItem onClick={handlePinMessage}>
+                <Pin className="mr-2 h-4 w-4 text-amber-400" />
+                <span>Pin Message</span>
+              </DropdownMenuItem>
+
+              {isCurrentUser && message.text && !message.deleted && (
+                <DropdownMenuItem onClick={() => { setIsEditing(true); setMenuOpen(false); }}>
+                  <Edit className="mr-2 h-4 w-4 text-blue-400" />
+                  <span>Edit Message</span>
+                </DropdownMenuItem>
+              )}
+
+              {isCurrentUser && !message.deleted && (
+                <>
+                  <DropdownMenuSeparator className="bg-zinc-800" />
+                  <DropdownMenuItem
+                    className="text-red-400 focus:text-red-300 focus:bg-red-950/40"
+                    onClick={() => {
+                      setIsDeleteDialogOpen(true);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Message</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         {/* Delete Confirmation Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
