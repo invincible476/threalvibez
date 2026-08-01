@@ -106,11 +106,11 @@ export function LiveKitVoiceModal({
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] w-[94vw] max-w-md rounded-3xl bg-zinc-950/95 border border-emerald-500/30 p-5 shadow-2xl backdrop-blur-xl text-zinc-100 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
-      {loading || !token ? (
+      {loading || (!token && !error) ? (
         <div className="flex flex-col items-center justify-center py-6 space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
           <p className="text-sm font-medium text-emerald-300 text-center">
-            {error ? error : 'Requesting media permissions & joining call...'}
+            Requesting media permissions & joining call...
           </p>
         </div>
       ) : error ? (
@@ -122,7 +122,7 @@ export function LiveKitVoiceModal({
               variant="outline"
               size="sm"
               onClick={() => setRetryCount((prev) => prev + 1)}
-              className="rounded-xl flex items-center gap-1.5 border-zinc-700 hover:bg-zinc-800"
+              className="rounded-xl flex items-center gap-1.5 border-zinc-700 hover:bg-zinc-800 text-zinc-200"
             >
               <RotateCcw className="h-4 w-4" />
               Retry Connection
@@ -143,13 +143,19 @@ export function LiveKitVoiceModal({
           audio={true}
           token={token}
           serverUrl={serverUrl}
+          connect={true}
           data-lk-theme="default"
           onDisconnected={onClose}
           onError={(err) => {
-            console.error('[LiveKit Room Error]:', err);
+            console.error('[LiveKit Cloud Error]', err);
+            setError(
+              `Connection Rejected: ${
+                err.message || 'Check if API Key/Secret matches omegaone project in LiveKit Console'
+              }`
+            );
             toast({
               title: 'Voice Room Disconnected',
-              description: err.message,
+              description: err.message || 'Connection error encountered.',
               variant: 'destructive',
             });
           }}
