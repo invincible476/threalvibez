@@ -52,14 +52,20 @@ export function useVoiceChat({
     voiceRoomRef.current = voiceRoom;
     console.log('Voice room created:', { voiceRoom: Boolean(voiceRoom) });
 
-    // Setup event handlers
+    // Setup event handlers with strict participant deduplication by unique userId
     voiceRoom.on(VoiceRoomEvent.PARTICIPANT_JOINED, (participant) => {
       console.log('Participant joined:', participant);
-      setParticipants((prev) => [...prev, participant]);
+      setParticipants((prev) => {
+        const next = [...prev.filter((p) => p.id !== participant.id), participant];
+        return Array.from(new Map(next.map((p) => [p.id, p])).values());
+      });
     });
 
     voiceRoom.on(VoiceRoomEvent.PARTICIPANT_LEFT, (participantId) => {
-      setParticipants((prev) => prev.filter(p => p.id !== participantId));
+      setParticipants((prev) => {
+        const next = prev.filter((p) => p.id !== participantId);
+        return Array.from(new Map(next.map((p) => [p.id, p])).values());
+      });
       setRemoteStreams((prev) => {
         const next = new Map(prev);
         next.delete(participantId);
@@ -68,9 +74,10 @@ export function useVoiceChat({
     });
 
     voiceRoom.on(VoiceRoomEvent.PARTICIPANT_UPDATED, (participant) => {
-      setParticipants((prev) =>
-        prev.map(p => p.id === participant.id ? { ...p, ...participant } : p)
-      );
+      setParticipants((prev) => {
+        const next = prev.map((p) => (p.id === participant.id ? { ...p, ...participant } : p));
+        return Array.from(new Map(next.map((p) => [p.id, p])).values());
+      });
     });
 
     voiceRoom.on(VoiceRoomEvent.STREAM_ADDED, (stream, participantId) => {

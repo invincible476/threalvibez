@@ -6,6 +6,7 @@ import { Mic, MicOff } from 'lucide-react';
 interface VoiceParticipantProps {
   name: string;
   photoURL?: string;
+  bio?: string;
   isSpeaking?: boolean;
   isMuted?: boolean;
   isCurrentUser?: boolean;
@@ -14,6 +15,7 @@ interface VoiceParticipantProps {
 export function VoiceParticipant({
   name,
   photoURL,
+  bio,
   isSpeaking,
   isMuted,
   isCurrentUser,
@@ -75,9 +77,13 @@ export function VoiceParticipant({
         <p className="font-medium truncate">
           {isCurrentUser ? 'You' : name}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {isMuted ? 'Muted' : isSpeaking ? 'Speaking' : 'Connected'}
-        </p>
+        {bio ? (
+          <p className="text-xs text-muted-foreground truncate">{bio}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {isMuted ? 'Muted' : isSpeaking ? 'Speaking' : 'Connected'}
+          </p>
+        )}
       </div>
     </div>
   );

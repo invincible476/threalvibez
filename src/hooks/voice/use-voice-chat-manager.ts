@@ -1,6 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { VoiceRoom } from '@/lib/voice/voice-room';
+import { VoiceRoomParticipant } from '@/lib/voice/types';
 import { useToast } from '@/hooks/use-toast';
+
+export function deduplicateParticipants(participants: VoiceRoomParticipant[]): VoiceRoomParticipant[] {
+  return Array.from(new Map(participants.map((p) => [p.id, p])).values());
+}
 
 export function useVoiceChatManager() {
   const voiceRoomRef = useRef<VoiceRoom | null>(null);
