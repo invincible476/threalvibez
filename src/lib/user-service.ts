@@ -35,6 +35,8 @@ export function normalizeUser(data: any, docId?: string): User {
   const email = data.email || '';
   const photoURL = data.photoURL || data.avatar || null;
   const status = data.status === 'online' ? 'online' : 'offline';
+  const instagramUrl = data.instagramUrl || data.instagram_url || '';
+  const instagramHandle = data.instagramHandle || data.instagram_handle || (data.instagram ? (data.instagram.startsWith('http') ? '' : data.instagram) : '');
 
   return {
     ...data,
@@ -45,6 +47,8 @@ export function normalizeUser(data: any, docId?: string): User {
     email,
     photoURL,
     status,
+    ...(instagramUrl && { instagramUrl }),
+    ...(instagramHandle && { instagramHandle }),
     friends: Array.isArray(data.friends) ? data.friends : [],
     friendRequestsSent: Array.isArray(data.friendRequestsSent) ? data.friendRequestsSent : [],
     friendRequestsReceived: Array.isArray(data.friendRequestsReceived) ? data.friendRequestsReceived : [],

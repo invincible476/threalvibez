@@ -8,7 +8,8 @@ type Device = {
 };
 
 export type User = {
-  instagramUrl?: string; //
+  instagramUrl?: string;
+  instagramHandle?: string;
   id: string;
   uid: string;
   name: string;

@@ -395,11 +395,26 @@ export default function ProfilePage() {
         }
 
         if (instagramUrl !== (activeUser.instagramUrl ?? '')) {
-            // Validate Instagram URL format if provided
-            if (instagramUrl && !instagramUrl.match(/^https?:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9_.]+\/?$/i)) {
-                throw new Error('Please enter a valid Instagram profile URL (e.g. https://instagram.com/username)');
+            const rawInsta = instagramUrl.trim();
+            if (rawInsta) {
+                let cleanUrl = rawInsta;
+                let cleanHandle = '';
+                if (rawInsta.startsWith('http://') || rawInsta.startsWith('https://')) {
+                    const match = rawInsta.match(/instagram\.com\/([^/?#]+)/i);
+                    cleanHandle = match ? `@${match[1]}` : '';
+                } else {
+                    const handle = rawInsta.replace(/^@/, '').trim();
+                    cleanUrl = `https://instagram.com/${handle}`;
+                    cleanHandle = `@${handle}`;
+                }
+                dataToUpdate.instagramUrl = cleanUrl;
+                if (cleanHandle) {
+                    dataToUpdate.instagramHandle = cleanHandle;
+                }
+            } else {
+                dataToUpdate.instagramUrl = '';
+                dataToUpdate.instagramHandle = '';
             }
-            dataToUpdate.instagramUrl = instagramUrl;
         }
 
         dataToUpdate.background = appBackground;
