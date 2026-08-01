@@ -35,6 +35,12 @@ export const CALL_ERROR_CODES = {
     title: 'ICE Disconnected',
     message: 'WebRTC peer connection dropped or blocked by firewall/NAT.',
   },
+  ERR_UNKNOWN: {
+    code: 500,
+    key: 'ERR_UNKNOWN',
+    title: 'Unexpected Call Error',
+    message: 'An unhandled WebRTC, Firestore, or audio exception occurred.',
+  },
 } as const;
 
 export type CallErrorCodeKey = keyof typeof CALL_ERROR_CODES;
@@ -44,10 +50,27 @@ export interface CallTelemetryState {
   currentStep: string;
   errorCode: string | null;
   errorDetails?: any;
+  timestamp?: number;
+}
+
+export function formatErrorDetails(errorDetails: any): string {
+  if (!errorDetails) return 'No detailed error message provided.';
+  if (errorDetails instanceof Error) {
+    return `${errorDetails.name}: ${errorDetails.message}${errorDetails.stack ? `\nStack: ${errorDetails.stack}` : ''}`;
+  }
+  if (typeof errorDetails === 'object') {
+    try {
+      return JSON.stringify(errorDetails, null, 2);
+    } catch (e) {
+      return String(errorDetails);
+    }
+  }
+  return String(errorDetails);
 }
 
 export function logVoiceError(code: string | number, errorDetails?: any) {
-  console.error(`[VoiceEngine Error ${code}]`, errorDetails || '');
+  const formatted = formatErrorDetails(errorDetails);
+  console.error(`[VoiceEngine Error ${code}]`, errorDetails || '', '\nFormatted:', formatted);
 }
 
 type TelemetryListener = (state: CallTelemetryState) => void;
@@ -57,6 +80,7 @@ class CallTelemetryManager {
     status: 'idle',
     currentStep: 'Idle',
     errorCode: null,
+    errorDetails: null,
   };
   private listeners: Set<TelemetryListener> = new Set();
 
@@ -73,12 +97,24 @@ class CallTelemetryManager {
     this.notify();
   }
 
-  public setError(codeKey: CallErrorCodeKey, errorDetails?: any) {
-    const errObj = CALL_ERROR_CODES[codeKey];
-    const codeString = `${errObj.key} (${errObj.code})`;
+  public setError(codeKey: CallErrorCodeKey | string, rawErrorDetails?: any) {
+    let codeString = String(codeKey);
+    let message = rawErrorDetails;
+
+    if (codeKey in CALL_ERROR_CODES) {
+      const errObj = CALL_ERROR_CODES[codeKey as CallErrorCodeKey];
+      codeString = `${errObj.key} (${errObj.code})`;
+      if (!message) {
+        message = errObj.message;
+      }
+    }
+
+    const formattedDetails = formatErrorDetails(message || rawErrorDetails);
+
     this.update({
       errorCode: codeString,
-      errorDetails: errorDetails || errObj.message,
+      errorDetails: formattedDetails,
+      timestamp: Date.now(),
     });
   }
 
@@ -87,6 +123,7 @@ class CallTelemetryManager {
       status: 'idle',
       currentStep: 'Idle',
       errorCode: null,
+      errorDetails: null,
     };
     this.notify();
   }

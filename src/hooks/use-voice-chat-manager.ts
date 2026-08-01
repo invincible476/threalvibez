@@ -117,7 +117,7 @@ export function useVoiceChatManager(currentUserId?: string) {
                 id: docSnap.id,
                 chatId: data.chatId || docSnap.id,
                 callerId: data.callerId,
-                callerName: data.callerName || 'User',
+                callerName: data.callerName && data.callerName.trim() !== '' ? data.callerName : 'Incoming Call...',
                 callerAvatar: data.callerAvatar || '',
                 receiverId: data.receiverId,
                 status: data.status,

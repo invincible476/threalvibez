@@ -1,4 +1,7 @@
+"use client";
+
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Phone, PhoneOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
@@ -19,8 +22,13 @@ export function IncomingCallModal({
 }: IncomingCallModalProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [showMicModal, setShowMicModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const ringIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Play synthesized Web Audio ringing sound while modal is mounted
   useEffect(() => {
@@ -93,7 +101,6 @@ export function IncomingCallModal({
       // 2. Execute getUserMedia synchronously inside click handler to request mic access
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Stop temporary track, actual MediaStream will be managed in VoiceRoom
         stream.getTracks().forEach((track) => track.stop());
       } catch (micErr: any) {
         logVoiceError(101, micErr);
@@ -116,7 +123,15 @@ export function IncomingCallModal({
     }
   };
 
-  return (
+  // Fallback defaults so card mounts and renders IMMEDIATELY when status === 'ringing'
+  const displayName =
+    incomingCall?.callerName && incomingCall.callerName.trim() !== ''
+      ? incomingCall.callerName
+      : 'Incoming Call...';
+
+  const avatarUrl = incomingCall?.callerAvatar || '';
+
+  const modalContent = (
     <>
       <MicPermissionModal
         isOpen={showMicModal}
@@ -125,22 +140,22 @@ export function IncomingCallModal({
       />
 
       {incomingCall && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="w-full max-w-sm rounded-3xl border border-primary/20 bg-card p-6 shadow-2xl flex flex-col items-center text-center space-y-6">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 pointer-events-auto">
+          <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl flex flex-col items-center text-center space-y-6 text-zinc-100">
             
             {/* Pulsing Avatar Header */}
             <div className="relative mt-2">
               <div className="absolute -inset-4 rounded-full bg-emerald-500/20 animate-ping opacity-75" />
               <div className="absolute -inset-2 rounded-full bg-emerald-500/30 animate-pulse" />
               <UserAvatar
-                user={{ name: incomingCall.callerName, photoURL: incomingCall.callerAvatar }}
+                user={{ name: displayName, photoURL: avatarUrl }}
                 className="h-24 w-24 relative shadow-lg ring-4 ring-emerald-500/40"
               />
             </div>
 
             {/* Caller Info */}
             <div className="space-y-1">
-              <h3 className="text-xl font-bold tracking-tight">{incomingCall.callerName}</h3>
+              <h3 className="text-xl font-bold tracking-tight text-zinc-100">{displayName}</h3>
               <p className="text-sm text-emerald-400 font-medium flex items-center justify-center gap-1.5">
                 <span className="relative h-2 w-2">
                   <span className="absolute h-full w-full rounded-full bg-emerald-400 animate-ping" />
@@ -156,7 +171,7 @@ export function IncomingCallModal({
                 variant="destructive"
                 size="lg"
                 disabled={isConnecting}
-                className="h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-semibold shadow-lg hover:scale-105 transition-transform"
+                className="h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-semibold shadow-lg hover:scale-105 transition-transform pointer-events-auto cursor-pointer"
                 onClick={() => onDecline(incomingCall)}
               >
                 <PhoneOff className="h-5 w-5" />
@@ -166,7 +181,7 @@ export function IncomingCallModal({
               <Button
                 size="lg"
                 disabled={isConnecting}
-                className="h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-base font-semibold shadow-lg hover:scale-105 transition-transform"
+                className="h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-base font-semibold shadow-lg hover:scale-105 transition-transform pointer-events-auto cursor-pointer"
                 onClick={handleAcceptClick}
               >
                 {isConnecting ? (
@@ -187,4 +202,10 @@ export function IncomingCallModal({
       )}
     </>
   );
+
+  if (mounted && typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
