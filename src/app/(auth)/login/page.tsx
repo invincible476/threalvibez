@@ -87,11 +87,8 @@ function LoginForm() {
     }
     
     try {
-      // Set persistence based on rememberMe selection
-      await setPersistence(
-        auth,
-        rememberMe ? browserLocalPersistence : browserSessionPersistence
-      );
+      // Always set local persistence for reliable persistent logins
+      await setPersistence(auth, browserLocalPersistence);
 
       // Clear any existing auth state first if signed in as another user
       if (auth.currentUser) {
@@ -241,10 +238,7 @@ function LoginForm() {
     setGoogleLoading(true);
     
     try {
-      await setPersistence(
-        auth,
-        rememberMe ? browserLocalPersistence : browserSessionPersistence
-      );
+      await setPersistence(auth, browserLocalPersistence);
       
       const user = await authService.signInWithGoogle();
       

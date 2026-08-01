@@ -91,10 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Attempt to restore auth state, clear if invalid
-    if (auth.currentUser && !validateSession(auth.currentUser)) {
-      clearAuthState();
-      auth.signOut().catch(console.error);
+    // Refresh session markers when currentUser is present
+    if (auth.currentUser) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastLogin', Date.now().toString());
+        localStorage.setItem('sessionUser', auth.currentUser.uid);
+      }
     }
 
     // Check for redirect result only if we expect one

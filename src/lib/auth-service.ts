@@ -20,10 +20,12 @@ import { getHighQualityGooglePhotoUrl } from '@/utils/avatar';
 // Ensure auth is defined
 const auth = firebaseAuth!;
 
-// Set up session-only persistence by default
-setPersistence(auth, browserSessionPersistence).catch(error => {
-  console.error('Failed to set persistence:', error);
-});
+// Set up local persistence by default for seamless persistent logins
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch(error => {
+    console.error('Failed to set local auth persistence:', error);
+  });
+}
 
 // Set up auth state monitoring with debouncing
 let authStatePromise: Promise<void> | null = null;
