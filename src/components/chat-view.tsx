@@ -106,17 +106,28 @@ const ChatViewComponent = ({
     const uniqueMap = new Map<string, MessageType>();
 
     for (const msg of combined) {
-      const key = msg.clientTempId || msg.id;
-      if (uniqueMap.has(key)) {
-        const existing = uniqueMap.get(key)!;
+      // Check if an entry with matching id OR matching clientTempId already exists in map
+      let existingKey: string | undefined;
+      for (const [k, existing] of Array.from(uniqueMap.entries())) {
+        if (existing.id === msg.id || (msg.clientTempId && existing.clientTempId === msg.clientTempId)) {
+          existingKey = k;
+          break;
+        }
+      }
+
+      if (existingKey) {
+        const existing = uniqueMap.get(existingKey)!;
+        // Prefer server-confirmed message (status !== 'sending' or non-temp id)
         if (existing.status === 'sending' && msg.status !== 'sending') {
-          uniqueMap.set(key, msg);
+          uniqueMap.delete(existingKey);
+          uniqueMap.set(msg.id, msg);
         } else if (existing.id.startsWith('temp-') && !msg.id.startsWith('temp-')) {
-          uniqueMap.set(key, msg);
+          uniqueMap.delete(existingKey);
+          uniqueMap.set(msg.id, msg);
         }
         continue;
       }
-      uniqueMap.set(key, msg);
+      uniqueMap.set(msg.id, msg);
     }
 
     const result = Array.from(uniqueMap.values());
@@ -133,6 +144,23 @@ const ChatViewComponent = ({
     });
     return result;
   }, [messages, optimisticMessages]);
+
+  // Clean up local optimistic messages once server messages confirm them
+  useEffect(() => {
+    if (optimisticMessages.length === 0) return;
+    const serverIds = new Set(messages.map((m) => m.id));
+    const serverTempIds = new Set(
+      messages.filter((m) => m.clientTempId).map((m) => m.clientTempId!)
+    );
+
+    setOptimisticMessages((prev) =>
+      prev.filter((opt) => {
+        const isConfirmedById = serverIds.has(opt.id);
+        const isConfirmedByTempId = opt.clientTempId ? serverTempIds.has(opt.clientTempId) : false;
+        return !isConfirmedById && !isConfirmedByTempId;
+      })
+    );
+  }, [messages, optimisticMessages.length]);
 
   const prevMessagesLength = useRef(displayMessages.length);
 
@@ -254,7 +282,7 @@ const ChatViewComponent = ({
     setOptimisticMessages((prev) => [...prev, optimisticMsg]);
 
     // 3. Trigger background Firestore write asynchronously
-    activeSendMessage(messageText, messageReply)
+    activeSendMessage(messageText, messageReply, tempId)
       .then((realId) => {
         // 4. On success, gracefully replace optimistic ID with real Firestore ID and update status to 'sent'
         setOptimisticMessages((prev) =>
@@ -299,7 +327,7 @@ const ChatViewComponent = ({
       prev.map((m) => ((m.clientTempId || m.id) === targetKey ? { ...m, status: 'sending' } : m))
     );
 
-    activeSendMessage(failedMsg.text, failedMsg.replyTo)
+    activeSendMessage(failedMsg.text, failedMsg.replyTo, targetKey)
       .then((realId) => {
         setOptimisticMessages((prev) =>
           prev.map((m) =>

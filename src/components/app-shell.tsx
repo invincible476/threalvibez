@@ -752,14 +752,26 @@ function useChatData() {
                     if (idx !== -1) {
                         result[idx] = { ...incoming };
                         prevById.set(incoming.id, result[idx]);
+                        if (incoming.clientTempId) {
+                            prevByTempId.set(incoming.clientTempId, result[idx]);
+                        }
                         changed = true;
                         needsSort = true;
                     }
-                } else if (!seenInitialIds.has(incoming.id)) {
-                    result.push(incoming);
-                    seenInitialIds.add(incoming.id);
-                    changed = true;
-                    needsSort = true;
+                } else {
+                    const alreadyExists = result.some(
+                        m => m.id === incoming.id || (incoming.clientTempId && m.clientTempId === incoming.clientTempId)
+                    );
+                    if (!alreadyExists && !seenInitialIds.has(incoming.id)) {
+                        result.push(incoming);
+                        seenInitialIds.add(incoming.id);
+                        prevById.set(incoming.id, incoming);
+                        if (incoming.clientTempId) {
+                            prevByTempId.set(incoming.clientTempId, incoming);
+                        }
+                        changed = true;
+                        needsSort = true;
+                    }
                 }
             }
 
@@ -881,11 +893,12 @@ function useChatData() {
     chatId: string,
     senderId: string,
     messageText: string,
-    replyTo?: Message['replyTo']
+    replyTo?: Message['replyTo'],
+    clientTempId?: string
   ): Promise<string> => {
     if (!messageText.trim() || !currentUser) return Promise.reject("Cannot send empty message");
   
-    const tempId = `temp-${Date.now()}`;
+    const tempId = clientTempId || `temp-${Date.now()}`;
 
     try {
       const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
@@ -1930,13 +1943,13 @@ function useChatData() {
   }, [currentUser]);
 
 
-  const activeSendMessage = useCallback(async (messageText: string, replyTo?: Message['replyTo']): Promise<string> => {
+  const activeSendMessage = useCallback(async (messageText: string, replyTo?: Message['replyTo'], clientTempId?: string): Promise<string> => {
     if (!selectedChat || !currentUser) return Promise.reject("No chat selected");
     if (selectedChat.id === AI_USER_ID) {
       await handleAiConversation(messageText);
       return Promise.resolve(uuidv4()); // Return a temp ID for AI chat
     } else {
-      return handleSendMessage(selectedChat.id, currentUser.uid, messageText, replyTo);
+      return handleSendMessage(selectedChat.id, currentUser.uid, messageText, replyTo, clientTempId);
     }
   }, [selectedChat, currentUser, handleAiConversation, handleSendMessage]);
 
@@ -2113,7 +2126,7 @@ interface AppShellContextType {
   handleDeleteStory: (storyId: string) => Promise<void>;
   handleStoryReaction: (storyId: string, emoji: string) => Promise<void>;
   handleChatSelect: (chatId: string) => Promise<void>;
-  activeSendMessage: (messageText: string, replyTo?: Message['replyTo']) => Promise<string>;
+  activeSendMessage: (messageText: string, replyTo?: Message['replyTo'], clientTempId?: string) => Promise<string>;
   activeSendFile: (file: File, message: string) => Promise<string>;
   activeSendBase64File: (base64: string, fileType: string, fileName: string, caption: string) => Promise<string | undefined>;
   handleMessageAction: (messageId: string, action: 'react' | 'delete' | 'pin' | 'edit', data?: unknown) => Promise<void>;
