@@ -28,12 +28,10 @@ function ActiveCallUI({ onClose }: { onClose: () => void }) {
   const connectionState = useConnectionState();
   const hasConnected = useRef(false);
 
-  // Track if we successfully connected first
   useEffect(() => {
     if (connectionState === 'connected') {
       hasConnected.current = true;
     }
-    // Only auto-close if we were previously connected and then explicitly disconnected
     if (connectionState === 'disconnected' && hasConnected.current) {
       onClose();
     }
@@ -130,7 +128,7 @@ export function LiveKitVoiceModal({
   const modalContent = (
     <div
       className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 pointer-events-auto"
-      onClick={(e) => e.stopPropagation()} // Prevent backdrop clicks from instantly closing during call start
+      onClick={(e) => e.stopPropagation()}
     >
       <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-white my-auto">
         {errorMessage ? (
