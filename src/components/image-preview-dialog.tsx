@@ -79,9 +79,14 @@ export function ImagePreviewDialog({ file, onSend, onCancel, mode }: ImagePrevie
   const imgRef = useRef<HTMLImageElement | null>(null);
   const initialCropSet = useRef(false);
 
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
+
   useEffect(() => {
     if (!file || !file.type) {
-      onCancel();
+      onCancelRef.current();
       return;
     }
     const url = URL.createObjectURL(file);
@@ -89,7 +94,7 @@ export function ImagePreviewDialog({ file, onSend, onCancel, mode }: ImagePrevie
     initialCropSet.current = false;
     setCrop(undefined);
     return () => URL.revokeObjectURL(url);
-  }, [file, onCancel]);
+  }, [file]);
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     imgRef.current = e.currentTarget;
@@ -246,6 +251,7 @@ export function ImagePreviewDialog({ file, onSend, onCancel, mode }: ImagePrevie
                 alt="Image preview"
                 width={500}
                 height={500}
+                unoptimized
                 style={{ objectFit: 'contain', maxHeight: '50vh', width: 'auto', height: 'auto' }}
               />
             )

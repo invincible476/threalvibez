@@ -28,13 +28,14 @@ export function StoryUploader({ isOpen, onOpenChange, onCreateStory }: StoryUplo
     useEffect(() => {
         if (!isOpen) {
             // Reset state when dialog closes
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
             setFile(null);
             setPreviewUrl(null);
             setCaption('');
             setIsUploading(false);
             setError(null);
         }
-    }, [isOpen]);
+    }, [isOpen, previewUrl]);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0];
@@ -117,6 +118,7 @@ export function StoryUploader({ isOpen, onOpenChange, onCreateStory }: StoryUplo
                                 alt="Story preview"
                                 width={500}
                                 height={500}
+                                unoptimized
                                 className="rounded-lg object-contain max-h-[50vh]"
                             />
                             <Button
@@ -124,6 +126,7 @@ export function StoryUploader({ isOpen, onOpenChange, onCreateStory }: StoryUplo
                                 size="icon"
                                 className="absolute top-2 right-2 rounded-full h-7 w-7"
                                 onClick={() => {
+                                    if (previewUrl) URL.revokeObjectURL(previewUrl);
                                     setFile(null);
                                     setPreviewUrl(null);
                                 }}

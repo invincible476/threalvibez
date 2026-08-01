@@ -1892,10 +1892,12 @@ function useChatData() {
       await addDoc(collection(db, 'stories'), storyData);
       
       toast({ title: "Story posted!" });
+      cleanup();
     } catch (err) {
       console.error("Error uploading story:", err);
       // remove optimistic story or mark failed
       setStories(prev => prev.filter(s => s.id !== tempId));
+      cleanup();
       toast({ title: "Error", description: "Failed to post story.", variant: "destructive" });
       return Promise.reject(err);
     }
