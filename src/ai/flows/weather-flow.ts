@@ -15,6 +15,7 @@ const GetWeatherOutputSchema = z.object({
   temperature: z.number().describe('The current temperature in the requested unit.'),
   condition: z.enum(['Sunny', 'Cloudy', 'Rainy', 'Windy', 'Stormy', 'Snowy', 'Clear', 'Mist', 'Haze', 'Fog']).describe('The current weather condition.'),
   unit: z.enum(['Celsius', 'Fahrenheit']).describe('The unit of the provided temperature.'),
+  resolvedName: z.string().optional().describe('The full resolved location name (e.g., Tokyo, Japan).'),
 });
 export type GetWeatherOutput = z.infer<typeof GetWeatherOutputSchema>;
 
@@ -26,6 +27,26 @@ function mapWmoCodeToCondition(wmoCode: number): GetWeatherOutput['condition'] {
   if ((wmoCode >= 71 && wmoCode <= 77) || (wmoCode >= 85 && wmoCode <= 86)) return 'Snowy';
   if (wmoCode >= 95 && wmoCode <= 99) return 'Stormy';
   return 'Sunny';
+}
+
+export async function validateLocation(location: string): Promise<{ isValid: boolean; resolvedName?: string; country?: string }> {
+  const cleanLoc = (location || '').trim();
+  if (!cleanLoc) return { isValid: false };
+  try {
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanLoc)}&count=1&language=en&format=json`;
+    const geoRes = await fetch(geoUrl, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+    if (geoRes.ok) {
+      const geoData = await geoRes.json();
+      if (geoData.results && geoData.results.length > 0) {
+        const item = geoData.results[0];
+        const resolvedName = item.country ? `${item.name}, ${item.country}` : item.name;
+        return { isValid: true, resolvedName, country: item.country };
+      }
+    }
+  } catch (err) {
+    console.warn('[Weather Service] Geocoding validation notice:', err);
+  }
+  return { isValid: false };
 }
 
 export async function getWeather(input: GetWeatherInput): Promise<GetWeatherOutput> {
@@ -43,7 +64,9 @@ export async function getWeather(input: GetWeatherInput): Promise<GetWeatherOutp
     if (geoRes.ok) {
       const geoData = await geoRes.json();
       if (geoData.results && geoData.results.length > 0) {
-        const { latitude, longitude } = geoData.results[0];
+        const resultItem = geoData.results[0];
+        const { latitude, longitude } = resultItem;
+        const resolvedName = resultItem.country ? `${resultItem.name}, ${resultItem.country}` : resultItem.name;
 
         // 2. Fetch real-time weather from Open-Meteo Forecast API
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
@@ -66,6 +89,7 @@ export async function getWeather(input: GetWeatherInput): Promise<GetWeatherOutp
               temperature: finalTemp,
               condition,
               unit: targetUnit,
+              resolvedName,
             };
           }
         }
