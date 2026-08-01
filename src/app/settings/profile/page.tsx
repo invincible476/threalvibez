@@ -268,6 +268,8 @@ export default function ProfilePage() {
     }
   }, [toast, handleUpdatePhotoUrl]);
 
+  const hasInitializedRef = useRef(false);
+
   useEffect(() => {
     if (authLoading) return;
     if (!authUser) {
@@ -276,13 +278,14 @@ export default function ProfilePage() {
     }
 
     const activeInitialUser = shellCurrentUser || fallbackUser;
-    if (activeInitialUser) {
-      setUser(prev => prev || activeInitialUser);
-      setName(prev => (prev || activeInitialUser.name || ''));
-      setAbout(prev => (prev || activeInitialUser.about || ''));
-      setAvatarUrl(prev => (prev || activeInitialUser.photoURL || ''));
-      setIsPrivate(prev => (prev || activeInitialUser.isPrivate || false));
-      setInstagramUrl(prev => (prev || activeInitialUser.instagramUrl || ''));
+    if (activeInitialUser && !hasInitializedRef.current) {
+      setUser(activeInitialUser);
+      setName(activeInitialUser.name ?? '');
+      setAbout(activeInitialUser.about ?? '');
+      setAvatarUrl(activeInitialUser.photoURL ?? '');
+      setIsPrivate(activeInitialUser.isPrivate ?? false);
+      setInstagramUrl(activeInitialUser.instagramUrl ?? '');
+      hasInitializedRef.current = true;
       setLoading(false);
     }
 
@@ -291,12 +294,16 @@ export default function ProfilePage() {
         if (docSnap.exists()) {
             const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as UserType;
             setUser(userData);
-            // Only update local input states if user is NOT actively editing them
-            if (!isNameDirty) setName(userData.name || '');
-            if (!isAboutDirty) setAbout(userData.about || '');
-            if (!isInstagramDirty) setInstagramUrl(userData.instagramUrl || '');
-            setAvatarUrl(userData.photoURL || '');
-            setIsPrivate(userData.isPrivate || false);
+            
+            // Populate form fields ONLY on initial load to prevent background updates from snapping back typed input
+            if (!hasInitializedRef.current) {
+              setName(userData.name ?? '');
+              setAbout(userData.about ?? '');
+              setAvatarUrl(userData.photoURL ?? '');
+              setIsPrivate(userData.isPrivate ?? false);
+              setInstagramUrl(userData.instagramUrl ?? '');
+              hasInitializedRef.current = true;
+            }
         } else {
             // Self-healing: ensure user document is created in Firestore
             await authService.ensureUserDocument(authUser);
@@ -308,7 +315,7 @@ export default function ProfilePage() {
     });
 
     return () => unsubscribe();
-  }, [authUser, authLoading, shellCurrentUser, fallbackUser, isNameDirty, isAboutDirty, isInstagramDirty]);
+  }, [authUser, authLoading, shellCurrentUser, fallbackUser]);
 
   const activeUser = user || shellCurrentUser || fallbackUser;
 
@@ -364,20 +371,30 @@ export default function ProfilePage() {
   const handleSaveChanges = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser || !activeUser) return;
+
+    if (!name || name.trim().length === 0) {
+        toast({
+            title: 'Name Required',
+            description: 'Name cannot be empty. Please enter a valid profile name.',
+            variant: 'destructive',
+        });
+        return;
+    }
     
     setIsSaving(true);
     try {
         const dataToUpdate: any = {};
-        if(name !== activeUser.name) {
-            await updateProfile(currentUser, { displayName: name });
-            dataToUpdate.name = name;
+        const trimmedName = name.trim();
+        if (trimmedName !== activeUser.name) {
+            await updateProfile(currentUser, { displayName: trimmedName });
+            dataToUpdate.name = trimmedName;
         }
 
-        if(about !== (activeUser.about || '')) {
+        if (about !== (activeUser.about ?? '')) {
             dataToUpdate.about = about;
         }
 
-        if(instagramUrl !== (activeUser.instagramUrl || '')) {
+        if (instagramUrl !== (activeUser.instagramUrl ?? '')) {
             // Validate Instagram URL format if provided
             if (instagramUrl && !instagramUrl.match(/^https?:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9_.]+\/?$/i)) {
                 throw new Error('Please enter a valid Instagram profile URL (e.g. https://instagram.com/username)');
@@ -438,7 +455,7 @@ export default function ProfilePage() {
     }
   }
 
-  const isSaveDisabled = !activeUser || (name === activeUser.name && about === (activeUser.about || '') && instagramUrl === (activeUser.instagramUrl || ''));
+  const isSaveDisabled = !activeUser || (name === (activeUser.name ?? '') && about === (activeUser.about ?? '') && instagramUrl === (activeUser.instagramUrl ?? ''));
 
   return (
     <motion.div 
