@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Phone, PhoneOff } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Phone, PhoneOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
 import { CallSession } from '@/lib/voice/types';
@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
 
 interface IncomingCallModalProps {
   incomingCall: CallSession | null;
-  onAccept: (call: CallSession) => void;
-  onDecline: (call: CallSession) => void;
+  onAccept: (call: CallSession) => Promise<void> | void;
+  onDecline: (call: CallSession) => Promise<void> | void;
 }
 
 export function IncomingCallModal({
@@ -16,6 +16,7 @@ export function IncomingCallModal({
   onAccept,
   onDecline,
 }: IncomingCallModalProps) {
+  const [isConnecting, setIsConnecting] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const ringIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -68,6 +69,16 @@ export function IncomingCallModal({
 
   if (!incomingCall) return null;
 
+  const handleAcceptClick = async () => {
+    setIsConnecting(true);
+    try {
+      await onAccept(incomingCall);
+    } catch (err) {
+      console.error('Error accepting call:', err);
+      setIsConnecting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
       <div className="w-full max-w-sm rounded-3xl border border-primary/20 bg-card p-6 shadow-2xl flex flex-col items-center text-center space-y-6">
@@ -90,7 +101,7 @@ export function IncomingCallModal({
               <span className="absolute h-full w-full rounded-full bg-emerald-400 animate-ping" />
               <span className="absolute h-full w-full rounded-full bg-emerald-400" />
             </span>
-            Incoming Voice Call...
+            {isConnecting ? 'Connecting Call...' : 'Incoming Voice Call...'}
           </p>
         </div>
 
@@ -99,6 +110,7 @@ export function IncomingCallModal({
           <Button
             variant="destructive"
             size="lg"
+            disabled={isConnecting}
             className="h-14 rounded-2xl flex items-center justify-center gap-2 text-base font-semibold shadow-lg hover:scale-105 transition-transform"
             onClick={() => onDecline(incomingCall)}
           >
@@ -108,11 +120,21 @@ export function IncomingCallModal({
 
           <Button
             size="lg"
+            disabled={isConnecting}
             className="h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 text-base font-semibold shadow-lg hover:scale-105 transition-transform"
-            onClick={() => onAccept(incomingCall)}
+            onClick={handleAcceptClick}
           >
-            <Phone className="h-5 w-5 fill-current" />
-            Accept
+            {isConnecting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <Phone className="h-5 w-5 fill-current" />
+                Accept
+              </>
+            )}
           </Button>
         </div>
       </div>

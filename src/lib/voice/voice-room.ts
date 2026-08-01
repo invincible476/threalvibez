@@ -148,12 +148,23 @@ export class VoiceRoom {
         { merge: true }
       );
 
+      // 30s Auto-hangup safety timeout on Caller side
+      const callerTimeout = setTimeout(() => {
+        if (pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') {
+          console.log('[Voice] 30s timeout reached on Caller side with no answer. Cancelling call.');
+          updateDoc(callDocRef, { status: 'cancelled' }).catch(() => {});
+          this.cleanup();
+        }
+      }, 30000);
+      this.unsubscribes.push(() => clearTimeout(callerTimeout));
+
       // Listen for Callee acceptance/answer or decline
       const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
         const data = snapshot.data();
         if (!data) return;
 
         if (data.status === 'declined' || data.status === 'cancelled' || data.status === 'ended') {
+          console.log('[Voice] Call status changed to:', data.status);
           this.cleanup();
           return;
         }
