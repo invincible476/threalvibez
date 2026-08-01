@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Button } from './ui/button';
-import Image from 'next/image';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export interface LightboxMedia {
   url: string;
@@ -26,11 +26,11 @@ export function MediaLightbox({
 }: MediaLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
-  if (!isOpen || !media || media.length === 0) return null;
+  if (!media || media.length === 0) return null;
 
   const currentItem = media[currentIndex] || media[0];
-  const isImage = currentItem.type.startsWith('image/');
-  const isVideo = currentItem.type.startsWith('video/');
+  const isImage = currentItem.type?.startsWith('image/');
+  const isVideo = currentItem.type?.startsWith('video/');
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,94 +54,102 @@ export function MediaLightbox({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 select-none animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      {/* Top Header */}
-      <div className="flex items-center justify-between w-full z-10 p-2" onClick={(e) => e.stopPropagation()}>
-        <span className="text-sm font-medium text-muted-foreground">
-          {media.length > 1 ? `${currentIndex + 1} of ${media.length}` : (currentItem.name || 'Media')}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
-            onClick={handleDownload}
-            title="Download"
-          >
-            <Download className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
-            onClick={onClose}
-            title="Close"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Main Display Container */}
-      <div
-        className="flex-1 relative flex items-center justify-center min-h-0 w-full p-2"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {media.length > 1 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-2 z-20 h-10 w-10 rounded-full bg-black/50 text-white hover:bg-black/80"
-            onClick={handlePrev}
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-        )}
-
-        <div className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden rounded-lg">
-          {isImage ? (
-            <img
-              src={currentItem.url}
-              alt={currentItem.name || 'Lightbox image'}
-              className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg"
-            />
-          ) : isVideo ? (
-            <video
-              src={currentItem.url}
-              controls
-              autoPlay
-              className="max-h-[85vh] max-w-[90vw] rounded-lg"
-            />
-          ) : (
-            <div className="text-muted-foreground p-8 text-center bg-card rounded-xl">
-              <p className="font-semibold">{currentItem.name}</p>
-              <p className="text-sm text-muted-foreground mt-2">Cannot preview this media format.</p>
-              <Button onClick={handleDownload} className="mt-4 bg-violet-700 text-white">
-                Download File
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 select-none will-change-[transform,opacity]"
+          onClick={onClose}
+        >
+          {/* Top Header */}
+          <div className="flex items-center justify-between w-full z-10 p-2" onClick={(e) => e.stopPropagation()}>
+            <span className="text-sm font-medium text-muted-foreground">
+              {media.length > 1 ? `${currentIndex + 1} of ${media.length}` : (currentItem.name || 'Media')}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
+                onClick={handleDownload}
+                title="Download"
+              >
+                <Download className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
+                onClick={onClose}
+                title="Close"
+              >
+                <X className="h-5 w-5" />
               </Button>
             </div>
-          )}
-        </div>
+          </div>
 
-        {media.length > 1 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-2 z-20 h-10 w-10 rounded-full bg-black/50 text-white hover:bg-black/80"
-            onClick={handleNext}
+          {/* Main Display Container */}
+          <div
+            className="flex-1 relative flex items-center justify-center min-h-0 w-full p-2"
+            onClick={(e) => e.stopPropagation()}
           >
-            <ChevronRight className="h-6 w-6" />
-          </Button>
-        )}
-      </div>
+            {media.length > 1 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 z-20 h-10 w-10 rounded-full bg-black/50 text-white hover:bg-black/80"
+                onClick={handlePrev}
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+            )}
 
-      {/* Footer Title */}
-      <div className="text-center text-xs text-muted-foreground py-2 select-none" onClick={(e) => e.stopPropagation()}>
-        {currentItem.name && <p className="truncate max-w-md mx-auto">{currentItem.name}</p>}
-      </div>
-    </div>
+            <div className="relative max-w-full max-h-full flex items-center justify-center overflow-hidden rounded-lg">
+              {isImage ? (
+                <img
+                  src={currentItem.url}
+                  alt={currentItem.name || 'Lightbox image'}
+                  className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg aspect-square-stable"
+                />
+              ) : isVideo ? (
+                <video
+                  src={currentItem.url}
+                  controls
+                  autoPlay
+                  className="max-h-[85vh] max-w-[90vw] rounded-lg"
+                />
+              ) : (
+                <div className="text-muted-foreground p-8 text-center bg-card rounded-xl">
+                  <p className="font-semibold">{currentItem.name}</p>
+                  <p className="text-sm text-muted-foreground mt-2">Cannot preview this media format.</p>
+                  <Button onClick={handleDownload} className="mt-4 bg-violet-700 text-white">
+                    Download File
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {media.length > 1 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 z-20 h-10 w-10 rounded-full bg-black/50 text-white hover:bg-black/80"
+                onClick={handleNext}
+              >
+                <ChevronRight className="h-6 w-6" />
+              </Button>
+            )}
+          </div>
+
+          {/* Footer Title */}
+          <div className="text-center text-xs text-muted-foreground py-2 select-none" onClick={(e) => e.stopPropagation()}>
+            {currentItem.name && <p className="truncate max-w-md mx-auto">{currentItem.name}</p>}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

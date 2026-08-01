@@ -355,7 +355,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
               value={message}
               onChange={handleTypingChange}
               placeholder="Type a message..."
-              className="flex-1 resize-none rounded-2xl border-border bg-card/90 py-2.5 px-4 pr-10 min-h-[40px] max-h-32 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-violet-500 transition-[height,max-height] duration-200 ease-in-out"
+              className="flex-1 resize-none rounded-2xl border-border bg-card/90 py-2.5 px-4 pr-10 min-h-[40px] max-h-32 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-violet-500 transition-[border-color,box-shadow] duration-150"
               rows={1}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {

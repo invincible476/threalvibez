@@ -168,6 +168,8 @@ html, body {
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
+    /* Eliminate grey flash on mobile taps globally */
+    -webkit-tap-highlight-color: transparent;
   }
   * {
     border-color: hsl(var(--border));
@@ -177,6 +179,17 @@ html, body {
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Ensure all interactive elements have no tap delay */
+  button, a, input, textarea, select, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Eliminate layout shift for images and media */
+  img, video {
+    display: block;
+    max-width: 100%;
   }
 }
 
@@ -235,6 +248,34 @@ textarea:-webkit-autofill:focus {
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Promote animated elements to their own GPU layer */
+[data-motion-animate], .motion-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Scroll containers: smooth momentum scrolling & GPU containment */
+.scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+}
+
+/* Stable aspect-ratio containers prevent CLS on image/avatar load */
+.aspect-square-stable {
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Typing indicator min-height reservation to prevent row jumps */
+.typing-indicator-reserve {
+  min-height: 1.25rem; /* 20px */
 }
 
 /* Reduced Motion Fallbacks for Accessibility */

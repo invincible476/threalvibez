@@ -41,7 +41,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, i
       <Avatar
         hasStory={effectiveHasStory}
         storyViewed={effectiveStoryViewed}
-        className={cn('animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 rounded-full overflow-hidden', className)}
+        className={cn('animate-pulse bg-muted rounded-full overflow-hidden aspect-square-stable shrink-0', className)}
       />
     );
   }
@@ -89,7 +89,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, i
         hasStory={effectiveHasStory}
         storyViewed={effectiveStoryViewed}
         className={cn(
-          'rounded-full overflow-hidden shrink-0 flex-shrink-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950', 
+          'rounded-full overflow-hidden shrink-0 flex-shrink-0 bg-muted aspect-square-stable', 
           className
         )}
       >
@@ -111,7 +111,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, i
             />
             {isImageLoading && (
               <AvatarFallback className={cn(
-                "rounded-full animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 text-muted-foreground",
+                "rounded-full animate-pulse bg-muted text-muted-foreground font-medium",
                 isGroupChat && "bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 text-white font-bold"
               )}>
                 {fallback}
@@ -128,7 +128,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, i
         )}
       </Avatar>
       {!isGroupChat && status === 'online' && (
-        <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
+        <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-background" />
       )}
     </div>
   );

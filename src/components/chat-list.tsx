@@ -33,16 +33,17 @@ const listVariants = {
     animate: { 
         opacity: 1,
         transition: {
-            staggerChildren: 0.05,
+            duration: 0.15,
+            ease: 'easeOut',
         }
     },
     exit: { opacity: 0 }
 };
 
 const itemVariants = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, x: -20 },
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.15, ease: 'easeOut' } },
+    exit: { opacity: 0, x: -10, transition: { duration: 0.1 } },
 };
 
 import { useMobileDesign } from './providers/mobile-provider';
@@ -509,7 +510,7 @@ const ChatItem = React.memo(
        <motion.li
           variants={itemVariants}
           layout
-          className="list-none w-full max-w-full min-w-0 overflow-x-hidden"
+          className="list-none w-full max-w-full min-w-0 overflow-x-hidden will-change-[transform,opacity]"
       >
           <div
               onClick={onSelect}

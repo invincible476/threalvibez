@@ -26,7 +26,7 @@ function FriendsPageSkeleton() {
     return (
         <div className="space-y-3 pt-4">
             {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div key={`friends-skel-${i}`} className="flex items-center gap-3 px-4 py-3">
                     <div className="h-10 w-10 rounded-full bg-muted animate-pulse shrink-0" />
                     <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="h-4 w-28 bg-muted rounded animate-pulse" />

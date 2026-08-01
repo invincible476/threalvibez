@@ -301,7 +301,7 @@ function MessageBubble({
         animate="animate"
         layout
         className={cn(
-          'group flex w-full items-end relative',
+          'group flex w-full items-end relative will-change-[transform,opacity]',
           isGrouped ? 'my-0.5' : 'my-1',
           isOutgoing ? 'justify-end' : 'justify-start gap-2'
         )}
@@ -414,7 +414,7 @@ function MessageBubble({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align={isCurrentUser ? 'end' : 'start'}
-              className="w-56 bg-card/95 border-border backdrop-blur-xl text-foreground shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 pointer-events-auto"
+              className="w-56 bg-card/95 border-border backdrop-blur-xl text-foreground shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 pointer-events-auto will-change-[transform,opacity] transform-gpu"
             >
               {/* Quick Reaction Emoji Pill */}
               <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-border">

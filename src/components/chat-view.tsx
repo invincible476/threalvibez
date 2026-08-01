@@ -361,9 +361,14 @@ const ChatViewComponent = ({
 
   const scrollToBottom = (smooth = true) => {
     if (messageListRef.current) {
-      messageListRef.current.scrollTo({
-        top: messageListRef.current.scrollHeight,
-        behavior: smooth ? 'smooth' : 'auto',
+      // Use rAF to ensure scroll happens after browser paint cycle
+      requestAnimationFrame(() => {
+        if (messageListRef.current) {
+          messageListRef.current.scrollTo({
+            top: messageListRef.current.scrollHeight,
+            behavior: smooth ? 'smooth' : 'auto',
+          });
+        }
       });
     }
     setNewMessagesCount(0);
@@ -546,7 +551,7 @@ const ChatViewComponent = ({
       {/* Floating Scroll to Bottom Button */}
       <div
         className={cn(
-          "absolute bottom-4 right-4 z-20 transition-all duration-200 ease-out",
+          "absolute bottom-4 right-4 z-20 transition-[transform,opacity] duration-200 ease-out will-change-[transform,opacity]",
           !isAtBottom
             ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
             : "opacity-0 translate-y-2 scale-90 pointer-events-none"
@@ -570,10 +575,13 @@ const ChatViewComponent = ({
 
     {/* Quoted Message Reply Banner & Input Container */}
     <div className="flex-none shrink-0 p-3 bg-background/90 backdrop-blur-md border-t border-border/40 z-20 w-full pb-safe">
+      {/* Reply Banner - GPU-accelerated with transform instead of max-height to avoid layout thrashing */}
       <div
         className={cn(
-          "overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-in-out",
-          replyToMessage ? "max-h-24 opacity-100 mb-2" : "max-h-0 opacity-0 mb-0"
+          "overflow-hidden transition-[opacity,transform] duration-200 ease-in-out will-change-[transform,opacity]",
+          replyToMessage
+            ? "opacity-100 translate-y-0 pointer-events-auto mb-2"
+            : "opacity-0 -translate-y-1 pointer-events-none h-0"
         )}
       >
         {replyToMessage && (

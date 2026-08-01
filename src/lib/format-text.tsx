@@ -12,7 +12,7 @@ export function formatText(text: string): JSX.Element {
       if (part.match(urlRegex)) {
         return (
           <a 
-            key={index} 
+            key={`url-${index}-${part.slice(0, 15)}`} 
             href={part} 
             target="_blank" 
             rel="noopener noreferrer" 
@@ -26,19 +26,19 @@ export function formatText(text: string): JSX.Element {
       // For non-URL parts, handle @gemini mentions
       const geminiParts = part.split(geminiMentionRegex);
       return (
-        <span key={index}>
+        <span key={`text-part-${index}`}>
           {geminiParts.map((gPart: string, gIndex: number) => {
             if (gPart === '@gemini') {
               return (
                 <span
-                  key={gIndex}
-                  className="inline-block bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-1 rounded"
+                  key={`gemini-${index}-${gIndex}`}
+                  className="inline-block bg-emerald-500/20 text-emerald-400 px-1 rounded font-medium"
                 >
                   {gPart}
                 </span>
               );
             }
-            return <span key={gIndex}>{gPart}</span>;
+            return <span key={`subpart-${index}-${gIndex}`}>{gPart}</span>;
           })}
         </span>
       );

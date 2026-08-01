@@ -17,7 +17,7 @@ const messageListVariants = {
     initial: {},
     animate: {
         transition: {
-            staggerChildren: 0.08,
+            // No stagger - prevents cascading jitter on large message lists
         }
     }
 };
@@ -132,10 +132,10 @@ export const MessageList = memo(forwardRef<HTMLDivElement, MessageListProps>(({
     }
 
     return (
-        <ScrollArea className="h-full w-full" viewportRef={ref as React.RefObject<HTMLDivElement>}>
+        <ScrollArea className="h-full w-full scroll-container" viewportRef={ref as React.RefObject<HTMLDivElement>}>
             <motion.div 
                 ref={viewportRef}
-                className="px-3 py-4 sm:px-4"
+                className="px-3 py-4 sm:px-4 will-change-[transform]"
                 variants={messageListVariants}
                 initial="initial"
                 animate="animate"

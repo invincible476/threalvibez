@@ -17,9 +17,9 @@ const Avatar = React.forwardRef<
 >(({ className, hasStory, storyViewed, ...props }, ref) => {
   const ringStyle = hasStory
     ? storyViewed
-      ? "ring-2 ring-zinc-700"
+      ? "ring-2 ring-muted-foreground/40 dark:ring-border"
       : "ring-2 ring-violet-500"
-    : "ring-1 ring-zinc-800/50";
+    : "ring-1 ring-border/40";
 
   return (
     <AvatarPrimitive.Root

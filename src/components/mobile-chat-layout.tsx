@@ -36,7 +36,7 @@ export function MobileChatLayout() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 min-h-0 w-full h-full"
+            className="flex-1 min-h-0 w-full h-full will-change-[transform,opacity] motion-layer"
           >
             <ErrorBoundary label="ChatList">
               <ChatList />
@@ -49,7 +49,7 @@ export function MobileChatLayout() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 min-h-0 w-full h-full absolute inset-0 z-20 bg-background"
+            className="flex-1 min-h-0 w-full h-full absolute inset-0 z-20 bg-background will-change-[transform,opacity] motion-layer"
           >
             <ChatView
               chat={selectedChat}
