@@ -23,9 +23,7 @@ export function useVoiceChatManager() {
 
   const joinVoiceRoom = useCallback(async (roomId: string, userId: string) => {
     try {
-      const deterministicRoomId = roomId.startsWith('voice_room_') || roomId.startsWith('call_')
-        ? roomId
-        : `voice_room_${roomId}`;
+      const deterministicRoomId = roomId;
 
       // Leave current room if in one
       if (voiceRoomRef.current) {

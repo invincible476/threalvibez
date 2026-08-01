@@ -77,7 +77,7 @@ const ChatViewComponent = ({
 
   const voiceRoomId = useMemo(() => {
     if (!chat?.id) return '';
-    return chat.id.startsWith('voice_room_') ? chat.id : `voice_room_${chat.id}`;
+    return chat.id;
   }, [chat?.id]);
 
   const {
