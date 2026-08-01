@@ -85,6 +85,8 @@ const ChatViewComponent = ({
     isMuted,
     participants: voiceParticipants,
     remoteStreams,
+    connectionState,
+    metrics,
     join: joinVoice,
     leave: leaveVoice,
     toggleMute,
@@ -512,6 +514,8 @@ const ChatViewComponent = ({
             currentUserId={currentUser.uid}
             remoteStreams={remoteStreams}
             isMuted={isMuted}
+            connectionState={connectionState}
+            metrics={metrics}
             onMuteToggle={toggleMute}
             onLeave={() => {
               leaveVoice();

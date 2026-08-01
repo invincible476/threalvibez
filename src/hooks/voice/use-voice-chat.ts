@@ -4,6 +4,7 @@ import {
   VoiceRoomParticipant,
   VoiceRoomEvent,
   VoiceConnectionState,
+  WebRTCMetrics,
 } from '@/lib/voice/types';
 
 export interface UseVoiceChatOptions {
@@ -25,6 +26,11 @@ export function useVoiceChat({
   const [connectionState, setConnectionState] = useState<VoiceConnectionState>(
     VoiceConnectionState.DISCONNECTED
   );
+  const [metrics, setMetrics] = useState<WebRTCMetrics>({
+    iceState: 'new',
+    signalingState: 'stable',
+    hasRemoteTrack: false,
+  });
 
   // Validate required parameters
   const isValid = useMemo(() => {
@@ -98,7 +104,11 @@ export function useVoiceChat({
 
     voiceRoom.on(VoiceRoomEvent.CONNECTION_STATE_CHANGED, (state) => {
       setConnectionState(state as VoiceConnectionState);
-      setIsConnected(state === 'connected');
+      setIsConnected(String(state) === VoiceConnectionState.CONNECTED || String(state) === 'connected');
+    });
+
+    voiceRoom.on(VoiceRoomEvent.METRICS_UPDATED, (newMetrics) => {
+      setMetrics(newMetrics);
     });
 
     voiceRoom.on(VoiceRoomEvent.ERROR, (error) => {
@@ -125,7 +135,6 @@ export function useVoiceChat({
       try {
         console.log('Joining voice chat:', { userId, roomId });
         await voiceRoomRef.current.join();
-        setIsConnected(true);
       } catch (error) {
         console.error('Voice chat join error:', error);
         onError?.(error as Error);
@@ -161,6 +170,7 @@ export function useVoiceChat({
     participants,
     remoteStreams,
     connectionState,
+    metrics,
     join,
     leave,
     toggleMute,

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { VoiceParticipant } from './voice-participant';
 import { Button } from '../ui/button';
 import { Mic, MicOff, PhoneOff } from 'lucide-react';
-import { VoiceRoomParticipant } from '@/lib/voice/types';
+import { VoiceRoomParticipant, VoiceConnectionState, WebRTCMetrics } from '@/lib/voice/types';
 import { useAppShell } from '../app-shell';
 import { ScrollArea } from '../ui/scroll-area';
 import { db } from '@/lib/firebase';
@@ -14,6 +14,8 @@ interface VoiceChatProps {
   currentUserId: string;
   remoteStreams: Map<string, MediaStream>;
   isMuted: boolean;
+  connectionState?: VoiceConnectionState | string;
+  metrics?: WebRTCMetrics;
   onMuteToggle: () => void;
   onLeave: () => void;
   className?: string;
@@ -51,11 +53,55 @@ export function VoiceChat({
   currentUserId,
   remoteStreams,
   isMuted,
+  connectionState,
+  metrics,
   onMuteToggle,
   onLeave,
   className,
 }: VoiceChatProps) {
   const { usersCache } = useAppShell();
+  const [callDuration, setCallDuration] = useState(0);
+
+  // Determine if WebRTC P2P connection is fully connected
+  const isFullyConnected = useMemo(() => {
+    const ice = metrics?.iceState;
+    if (ice === 'connected' || ice === 'completed') return true;
+    if (connectionState === VoiceConnectionState.CONNECTED || connectionState === 'connected') return true;
+    return false;
+  }, [metrics?.iceState, connectionState]);
+
+  // Format call duration timer (MM:SS)
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isFullyConnected) {
+      timer = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isFullyConnected]);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Derive dynamic status text strictly bound to RTCPeerConnection iceConnectionState
+  const statusText = useMemo(() => {
+    const ice = metrics?.iceState || 'new';
+    if (isFullyConnected) {
+      return `Connected (${formatDuration(callDuration)})`;
+    }
+    if (ice === 'disconnected' || ice === 'failed' || connectionState === VoiceConnectionState.FAILED) {
+      return 'Connection Failed - Reconnecting...';
+    }
+    return 'Connecting to peer...';
+  }, [isFullyConnected, metrics?.iceState, connectionState, callDuration]);
 
   // Deduplicate participants array by unique userId
   const deduplicatedParticipants = useMemo(() => {
@@ -126,20 +172,39 @@ export function VoiceChat({
     fetchRemoteProfiles();
   }, [sortedParticipants, currentUserId, usersCache]);
 
+  const iceStateDisplay = metrics?.iceState || 'new';
+  const signalingStateDisplay = metrics?.signalingState || 'stable';
+  const peerDisplay = (metrics?.hasRemoteTrack || remoteStreams.size > 0) ? 'Active' : 'Waiting';
+
   return (
     <VoiceChatErrorBoundary>
       <div className={cn('flex flex-col', className)}>
       {/* Voice chat header */}
-      <div className="flex items-center justify-between p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 p-4">
         <div className="flex items-center gap-2">
-          <div className="relative h-2 w-2">
-            <div className="absolute h-full w-full bg-primary rounded-full animate-ping opacity-75" />
-            <div className="absolute h-full w-full bg-primary rounded-full" />
+          <div className="relative h-2.5 w-2.5">
+            <div
+              className={cn(
+                'absolute h-full w-full rounded-full animate-ping opacity-75',
+                isFullyConnected ? 'bg-emerald-500' : 'bg-amber-500'
+              )}
+            />
+            <div
+              className={cn(
+                'absolute h-full w-full rounded-full',
+                isFullyConnected ? 'bg-emerald-500' : 'bg-amber-500'
+              )}
+            />
           </div>
-          <span className="font-medium">Voice Connected</span>
-          <span className="text-sm text-muted-foreground">
+          <span className="font-semibold text-sm">{statusText}</span>
+          <span className="text-xs text-muted-foreground">
             ({sortedParticipants.length} {sortedParticipants.length === 1 ? 'user' : 'users'})
           </span>
+        </div>
+
+        {/* Live WebRTC Telemetry Badge Overlay */}
+        <div className="text-[11px] px-2.5 py-1 rounded-full bg-muted/80 font-mono text-muted-foreground border border-border/40">
+          ICE: {iceStateDisplay} | Signaling: {signalingStateDisplay} | Peer: {peerDisplay}
         </div>
 
         <div className="flex items-center gap-2">
@@ -206,7 +271,7 @@ export function VoiceChat({
         </div>
       </ScrollArea>
 
-      {/* Remote audio elements (hidden) */}
+      {/* Remote audio elements with play promise error handling for mobile policies */}
       {Array.from(remoteStreams.entries()).map(([participantId, stream]) => (
         <audio
           key={participantId}
@@ -218,18 +283,16 @@ export function VoiceChat({
                 el.srcObject = stream;
               }
               el.volume = 1.0;
-              
-              // Ensure audio plays when ready
               const playPromise = el.play();
               if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                  console.warn('Audio playback failed:', error);
+                playPromise.catch((error) => {
+                  console.warn('[Voice] Remote audio playback promise error:', error);
                 });
               }
             }
           }}
           onError={(e) => {
-            console.error('Audio element error:', e);
+            console.error('[Voice] Audio element error:', e);
           }}
           className="hidden"
         />

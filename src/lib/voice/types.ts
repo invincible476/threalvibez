@@ -19,6 +19,15 @@ export interface VoiceRoom {
 }
 
 /**
+ * WebRTC connection metrics
+ */
+export interface WebRTCMetrics {
+  iceState: string;
+  signalingState: string;
+  hasRemoteTrack: boolean;
+}
+
+/**
  * Voice connection configuration
  */
 export interface VoiceConnectionConfig {
@@ -37,6 +46,7 @@ export enum VoiceRoomEvent {
   STREAM_ADDED = 'STREAM_ADDED',
   STREAM_REMOVED = 'STREAM_REMOVED',
   CONNECTION_STATE_CHANGED = 'CONNECTION_STATE_CHANGED',
+  METRICS_UPDATED = 'METRICS_UPDATED',
   ERROR = 'ERROR',
 }
 
@@ -49,7 +59,8 @@ export type VoiceRoomEventHandler = {
   [VoiceRoomEvent.PARTICIPANT_UPDATED]: (participant: VoiceRoomParticipant) => void;
   [VoiceRoomEvent.STREAM_ADDED]: (stream: MediaStream, participantId: string) => void;
   [VoiceRoomEvent.STREAM_REMOVED]: (participantId: string) => void;
-  [VoiceRoomEvent.CONNECTION_STATE_CHANGED]: (state: RTCPeerConnectionState) => void;
+  [VoiceRoomEvent.CONNECTION_STATE_CHANGED]: (state: RTCPeerConnectionState | VoiceConnectionState) => void;
+  [VoiceRoomEvent.METRICS_UPDATED]: (metrics: WebRTCMetrics) => void;
   [VoiceRoomEvent.ERROR]: (error: Error) => void;
 };
 
