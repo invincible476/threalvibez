@@ -26,16 +26,6 @@ const LIVEKIT_WS_URL = 'wss://omegaone-7kb381s3.livekit.cloud';
 function ActiveCallUI({ onClose }: { onClose: () => void }) {
   const participants = useParticipants();
   const connectionState = useConnectionState();
-  const hasConnected = useRef(false);
-
-  useEffect(() => {
-    if (connectionState === 'connected') {
-      hasConnected.current = true;
-    }
-    if (connectionState === 'disconnected' && hasConnected.current) {
-      onClose();
-    }
-  }, [connectionState, onClose]);
 
   return (
     <div className="flex flex-col items-center gap-6 w-full py-2">
@@ -64,7 +54,6 @@ function ActiveCallUI({ onClose }: { onClose: () => void }) {
             screenShare: false,
             leave: true,
           }}
-          onLeave={onClose}
         />
       </div>
     </div>
@@ -84,34 +73,60 @@ export function LiveKitVoiceModal({
   const [token, setToken] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [mounted, setMounted] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('connecting');
+  const abortRef = useRef<AbortController | null>(null);
+  const hasConnectedRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (isOpen === false) return;
-    let isMounted = true;
+    if (!isOpen) {
+      setToken('');
+      setErrorMessage('');
+      setConnectionStatus('connecting');
+      hasConnectedRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = null;
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+
+    setToken('');
+    setErrorMessage('');
+    setConnectionStatus('connecting');
+    hasConnectedRef.current = false;
 
     async function fetchToken() {
       try {
         const baseUsername = username || userName || 'User';
         const uniqueUsername = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
         const res = await fetch(
-          `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(uniqueUsername)}`
+          `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(uniqueUsername)}`,
+          { signal: controller.signal }
         );
         const data = await res.json();
+
+        if (!active) return;
 
         if (!res.ok || data.error) {
           throw new Error(data.error || `HTTP ${res.status}`);
         }
 
-        if (isMounted && data.token) {
+        if (data.token) {
           setToken(data.token);
+          setConnectionStatus('connecting');
         }
       } catch (err: any) {
-        if (isMounted) {
+        if (err?.name === 'AbortError') return;
+        if (active) {
           setErrorMessage(err.message || 'Failed to fetch access token');
+          setConnectionStatus('error');
         }
       }
     }
@@ -119,7 +134,9 @@ export function LiveKitVoiceModal({
     fetchToken();
 
     return () => {
-      isMounted = false;
+      active = false;
+      controller.abort();
+      abortRef.current = null;
     };
   }, [isOpen, roomId, username, userName]);
 
@@ -146,17 +163,30 @@ export function LiveKitVoiceModal({
             <div className="animate-pulse text-sm font-medium text-zinc-300">
               Connecting to Voice Server...
             </div>
+            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-zinc-400">{connectionStatus}</p>
           </div>
         ) : (
           <LiveKitRoom
+            key={token}
             video={false}
             audio={true}
             token={token}
             serverUrl={LIVEKIT_WS_URL}
             connect={true}
             data-lk-theme="default"
+            onConnected={() => {
+              hasConnectedRef.current = true;
+              setConnectionStatus('connected');
+            }}
+            onDisconnected={() => {
+              if (hasConnectedRef.current) {
+                onClose();
+              }
+              setConnectionStatus('disconnected');
+            }}
             onError={(err: any) => {
               console.error('[LiveKit Error]:', err);
+              setConnectionStatus('error');
               setErrorMessage(err.message || 'Connection error occurred');
             }}
           >
