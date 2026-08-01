@@ -22,7 +22,7 @@ interface LiveKitVoiceModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_WS_URL = "wss://omegaone-7kb381s3.livekit.cloud";
+const LIVEKIT_SERVER_URL = "wss://omegaone-7kb381s3.livekit.cloud";
 
 export function LiveKitVoiceModal({
   isOpen,
@@ -34,11 +34,27 @@ export function LiveKitVoiceModal({
   onClose,
 }: LiveKitVoiceModalProps) {
   const [token, setToken] = useState<string>('');
-  const [wsUrl, setWsUrl] = useState<string>(DEFAULT_WS_URL);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState<number>(0);
   const { toast } = useToast();
+
+  // 1. Direct Native fetch() Diagnostic Check
+  useEffect(() => {
+    if (!isOpen) return;
+    async function testNetwork() {
+      try {
+        await fetch('https://omegaone-7kb381s3.livekit.cloud', { method: 'HEAD', mode: 'no-cors' });
+        console.log('[LiveKit Diagnostic] Cloud Server is reachable!');
+      } catch (err: any) {
+        console.error('[LiveKit Diagnostic] Browser network fetch failed:', err);
+        setError(
+          `Browser blocked connection to LiveKit Cloud (${err.message}). If using Brave or AdBlock, turn off Shields for this site.`
+        );
+      }
+    }
+    testNetwork();
+  }, [isOpen]);
 
   const initVoiceConnection = useCallback(async () => {
     if (!roomId || !userId) return;
@@ -47,7 +63,7 @@ export function LiveKitVoiceModal({
     setError(null);
     setToken('');
 
-    // 1. Explicit Microphone Permission Pre-fetch
+    // 2. Explicit Microphone Permission Pre-fetch
     try {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -60,7 +76,7 @@ export function LiveKitVoiceModal({
       return;
     }
 
-    // 2. Token Fetching from Server Route
+    // 3. Token Fetching from Server Route
     try {
       const res = await fetch(
         `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(
@@ -79,9 +95,6 @@ export function LiveKitVoiceModal({
       }
 
       setToken(data.token);
-      if (data.wsUrl) {
-        setWsUrl(data.wsUrl);
-      }
       setLoading(false);
     } catch (err: any) {
       console.error('[LiveKit] Connection setup error:', err);
@@ -101,8 +114,6 @@ export function LiveKitVoiceModal({
   }, [isOpen, initVoiceConnection, retryCount]);
 
   if (!isOpen) return null;
-
-  const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || wsUrl || DEFAULT_WS_URL;
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] w-[94vw] max-w-md rounded-3xl bg-zinc-950/95 border border-emerald-500/30 p-5 shadow-2xl backdrop-blur-xl text-zinc-100 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
@@ -142,7 +153,7 @@ export function LiveKitVoiceModal({
           video={false}
           audio={true}
           token={token}
-          serverUrl={serverUrl}
+          serverUrl={LIVEKIT_SERVER_URL}
           connect={true}
           data-lk-theme="default"
           onDisconnected={onClose}
