@@ -182,7 +182,7 @@ function useChatData() {
   const pathname = usePathname();
   const { user: authUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const { setAppBackground, setUseCustomBackground } = useAppearance();
+  const { setAppBackground, setUseCustomBackground, setWeatherLocation, setWeatherUnit, setIsWeatherVisible } = useAppearance();
 
   const aiUser: User = {
     id: AI_USER_ID,
@@ -292,6 +292,15 @@ function useChatData() {
             }
             if(userData.hasOwnProperty('useCustomBackground')) {
               setUseCustomBackground(userData.useCustomBackground ?? false);
+            }
+            if(userData.weatherLocation !== undefined && userData.weatherLocation !== null) {
+              setWeatherLocation(userData.weatherLocation);
+            }
+            if(userData.weatherUnit) {
+              setWeatherUnit(userData.weatherUnit);
+            }
+            if(userData.hasOwnProperty('isWeatherVisible') && userData.isWeatherVisible !== undefined) {
+              setIsWeatherVisible(userData.isWeatherVisible);
             }
         } else {
             console.warn('[AppShell] User document missing in Firestore. Self-healing user document...');

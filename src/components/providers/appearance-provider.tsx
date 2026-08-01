@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useTheme } from 'next-themes';
+import { auth, db } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 type WeatherUnit = 'Celsius' | 'Fahrenheit';
 
@@ -227,19 +229,30 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     safeSet('areNotificationsMuted', String(muted));
   };
 
+  const syncWeatherField = (field: string, value: any) => {
+    if (auth?.currentUser?.uid) {
+      updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        [field]: value
+      }).catch(err => console.warn(`Error syncing ${field} to Firestore:`, err));
+    }
+  };
+
   const setIsWeatherVisible = (visible: boolean) => {
     setIsWeatherVisibleState(visible);
     safeSet('isWeatherVisible', String(visible));
+    syncWeatherField('isWeatherVisible', visible);
   };
 
   const setWeatherLocation = (location: string) => {
     setWeatherLocationState(location);
     safeSet('weatherLocation', location);
+    syncWeatherField('weatherLocation', location);
   };
 
   const setWeatherUnit = (unit: WeatherUnit) => {
     setWeatherUnitState(unit);
     safeSet('weatherUnit', unit);
+    syncWeatherField('weatherUnit', unit);
   };
 
   const setChatListOpacity = (opacity: number) => {

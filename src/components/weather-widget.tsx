@@ -81,11 +81,11 @@ export function WeatherWidget() {
                     if (city) {
                         setWeatherLocation(city);
                     } else {
-                        setWeatherLocation('London');
+                        fetchWeather('London', weatherUnit);
                     }
                 } catch (error) {
                     console.warn("Geolocation fallback to default city (London):", error);
-                    setWeatherLocation('London');
+                    fetchWeather('London', weatherUnit);
                 }
             }
         };

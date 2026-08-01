@@ -28,6 +28,9 @@ export type User = {
   isVerified?: boolean;
   background?: string;
   useCustomBackground?: boolean;
+  weatherLocation?: string;
+  weatherUnit?: 'Celsius' | 'Fahrenheit';
+  isWeatherVisible?: boolean;
   mutedConversations?: string[];
   devices?: Device[];
   about?: string;
