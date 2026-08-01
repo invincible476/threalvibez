@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     const at = new AccessToken(apiKey, apiSecret, {
       identity: identity,
       name: username,
+      ttl: '1h',
     });
 
     at.addGrant({

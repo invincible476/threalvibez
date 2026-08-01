@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   LiveKitRoom,
   RoomAudioRenderer,
-  ControlBar,
   AudioConference,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { PhoneOff, Loader2, ShieldAlert } from 'lucide-react';
+import { PhoneOff, Loader2, ShieldAlert, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +22,8 @@ interface LiveKitVoiceModalProps {
   onClose: () => void;
 }
 
+const DEFAULT_WS_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://omegaone-7kb381s3.livekit.cloud';
+
 export function LiveKitVoiceModal({
   isOpen,
   roomId,
@@ -33,61 +34,60 @@ export function LiveKitVoiceModal({
   onClose,
 }: LiveKitVoiceModalProps) {
   const [token, setToken] = useState<string>('');
-  const [wsUrl, setWsUrl] = useState<string>('');
+  const [wsUrl, setWsUrl] = useState<string>(DEFAULT_WS_URL);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (!isOpen || !roomId || !userId) return;
+  const fetchToken = useCallback(async () => {
+    if (!roomId || !userId) return;
 
-    let isMounted = true;
     setLoading(true);
     setError(null);
 
-    const fetchToken = async () => {
-      try {
-        const res = await fetch(
-          `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(
-            userName
-          )}&identity=${encodeURIComponent(userId)}`
-        );
+    try {
+      const res = await fetch(
+        `/api/livekit/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(
+          userName
+        )}&identity=${encodeURIComponent(userId)}`
+      );
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `Server responded with status ${res.status}`);
-        }
-
-        const data = await res.json();
-        if (isMounted) {
-          setToken(data.token);
-          setWsUrl(data.wsUrl || process.env.NEXT_PUBLIC_LIVEKIT_URL || '');
-          setLoading(false);
-        }
-      } catch (err: any) {
-        console.error('[LiveKit] Token fetch error:', err);
-        if (isMounted) {
-          setError(err.message || 'Failed to initialize LiveKit connection');
-          setLoading(false);
-          toast({
-            title: 'LiveKit Voice Error',
-            description: err.message || 'Failed to connect to LiveKit voice room.',
-            variant: 'destructive',
-          });
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Token endpoint returned HTTP ${res.status}`);
       }
-    };
 
+      const data = await res.json();
+      if (!data.token) {
+        throw new Error(data.error || 'No token returned by token endpoint');
+      }
+
+      setToken(data.token);
+      if (data.wsUrl) {
+        setWsUrl(data.wsUrl);
+      }
+      setLoading(false);
+    } catch (err: any) {
+      console.error('[LiveKit] Token fetch error:', err);
+      setError(err.message || 'Failed to connect to LiveKit voice room');
+      setLoading(false);
+      toast({
+        title: 'LiveKit Voice Error',
+        description: err.message || 'Failed to connect to LiveKit voice room.',
+        variant: 'destructive',
+      });
+    }
+  }, [roomId, userId, userName, toast]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     fetchToken();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, roomId, userId, userName, toast]);
+  }, [isOpen, fetchToken, retryCount]);
 
   if (!isOpen) return null;
 
-  const livekitServerUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || wsUrl;
+  const serverUrl = wsUrl || DEFAULT_WS_URL;
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] w-[94vw] max-w-md rounded-3xl bg-zinc-950/95 border border-emerald-500/30 p-5 shadow-2xl backdrop-blur-xl text-zinc-100 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
@@ -100,16 +100,32 @@ export function LiveKitVoiceModal({
         <div className="flex flex-col items-center justify-center py-4 space-y-3 text-center">
           <ShieldAlert className="h-8 w-8 text-destructive animate-bounce" />
           <p className="text-sm font-semibold text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={onClose} className="rounded-xl mt-2">
-            Dismiss
-          </Button>
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRetryCount((prev) => prev + 1)}
+              className="rounded-xl flex items-center gap-1.5 border-zinc-700 hover:bg-zinc-800"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retry Connection
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onClose}
+              className="rounded-xl"
+            >
+              Close
+            </Button>
+          </div>
         </div>
       ) : (
         <LiveKitRoom
           video={false}
           audio={true}
           token={token}
-          serverUrl={livekitServerUrl}
+          serverUrl={serverUrl}
           data-lk-theme="default"
           onDisconnected={onClose}
           onError={(err) => {
