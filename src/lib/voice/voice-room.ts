@@ -22,6 +22,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from 'firebase/firestore';
+import { callTelemetry, checkMicrophonePermission, logVoiceError, CALL_ERROR_CODES } from './telemetry';
 
 const DEFAULT_CONFIG: VoiceConnectionConfig = {
   iceServers: [
@@ -29,8 +30,8 @@ const DEFAULT_CONFIG: VoiceConnectionConfig = {
       urls: [
         'stun:stun.l.google.com:19302',
         'stun:stun1.l.google.com:19302',
-      ]
-    }
+      ],
+    },
   ],
   maxRetries: 3,
   reconnectDelay: 1000,
@@ -74,11 +75,21 @@ export class VoiceRoom {
     currentUserProfile: { name: string; photoURL?: string }
   ): Promise<void> {
     console.log(`[Voice] Starting outgoing call to ${targetUser.name} in Room ID: ${this.roomId}`);
+    callTelemetry.update({
+      status: 'calling',
+      currentStep: 'Checking Microphone Permission',
+      errorCode: null,
+    });
+
+    const callDocRef = doc(db, 'calls', this.roomId);
+    const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
+    const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
+
     try {
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
       this.updateMetrics();
 
-      // 1. Setup local audio stream
+      // 1. Setup local audio stream with microphone permission checks
       await this.setupLocalStream();
 
       // 2. Register Local Participant State
@@ -92,16 +103,17 @@ export class VoiceRoom {
       this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
 
       // 3. Initialize Caller RTCPeerConnection & SDP Offer
-      const callDocRef = doc(db, 'calls', this.roomId);
-      const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
-      const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
+      callTelemetry.update({
+        status: 'calling',
+        currentStep: 'Creating WebRTC Offer',
+      });
 
       const pc = new RTCPeerConnection({
         iceServers: this.config.iceServers,
       });
       this.pc = pc;
 
-      this.attachPeerConnectionListeners(pc);
+      this.attachPeerConnectionListeners(pc, callDocRef);
 
       // Add local audio track
       if (this.localStream) {
@@ -130,6 +142,11 @@ export class VoiceRoom {
         userId: this.userId,
       };
 
+      callTelemetry.update({
+        status: 'ringing',
+        currentStep: 'Writing Offer to Firestore (Calling)',
+      });
+
       // Write calls/${roomId} document with status: 'ringing'
       await setDoc(
         callDocRef,
@@ -148,15 +165,27 @@ export class VoiceRoom {
         { merge: true }
       );
 
+      callTelemetry.update({
+        status: 'ringing',
+        currentStep: 'Ringing Callee',
+      });
+
       // 30s Auto-hangup safety timeout on Caller side
       const callerTimeout = setTimeout(() => {
         if (pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') {
           console.log('[Voice] 30s timeout reached on Caller side with no answer. Cancelling call.');
+          callTelemetry.update({
+            status: 'cancelled',
+            currentStep: 'Call Timed Out (30s)',
+          });
           updateDoc(callDocRef, { status: 'cancelled' }).catch(() => {});
           this.cleanup();
         }
       }, 30000);
       this.unsubscribes.push(() => clearTimeout(callerTimeout));
+
+      // Timer to check for 10s SDP Answer Timeout once status changes to 'accepted'
+      let answerTimer: NodeJS.Timeout | null = null;
 
       // Listen for Callee acceptance/answer or decline
       const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
@@ -165,12 +194,47 @@ export class VoiceRoom {
 
         if (data.status === 'declined' || data.status === 'cancelled' || data.status === 'ended') {
           console.log('[Voice] Call status changed to:', data.status);
+          callTelemetry.update({
+            status: data.status,
+            currentStep: `Call ${data.status}`,
+          });
+          this.cleanup();
+          return;
+        }
+
+        if (data.status === 'failed') {
+          callTelemetry.update({
+            status: 'failed',
+            currentStep: 'Call Failed',
+          });
           this.cleanup();
           return;
         }
 
         if (Array.isArray(data.participantIds)) {
           this.syncParticipants(data.participantIds);
+        }
+
+        if (data.status === 'accepted') {
+          callTelemetry.update({
+            status: 'accepted',
+            currentStep: 'Callee Accepted. Awaiting SDP Answer',
+          });
+
+          // Set 10s timeout for SDP Answer post after acceptance (ERR_ANSWER_TIMEOUT)
+          if (!data.answer && !answerTimer) {
+            answerTimer = setTimeout(() => {
+              if (pc.signalingState !== 'stable' && !pc.currentRemoteDescription) {
+                logVoiceError(302, 'Callee accepted call but failed to post SDP answer within 10s');
+                callTelemetry.setError('ERR_ANSWER_TIMEOUT', 'Callee accepted call but failed to post SDP answer within 10s');
+                updateDoc(callDocRef, { status: 'failed', errorCode: 'ERR_ANSWER_TIMEOUT' }).catch(() => {});
+                this.cleanup();
+              }
+            }, 10000);
+            this.unsubscribes.push(() => {
+              if (answerTimer) clearTimeout(answerTimer);
+            });
+          }
         }
 
         if (
@@ -180,9 +244,20 @@ export class VoiceRoom {
           pc.signalingState !== 'stable' &&
           !pc.currentRemoteDescription
         ) {
+          if (answerTimer) {
+            clearTimeout(answerTimer);
+            answerTimer = null;
+          }
           console.log('[Voice] Callee accepted call. Received SDP answer:', data.calleeId || 'callee');
+          callTelemetry.update({
+            status: 'connecting',
+            currentStep: 'Processing Callee SDP Answer',
+          });
           const answerDescription = new RTCSessionDescription(data.answer);
-          await pc.setRemoteDescription(answerDescription).catch(console.error);
+          await pc.setRemoteDescription(answerDescription).catch((err) => {
+            logVoiceError('REMOTE_DESC_ERR', err);
+            callTelemetry.setError('ERR_ANSWER_TIMEOUT', 'Invalid SDP Answer remote description');
+          });
           this.updateMetrics();
         }
       });
@@ -198,14 +273,27 @@ export class VoiceRoom {
             }
             console.log('[Voice] Received SDP candidate from callee');
             const candidate = new RTCIceCandidate(candidateData);
-            await pc.addIceCandidate(candidate).catch(console.error);
+            await pc.addIceCandidate(candidate).catch((err) => {
+              console.warn('[Voice] Add ICE candidate error:', err);
+            });
           }
         });
       });
       this.unsubscribes.push(unsubCalleeCandidates);
 
-    } catch (error) {
+    } catch (error: any) {
       const formattedError = error instanceof Error ? error : new Error(String(error));
+      logVoiceError('START_CALL_FAIL', formattedError);
+
+      if (formattedError.message.includes('ERR_MIC_DENIED') || formattedError.message.includes('Microphone access denied')) {
+        callTelemetry.setError('ERR_MIC_DENIED', formattedError.message);
+      } else if (formattedError.message.includes('ERR_MIC_UNSUPPORTED')) {
+        callTelemetry.setError('ERR_MIC_UNSUPPORTED', formattedError.message);
+      } else {
+        callTelemetry.setError('ERR_OFFER_MISSING', formattedError.message);
+      }
+
+      await updateDoc(callDocRef, { status: 'failed' }).catch(() => {});
       this.handleError(formattedError);
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
       throw formattedError;
@@ -217,11 +305,33 @@ export class VoiceRoom {
    */
   public async acceptCall(incomingCallData: CallSession): Promise<void> {
     console.log(`[Voice] Accepting incoming call in Room ID: ${this.roomId}`);
+    callTelemetry.update({
+      status: 'accepting',
+      currentStep: 'Validating Incoming Offer Payload',
+      errorCode: null,
+    });
+
+    const callDocRef = doc(db, 'calls', this.roomId);
+    const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
+    const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
+
     try {
+      // Validate offer payload (ERR_OFFER_MISSING - 301)
+      if (!incomingCallData || !incomingCallData.offer || !incomingCallData.offer.sdp) {
+        logVoiceError(301, { incomingCallData, reason: 'Offer payload null or invalid' });
+        callTelemetry.setError('ERR_OFFER_MISSING', 'Call document ringing but SDP offer payload is null or invalid');
+        await updateDoc(callDocRef, { status: 'failed', errorCode: 'ERR_OFFER_MISSING' }).catch(() => {});
+        throw new Error('ERR_OFFER_MISSING (301): Call doc ringing but SDP offer payload is null/invalid.');
+      }
+
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
       this.updateMetrics();
 
-      // 1. Setup local audio stream
+      // 1. Setup local audio stream with mic permission checks
+      callTelemetry.update({
+        status: 'accepting',
+        currentStep: 'Setting up Microphone Media Stream',
+      });
       await this.setupLocalStream();
 
       // 2. Register Local Participant State
@@ -235,16 +345,17 @@ export class VoiceRoom {
       this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
 
       // 3. Initialize Callee RTCPeerConnection & SDP Answer
-      const callDocRef = doc(db, 'calls', this.roomId);
-      const callerCandidatesCol = collection(db, 'calls', this.roomId, 'callerCandidates');
-      const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
+      callTelemetry.update({
+        status: 'accepting',
+        currentStep: 'Creating Callee PeerConnection',
+      });
 
       const pc = new RTCPeerConnection({
         iceServers: this.config.iceServers,
       });
       this.pc = pc;
 
-      this.attachPeerConnectionListeners(pc);
+      this.attachPeerConnectionListeners(pc, callDocRef);
 
       // Add local audio tracks
       if (this.localStream) {
@@ -263,13 +374,23 @@ export class VoiceRoom {
       };
 
       // Set Remote Description from Caller Offer
-      if (incomingCallData.offer) {
-        console.log('[Voice] Received SDP offer from caller:', incomingCallData.callerId);
-        await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer)).catch(console.error);
-        this.updateMetrics();
-      }
+      console.log('[Voice] Received SDP offer from caller:', incomingCallData.callerId);
+      callTelemetry.update({
+        status: 'accepting',
+        currentStep: 'Setting Remote Description (Caller Offer)',
+      });
+      await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer)).catch((err) => {
+        logVoiceError(301, err);
+        callTelemetry.setError('ERR_OFFER_MISSING', 'Failed to set Remote Description from caller offer');
+        throw new Error('ERR_OFFER_MISSING (301): Invalid SDP Offer description.');
+      });
+      this.updateMetrics();
 
       // Create Answer
+      callTelemetry.update({
+        status: 'accepting',
+        currentStep: 'Creating & Setting Local SDP Answer',
+      });
       const answerDescription = await pc.createAnswer();
       await pc.setLocalDescription(answerDescription);
 
@@ -280,13 +401,18 @@ export class VoiceRoom {
         userId: this.userId,
       };
 
-      // Update call document status to 'accepted' and set answer
-      await updateDoc(callDocRef, {
+      callTelemetry.update({
+        status: 'accepted',
+        currentStep: 'Posting Answer to Firestore',
+      });
+
+      // Update call document status to 'accepted' and set answer within 10s deadline (ERR_ANSWER_TIMEOUT)
+      const answerPostPromise = updateDoc(callDocRef, {
         calleeId: this.userId,
         participantIds: arrayUnion(this.userId),
         answer,
         status: 'accepted',
-      }).catch(async (err) => {
+      }).catch(async () => {
         await setDoc(
           callDocRef,
           {
@@ -299,12 +425,37 @@ export class VoiceRoom {
         );
       });
 
+      // Timeout race condition for posting answer
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('ERR_ANSWER_TIMEOUT (302): Callee accepted but SDP answer failed to post within 10s.'));
+        }, 10000);
+      });
+
+      await Promise.race([answerPostPromise, timeoutPromise]).catch(async (err: any) => {
+        if (err?.message?.includes('ERR_ANSWER_TIMEOUT')) {
+          logVoiceError(302, err);
+          callTelemetry.setError('ERR_ANSWER_TIMEOUT', err.message);
+          await updateDoc(callDocRef, { status: 'failed', errorCode: 'ERR_ANSWER_TIMEOUT' }).catch(() => {});
+          throw err;
+        }
+      });
+
+      callTelemetry.update({
+        status: 'connecting',
+        currentStep: 'Establishing ICE Connection',
+      });
+
       // Listen for Call Document status updates
       const unsubCallDoc = onSnapshot(callDocRef, async (snapshot) => {
         const data = snapshot.data();
         if (!data) return;
 
-        if (data.status === 'ended' || data.status === 'cancelled') {
+        if (data.status === 'ended' || data.status === 'cancelled' || data.status === 'failed') {
+          callTelemetry.update({
+            status: data.status,
+            currentStep: `Call ${data.status}`,
+          });
           this.cleanup();
           return;
         }
@@ -325,14 +476,29 @@ export class VoiceRoom {
             }
             console.log('[Voice] Received SDP candidate from caller');
             const candidate = new RTCIceCandidate(candidateData);
-            await pc.addIceCandidate(candidate).catch(console.error);
+            await pc.addIceCandidate(candidate).catch((err) => {
+              console.warn('[Voice] Add ICE candidate error:', err);
+            });
           }
         });
       });
       this.unsubscribes.push(unsubCallerCandidates);
 
-    } catch (error) {
+    } catch (error: any) {
       const formattedError = error instanceof Error ? error : new Error(String(error));
+      logVoiceError('ACCEPT_CALL_FAIL', formattedError);
+
+      if (formattedError.message.includes('ERR_MIC_DENIED') || formattedError.message.includes('Microphone access denied')) {
+        callTelemetry.setError('ERR_MIC_DENIED', formattedError.message);
+      } else if (formattedError.message.includes('ERR_OFFER_MISSING')) {
+        callTelemetry.setError('ERR_OFFER_MISSING', formattedError.message);
+      } else if (formattedError.message.includes('ERR_ANSWER_TIMEOUT')) {
+        callTelemetry.setError('ERR_ANSWER_TIMEOUT', formattedError.message);
+      } else {
+        callTelemetry.setError('ERR_ICE_DISCONNECTED', formattedError.message);
+      }
+
+      await updateDoc(callDocRef, { status: 'failed' }).catch(() => {});
       this.handleError(formattedError);
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
       throw formattedError;
@@ -344,13 +510,17 @@ export class VoiceRoom {
    */
   public async declineCall(): Promise<void> {
     try {
+      callTelemetry.update({
+        status: 'declined',
+        currentStep: 'Declined Call',
+      });
       const callDocRef = doc(db, 'calls', this.roomId);
       await updateDoc(callDocRef, { status: 'declined' }).catch(async () => {
         await setDoc(callDocRef, { status: 'declined' }, { merge: true }).catch(() => {});
       });
       this.cleanup();
     } catch (err) {
-      console.error('Error declining call:', err);
+      logVoiceError('DECLINE_ERR', err);
     }
   }
 
@@ -359,13 +529,17 @@ export class VoiceRoom {
    */
   public async cancelCall(): Promise<void> {
     try {
+      callTelemetry.update({
+        status: 'cancelled',
+        currentStep: 'Cancelled Outgoing Call',
+      });
       const callDocRef = doc(db, 'calls', this.roomId);
       await updateDoc(callDocRef, { status: 'cancelled' }).catch(async () => {
         await setDoc(callDocRef, { status: 'cancelled' }, { merge: true }).catch(() => {});
       });
       this.cleanup();
     } catch (err) {
-      console.error('Error cancelling call:', err);
+      logVoiceError('CANCEL_ERR', err);
     }
   }
 
@@ -374,6 +548,11 @@ export class VoiceRoom {
    */
   public async join(): Promise<void> {
     console.log(`[Voice] Connected to Room ID: ${this.roomId}`);
+    callTelemetry.update({
+      status: 'connecting',
+      currentStep: 'Joining Voice Room',
+      errorCode: null,
+    });
     try {
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTING as any);
       this.updateMetrics();
@@ -390,18 +569,29 @@ export class VoiceRoom {
       this.emit(VoiceRoomEvent.PARTICIPANT_JOINED, localParticipant);
 
       await this.setupFirestoreSignaling();
-    } catch (error) {
+    } catch (error: any) {
       const formattedError = error instanceof Error ? error : new Error(String(error));
+      logVoiceError('JOIN_ERR', formattedError);
       this.handleError(formattedError);
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
       throw formattedError;
     }
   }
 
-  private attachPeerConnectionListeners(pc: RTCPeerConnection): void {
+  private attachPeerConnectionListeners(pc: RTCPeerConnection, callDocRef: any): void {
     pc.oniceconnectionstatechange = () => {
       console.log('[Voice] iceConnectionState:', pc.iceConnectionState);
       this.updateMetrics();
+
+      // Catch WebRTC peer disconnection (ERR_ICE_DISCONNECTED - 401)
+      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        logVoiceError(401, `ICE connection state became: ${pc.iceConnectionState}`);
+        callTelemetry.setError(
+          'ERR_ICE_DISCONNECTED',
+          `WebRTC peer connection dropped or blocked by firewall/NAT (State: ${pc.iceConnectionState})`
+        );
+        updateDoc(callDocRef, { status: 'failed', errorCode: 'ERR_ICE_DISCONNECTED' }).catch(() => {});
+      }
     };
 
     pc.onsignalingstatechange = () => {
@@ -412,6 +602,13 @@ export class VoiceRoom {
     pc.onconnectionstatechange = () => {
       console.log('[Voice] connectionState:', pc.connectionState);
       this.updateMetrics();
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+        logVoiceError(401, `Peer connection state became: ${pc.connectionState}`);
+        callTelemetry.setError(
+          'ERR_ICE_DISCONNECTED',
+          `WebRTC connection lost (State: ${pc.connectionState})`
+        );
+      }
     };
 
     pc.ontrack = (event) => {
@@ -420,6 +617,10 @@ export class VoiceRoom {
         const remoteStream = event.streams[0];
         const remoteTargetId = 'remote_peer';
         this.remoteStreams.set(remoteTargetId, remoteStream);
+        callTelemetry.update({
+          status: 'connected',
+          currentStep: 'Media Active (Remote Audio Playing)',
+        });
         this.updateMetrics();
         this.emit(VoiceRoomEvent.STREAM_ADDED, remoteStream, remoteTargetId);
       }
@@ -444,6 +645,10 @@ export class VoiceRoom {
     });
 
     if (iceState === 'connected' || iceState === 'completed') {
+      callTelemetry.update({
+        status: 'connected',
+        currentStep: 'P2P WebRTC Connected',
+      });
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.CONNECTED as any);
     } else if (iceState === 'disconnected' || iceState === 'failed' || iceState === 'closed') {
       this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.FAILED as any);
@@ -457,6 +662,10 @@ export class VoiceRoom {
    */
   public async leave(): Promise<void> {
     try {
+      callTelemetry.update({
+        status: 'ended',
+        currentStep: 'Leaving Call Session',
+      });
       const callDocRef = doc(db, 'calls', this.roomId);
       const callSnap = await getDoc(callDocRef).catch(() => null);
 
@@ -533,10 +742,22 @@ export class VoiceRoom {
   }
 
   /**
-   * Setup local media stream with WebRTC audio constraints
+   * Setup local media stream with WebRTC audio constraints and explicit permission checks
    */
   private async setupLocalStream(): Promise<void> {
     try {
+      const permResult = await checkMicrophonePermission();
+      if (permResult.state === 'unsupported') {
+        logVoiceError(102, 'navigator.mediaDevices.getUserMedia is unsupported');
+        callTelemetry.setError('ERR_MIC_UNSUPPORTED', 'Microphone mediaDevices API not available');
+        throw new Error('ERR_MIC_UNSUPPORTED (102): mediaDevices.getUserMedia not available on current device context.');
+      }
+      if (permResult.state === 'denied') {
+        logVoiceError(101, 'Microphone permission state is denied');
+        callTelemetry.setError('ERR_MIC_DENIED', 'Microphone permission state is denied by browser policy');
+        throw new Error('ERR_MIC_DENIED (101): Microphone access rejected by user or blocked by browser policy.');
+      }
+
       const supported = await navigator.mediaDevices.getSupportedConstraints();
       const audioConstraints: MediaTrackConstraints = {
         echoCancellation: supported.echoCancellation ? true : undefined,
@@ -549,8 +770,13 @@ export class VoiceRoom {
       });
 
       this.setupAudioAnalysis();
-    } catch (error) {
-      throw new Error('Microphone access denied or unavailable: ' + (error instanceof Error ? error.message : String(error)));
+    } catch (error: any) {
+      if (error?.message?.includes('ERR_MIC_UNSUPPORTED') || error?.message?.includes('ERR_MIC_DENIED')) {
+        throw error;
+      }
+      logVoiceError(101, error);
+      callTelemetry.setError('ERR_MIC_DENIED', error?.message || 'Microphone access denied');
+      throw new Error('ERR_MIC_DENIED (101): Microphone access rejected by user or blocked by browser policy.');
     }
   }
 
@@ -643,11 +869,11 @@ export class VoiceRoom {
     const calleeCandidatesCol = collection(db, 'calls', this.roomId, 'calleeCandidates');
 
     const pc = new RTCPeerConnection({
-      iceServers: this.config.iceServers
+      iceServers: this.config.iceServers,
     });
     this.pc = pc;
 
-    this.attachPeerConnectionListeners(pc);
+    this.attachPeerConnectionListeners(pc, callDocRef);
 
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
@@ -693,7 +919,7 @@ export class VoiceRoom {
         const data = snapshot.data();
         if (!data) return;
 
-        if (data.status === 'ended' || data.status === 'declined' || data.status === 'cancelled') {
+        if (data.status === 'ended' || data.status === 'declined' || data.status === 'cancelled' || data.status === 'failed') {
           this.cleanup();
           return;
         }
@@ -783,7 +1009,7 @@ export class VoiceRoom {
         const data = snapshot.data();
         if (!data) return;
 
-        if (data.status === 'ended' || data.status === 'cancelled') {
+        if (data.status === 'ended' || data.status === 'cancelled' || data.status === 'failed') {
           this.cleanup();
           return;
         }
@@ -884,6 +1110,7 @@ export class VoiceRoom {
 
     this.participantsMap.clear();
     this.isSpeaking = false;
+    callTelemetry.reset();
     this.emit(VoiceRoomEvent.CONNECTION_STATE_CHANGED, VoiceConnectionState.DISCONNECTED as any);
   }
 }

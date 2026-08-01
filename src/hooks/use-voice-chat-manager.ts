@@ -10,25 +10,47 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import { CallSession } from '@/lib/voice/types';
+import { callTelemetry, checkMicrophonePermission, logVoiceError } from '@/lib/voice/telemetry';
 
 export function useVoiceChatManager(currentUserId?: string) {
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+  const [showMicPermissionModal, setShowMicPermissionModal] = useState(false);
+
+  // 1. Stabilize currentUserId reference using a persistent useRef & cached state
   const stableUserIdRef = useRef<string | undefined>(currentUserId);
-
-  // Keep stable user ID cached to prevent user re-hydration state flickering
-  useEffect(() => {
-    if (currentUserId && currentUserId.length > 0) {
-      stableUserIdRef.current = currentUserId;
-    }
-  }, [currentUserId]);
-
+  if (currentUserId && currentUserId.length > 0) {
+    stableUserIdRef.current = currentUserId;
+  }
   const activeUserId = currentUserId || stableUserIdRef.current;
 
-  // Real-time Firestore snapshot listener for incoming calls where receiverId === activeUserId
-  useEffect(() => {
-    if (!activeUserId) return;
+  // 2. Store active call listener unsubscribe function in a ref to prevent duplicate subscriptions
+  const listenerUnsubRef = useRef<(() => void) | null>(null);
+  const subscribedUserIdRef = useRef<string | undefined>(undefined);
 
-    console.log('[VoiceManager] Listening for calls for receiver:', activeUserId);
+  // Real-time Firestore snapshot listener for incoming calls
+  useEffect(() => {
+    if (!activeUserId) {
+      if (listenerUnsubRef.current) {
+        listenerUnsubRef.current();
+        listenerUnsubRef.current = null;
+        subscribedUserIdRef.current = undefined;
+      }
+      return;
+    }
+
+    // Avoid duplicate subscriptions if listener is already active for the same activeUserId
+    if (subscribedUserIdRef.current === activeUserId && listenerUnsubRef.current) {
+      return;
+    }
+
+    // Cleanup existing subscription if switching users
+    if (listenerUnsubRef.current) {
+      listenerUnsubRef.current();
+      listenerUnsubRef.current = null;
+    }
+
+    subscribedUserIdRef.current = activeUserId;
+    console.log('[VoiceManager] Subscribing listener for incoming calls. Receiver ID:', activeUserId);
 
     const callsQuery = query(
       collection(db, 'calls'),
@@ -42,6 +64,20 @@ export function useVoiceChatManager(currentUserId?: string) {
         if (!snapshot.empty) {
           const docSnap = snapshot.docs[0];
           const data = docSnap.data();
+
+          // Auth desync guard check
+          if (data.receiverId !== activeUserId) {
+            logVoiceError(201, {
+              reason: 'Receiver ID mismatch in call doc snapshot',
+              docReceiverId: data.receiverId,
+              activeUserId,
+            });
+            callTelemetry.setError('ERR_SNAPSHOT_DESYNC', {
+              docReceiverId: data.receiverId,
+              activeUserId,
+            });
+            return;
+          }
 
           // Calculate call age for auto-hangup 30s timeout
           let isExpired = false;
@@ -62,41 +98,68 @@ export function useVoiceChatManager(currentUserId?: string) {
             const callRef = doc(db, 'calls', docSnap.id);
             updateDoc(callRef, { status: 'cancelled' }).catch(() => {});
             setIncomingCall(null);
+            callTelemetry.reset();
             return;
           }
 
-          // Maintain incomingCall state across offer/candidate document updates while ringing
-          setIncomingCall((prevCall) => {
-            const newCallData: CallSession = {
-              id: docSnap.id,
-              chatId: data.chatId || docSnap.id,
-              callerId: data.callerId,
-              callerName: data.callerName || 'User',
-              callerAvatar: data.callerAvatar || '',
-              receiverId: data.receiverId,
-              status: data.status,
-              offer: data.offer,
-              answer: data.answer,
-              createdAt: data.createdAt,
-            };
+          // 3. GUARD state updates: DO NOT reset incomingCall state to null if the document is updated
+          // with new metadata (like candidates or offer timestamps).
+          // ONLY update/maintain incomingCall state when status is explicitly 'ringing'.
+          if (data.status === 'ringing') {
+            callTelemetry.update({
+              status: 'ringing',
+              currentStep: 'Incoming Call Ringing',
+              errorCode: null,
+            });
 
-            // If previous call was already ringing for the same document, merge updates smoothly
-            if (prevCall && prevCall.chatId === newCallData.chatId && newCallData.status === 'ringing') {
-              return { ...prevCall, ...newCallData };
-            }
-            return newCallData;
-          });
+            setIncomingCall((prevCall) => {
+              const newCallData: CallSession = {
+                id: docSnap.id,
+                chatId: data.chatId || docSnap.id,
+                callerId: data.callerId,
+                callerName: data.callerName || 'User',
+                callerAvatar: data.callerAvatar || '',
+                receiverId: data.receiverId,
+                status: data.status,
+                offer: data.offer,
+                answer: data.answer,
+                createdAt: data.createdAt,
+              };
+
+              // Merge metadata smoothly without triggering UI flicker
+              if (prevCall && prevCall.chatId === newCallData.chatId) {
+                return { ...prevCall, ...newCallData };
+              }
+              return newCallData;
+            });
+          } else if (['ended', 'declined', 'cancelled', 'failed'].includes(data.status)) {
+            // ONLY set incomingCall to null if status explicitly changes to ended/declined/cancelled/failed
+            setIncomingCall(null);
+            callTelemetry.update({
+              status: data.status,
+              currentStep: `Call ${data.status}`,
+            });
+          }
         } else {
-          // Dismiss modal when snapshot becomes empty (status changed from ringing)
+          // Document was deleted or status changed away from ringing -> reset incomingCall
           setIncomingCall(null);
         }
       },
       (err) => {
-        console.error('[VoiceManager] Firestore snapshot error:', err);
+        logVoiceError('SNAPSHOT_ERR', err);
       }
     );
 
-    return () => unsub();
+    listenerUnsubRef.current = unsub;
+
+    return () => {
+      // Cleanup on unmount or user change
+      if (listenerUnsubRef.current) {
+        listenerUnsubRef.current();
+        listenerUnsubRef.current = null;
+        subscribedUserIdRef.current = undefined;
+      }
+    };
   }, [activeUserId]);
 
   // Auto-hangup 30s safety timer for active incoming call
@@ -110,32 +173,70 @@ export function useVoiceChatManager(currentUserId?: string) {
         await setDoc(callRef, { status: 'cancelled' }, { merge: true }).catch(() => {});
       });
       setIncomingCall(null);
+      callTelemetry.reset();
     }, 30000);
 
     return () => clearTimeout(timer);
   }, [incomingCall]);
 
   const acceptCall = useCallback(async (call: CallSession) => {
+    callTelemetry.update({
+      status: 'connecting',
+      currentStep: 'Checking Microphone Permission',
+    });
+
+    // Check microphone permission before proceeding
+    const perm = await checkMicrophonePermission();
+    if (perm.state === 'denied') {
+      callTelemetry.setError('ERR_MIC_DENIED', 'Microphone permission state is denied');
+      setShowMicPermissionModal(true);
+      return false;
+    }
+
+    // Direct getUserMedia test to ensure microphone can be accessed
     try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop temporary track right after test since VoiceRoom will manage the actual media stream
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (micErr: any) {
+      logVoiceError(101, micErr);
+      callTelemetry.setError('ERR_MIC_DENIED', micErr?.message || 'Microphone access denied');
+      setShowMicPermissionModal(true);
+      return false;
+    }
+
+    try {
+      callTelemetry.update({
+        status: 'accepting',
+        currentStep: 'Posting Acceptance to Firestore',
+      });
       const callDocRef = doc(db, 'calls', call.chatId);
       await updateDoc(callDocRef, { status: 'accepted' }).catch(async () => {
         await setDoc(callDocRef, { status: 'accepted' }, { merge: true });
       });
       setIncomingCall(null);
-    } catch (err) {
-      console.error('[VoiceManager] Error accepting call:', err);
+      return true;
+    } catch (err: any) {
+      logVoiceError('ACCEPT_ERR', err);
+      callTelemetry.setError('ERR_ANSWER_TIMEOUT', err?.message || 'Failed to accept call in Firestore');
+      return false;
     }
   }, []);
 
   const declineCall = useCallback(async (call: CallSession) => {
     try {
+      callTelemetry.update({
+        status: 'declining',
+        currentStep: 'Declining Call',
+      });
       const callDocRef = doc(db, 'calls', call.chatId);
       await updateDoc(callDocRef, { status: 'declined' }).catch(async () => {
         await setDoc(callDocRef, { status: 'declined' }, { merge: true });
       });
       setIncomingCall(null);
+      callTelemetry.reset();
     } catch (err) {
-      console.error('[VoiceManager] Error declining call:', err);
+      logVoiceError('DECLINE_ERR', err);
     }
   }, []);
 
@@ -143,5 +244,7 @@ export function useVoiceChatManager(currentUserId?: string) {
     incomingCall,
     acceptCall,
     declineCall,
+    showMicPermissionModal,
+    setShowMicPermissionModal,
   };
 }

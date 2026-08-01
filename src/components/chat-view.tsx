@@ -28,6 +28,9 @@ import { cn } from '@/lib/utils';
 import { UserProfileSheet } from './user-profile-sheet';
 import { SidebarTrigger } from './ui/sidebar';
 import { useAppearance } from './providers/appearance-provider';
+import { checkMicrophonePermission, callTelemetry, logVoiceError } from '@/lib/voice/telemetry';
+import { MicPermissionModal } from './mic-permission-modal';
+
 import Image from 'next/image';
 import { ImagePreviewDialog } from './image-preview-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -71,6 +74,8 @@ const ChatViewComponent = ({
   const { viewportHeight } = useMobileKeyboardHeight();
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
+  const [showMicModal, setShowMicModal] = useState(false);
+
   
   // Chat type flags
   const isAIChat = chat?.id === AI_USER_ID;
@@ -447,34 +452,61 @@ const ChatViewComponent = ({
         <div className={cn("flex items-center gap-2", isAIChat && "hidden")}>
           {/* Voice Call Button — Icon Only Control */}
           {!isVoiceConnected && !isAIChat && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-              onClick={async () => {
-                if (!currentUser?.uid || !chat?.id) return;
-                try {
-                  const targetUserId = chat.participants?.find((id) => id !== currentUser.uid) || '';
-                  const targetUser = usersCache.get(targetUserId);
-                  setIsOutgoingCalling(true);
-                  if (startCall) {
-                    await startCall(
-                      { uid: targetUserId, name: targetUser?.name || 'User', photoURL: targetUser?.photoURL || undefined },
-                      { name: currentUser.name, photoURL: currentUser.photoURL || undefined }
-                    );
-                  } else {
-                    await joinVoice();
+            <>
+              <MicPermissionModal
+                isOpen={showMicModal}
+                onClose={() => setShowMicModal(false)}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+                onClick={async () => {
+                  if (!currentUser?.uid || !chat?.id) return;
+
+                  // 1. Explicit permission check before initializing WebRTC
+                  const permResult = await checkMicrophonePermission();
+                  if (permResult.state === 'denied') {
+                    logVoiceError(101, 'Microphone permission state is denied');
+                    callTelemetry.setError('ERR_MIC_DENIED', 'Microphone access denied in browser settings');
+                    setShowMicModal(true);
+                    return;
                   }
-                  setIsVoiceEnabled(true);
-                } catch (error) {
-                  toast({ title: 'Voice Call Error', description: 'Could not connect.', variant: 'destructive' });
-                  setIsOutgoingCalling(false);
-                }
-              }}
-            >
-              <Phone className="h-4 w-4" />
-              <span className="sr-only">Voice Call</span>
-            </Button>
+
+                  // 2. Direct getUserMedia test synchronously inside user action handler
+                  try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach((track) => track.stop());
+                  } catch (micErr: any) {
+                    logVoiceError(101, micErr);
+                    callTelemetry.setError('ERR_MIC_DENIED', micErr?.message || 'Microphone access rejected by user');
+                    setShowMicModal(true);
+                    return;
+                  }
+
+                  try {
+                    const targetUserId = chat.participants?.find((id) => id !== currentUser.uid) || '';
+                    const targetUser = usersCache.get(targetUserId);
+                    setIsOutgoingCalling(true);
+                    if (startCall) {
+                      await startCall(
+                        { uid: targetUserId, name: targetUser?.name || 'User', photoURL: targetUser?.photoURL || undefined },
+                        { name: currentUser.name, photoURL: currentUser.photoURL || undefined }
+                      );
+                    } else {
+                      await joinVoice();
+                    }
+                    setIsVoiceEnabled(true);
+                  } catch (error: any) {
+                    toast({ title: 'Voice Call Error', description: error?.message || 'Could not connect.', variant: 'destructive' });
+                    setIsOutgoingCalling(false);
+                  }
+                }}
+              >
+                <Phone className="h-4 w-4" />
+                <span className="sr-only">Voice Call</span>
+              </Button>
+            </>
           )}
 
           {/* 3-dots Menu Button */}
