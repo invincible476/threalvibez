@@ -5,17 +5,12 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   ControlBar,
-  useTracks,
-  useParticipants,
-  AudioVisualizer,
-  TrackRefContext,
+  AudioConference,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Track } from 'livekit-client';
-import { PhoneOff, Mic, MicOff, Volume2, VolumeX, Loader2, Users, ShieldAlert } from 'lucide-react';
+import { PhoneOff, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface LiveKitVoiceModalProps {
@@ -66,7 +61,7 @@ export function LiveKitVoiceModal({
         const data = await res.json();
         if (isMounted) {
           setToken(data.token);
-          setWsUrl(data.wsUrl);
+          setWsUrl(data.wsUrl || process.env.NEXT_PUBLIC_LIVEKIT_URL || '');
           setLoading(false);
         }
       } catch (err: any) {
@@ -92,8 +87,10 @@ export function LiveKitVoiceModal({
 
   if (!isOpen) return null;
 
+  const livekitServerUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || wsUrl;
+
   return (
-    <div className="fixed bottom-4 right-4 z-[99999] w-[94vw] max-w-md rounded-3xl bg-zinc-950/95 border border-emerald-500/30 p-5 shadow-2xl backdrop-blur-xl text-zinc-100 animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed bottom-4 right-4 z-[9999] w-[94vw] max-w-md rounded-3xl bg-zinc-950/95 border border-emerald-500/30 p-5 shadow-2xl backdrop-blur-xl text-zinc-100 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
       {loading ? (
         <div className="flex flex-col items-center justify-center py-6 space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
@@ -112,7 +109,7 @@ export function LiveKitVoiceModal({
           video={false}
           audio={true}
           token={token}
-          serverUrl={wsUrl}
+          serverUrl={livekitServerUrl}
           data-lk-theme="default"
           onDisconnected={onClose}
           onError={(err) => {
@@ -157,20 +154,12 @@ export function LiveKitVoiceModal({
             </Button>
           </div>
 
-          {/* Room Audio Renderer & Custom Controls */}
+          {/* Room Audio Renderer */}
           <RoomAudioRenderer />
-          
-          <div className="pt-1 flex items-center justify-center">
-            <ControlBar
-              controls={{
-                microphone: true,
-                camera: false,
-                screenShare: false,
-                chat: false,
-                leave: false,
-              }}
-              className="bg-zinc-900/90 border border-zinc-800 rounded-2xl px-2 py-1.5"
-            />
+
+          {/* LiveKit Audio Conference & Controls */}
+          <div className="pt-1 flex flex-col items-center justify-center">
+            <AudioConference />
           </div>
         </LiveKitRoom>
       )}
