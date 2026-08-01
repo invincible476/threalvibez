@@ -214,10 +214,10 @@ function ResetPasswordForm() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/30">
             <Check className="h-7 w-7" />
           </div>
-          <CardTitle className="text-2xl font-bold font-heading text-white">
+          <CardTitle className="text-2xl font-bold font-heading text-foreground">
             Password Reset Complete
           </CardTitle>
-          <CardDescription className="text-zinc-300 text-sm max-w-sm mx-auto leading-relaxed">
+          <CardDescription className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
             Your password has been updated successfully. You can now close this browser tab, open the Vibez mobile app, and sign in with your new credentials.
           </CardDescription>
         </CardHeader>

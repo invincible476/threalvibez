@@ -27,12 +27,12 @@ function FriendsPageSkeleton() {
         <div className="space-y-3 pt-4">
             {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
-                    <div className="h-10 w-10 rounded-full bg-zinc-800 animate-pulse shrink-0" />
+                    <div className="h-10 w-10 rounded-full bg-muted animate-pulse shrink-0" />
                     <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="h-4 w-28 bg-zinc-800 rounded animate-pulse" />
-                        <div className="h-3 w-40 bg-zinc-800 rounded animate-pulse" />
+                        <div className="h-4 w-28 bg-muted rounded animate-pulse" />
+                        <div className="h-3 w-40 bg-muted rounded animate-pulse" />
                     </div>
-                    <div className="h-8 w-20 bg-zinc-800 rounded-lg animate-pulse shrink-0" />
+                    <div className="h-8 w-20 bg-muted rounded-lg animate-pulse shrink-0" />
                 </div>
             ))}
         </div>
@@ -328,7 +328,7 @@ export default function FriendsPage() {
             {/* Search Bar — clean, borderless, full-width */}
             <motion.div variants={cardVariants} className="px-4 pt-4 pb-2">
                 <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
                         type="search"
                         placeholder="Search friends or usernames..."
@@ -338,7 +338,7 @@ export default function FriendsPage() {
                         spellCheck={false}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 pr-9 h-10 w-full truncate border-none bg-zinc-900 rounded-xl text-sm text-zinc-100 placeholder:text-zinc-500"
+                        className="pl-9 pr-9 h-10 w-full truncate border-none bg-card rounded-xl text-sm text-foreground placeholder:text-muted-foreground"
                     />
                     {isSearching && (
                         <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-violet-400" />
@@ -358,7 +358,7 @@ export default function FriendsPage() {
                             return (
                                 <div
                                     key={user.uid}
-                                    className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40 w-full min-w-0 overflow-x-hidden"
+                                    className="flex items-center gap-3 px-4 py-3 border-b border-border/40 w-full min-w-0 overflow-x-hidden"
                                 >
                                     <div
                                         className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
@@ -366,8 +366,8 @@ export default function FriendsPage() {
                                     >
                                         <UserAvatar user={user} hasStory={user.hasActiveStory} storyViewed={user.storyViewed} isFriend={!!isFriend} className="h-10 w-10 shrink-0" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-sm text-zinc-100 truncate">{user.name}</p>
-                                            <p className="text-xs text-zinc-400 truncate">
+                                            <p className="font-semibold text-sm text-foreground truncate">{user.name}</p>
+                                            <p className="text-xs text-muted-foreground truncate">
                                                 {user.username ? `@${user.username}` : user.email}
                                             </p>
                                         </div>
@@ -422,7 +422,7 @@ export default function FriendsPage() {
                             );
                         })
                     ) : (
-                        <p className="text-center text-xs text-zinc-400 py-8 px-4">
+                        <p className="text-center text-xs text-muted-foreground py-8 px-4">
                             {isSearching
                                 ? 'Searching...'
                                 : `No users found for "${searchQuery}".`}
@@ -450,11 +450,11 @@ export default function FriendsPage() {
                         {/* MY FRIENDS */}
                         <TabsContent value="friends" className="mt-3">
                             {friends.length > 0 ? (
-                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden">
+                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-border/50 bg-card/40 overflow-hidden">
                                     {friends.map(friend => (
                                         <div
                                             key={friend.uid}
-                                            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors w-full min-w-0 overflow-x-hidden"
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors w-full min-w-0 overflow-x-hidden"
                                         >
                                             <div
                                                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
@@ -462,8 +462,8 @@ export default function FriendsPage() {
                                             >
                                                 <UserAvatar user={friend} hasStory={friend.hasActiveStory} storyViewed={friend.storyViewed} isFriend={true} className="h-10 w-10 shrink-0" />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-sm text-zinc-100 truncate">{friend.name}</p>
-                                                    <p className="text-xs text-zinc-400 truncate">{friend.email}</p>
+                                                    <p className="font-semibold text-sm text-foreground truncate">{friend.name}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">{friend.email}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
@@ -482,7 +482,7 @@ export default function FriendsPage() {
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    className="w-8 h-8 p-0 flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-400/10 shrink-0"
+                                                    className="w-8 h-8 p-0 flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-400/10 shrink-0"
                                                     onClick={() => handleFriendAction(friend.uid, 'removeFriend')}
                                                 >
                                                     <UserX className="h-4 w-4" />
@@ -492,7 +492,7 @@ export default function FriendsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-center text-xs text-zinc-400 py-10">
+                                <p className="text-center text-xs text-muted-foreground py-10">
                                     No friends yet. Use the search bar above to find people!
                                 </p>
                             )}
@@ -501,11 +501,11 @@ export default function FriendsPage() {
                         {/* INCOMING REQUESTS */}
                         <TabsContent value="requests" className="mt-3">
                             {requests.length > 0 ? (
-                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden">
+                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-border/50 bg-card/40 overflow-hidden">
                                     {requests.map(requestUser => (
                                         <div
                                             key={requestUser.uid}
-                                            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors w-full min-w-0 overflow-x-hidden"
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors w-full min-w-0 overflow-x-hidden"
                                         >
                                             <div
                                                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
@@ -513,8 +513,8 @@ export default function FriendsPage() {
                                             >
                                                 <UserAvatar user={requestUser} hasStory={requestUser.hasActiveStory} storyViewed={requestUser.storyViewed} className="h-10 w-10 shrink-0" />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-sm text-zinc-100 truncate">{requestUser.name}</p>
-                                                    <p className="text-xs text-zinc-400 truncate">{requestUser.email}</p>
+                                                    <p className="font-semibold text-sm text-foreground truncate">{requestUser.name}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">{requestUser.email}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
@@ -527,7 +527,7 @@ export default function FriendsPage() {
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    className="w-8 h-8 p-0 flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-400/10 shrink-0"
+                                                    className="w-8 h-8 p-0 flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-400/10 shrink-0"
                                                     onClick={() => handleFriendAction(requestUser.uid, 'declineRequest')}
                                                 >
                                                     <X className="h-4 w-4" />
@@ -537,18 +537,18 @@ export default function FriendsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-center text-xs text-zinc-400 py-10">No pending friend requests.</p>
+                                <p className="text-center text-xs text-muted-foreground py-10">No pending friend requests.</p>
                             )}
                         </TabsContent>
 
                         {/* SENT REQUESTS */}
                         <TabsContent value="sent" className="mt-3">
                             {sentRequests.length > 0 ? (
-                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-zinc-800/50 bg-zinc-900/40 overflow-hidden">
+                                <div className="flex flex-col divide-y divide-zinc-800/40 rounded-xl border border-border/50 bg-card/40 overflow-hidden">
                                     {sentRequests.map(sentRequestUser => (
                                         <div
                                             key={sentRequestUser.uid}
-                                            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors w-full min-w-0 overflow-x-hidden"
+                                            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors w-full min-w-0 overflow-x-hidden"
                                         >
                                             <div
                                                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
@@ -556,8 +556,8 @@ export default function FriendsPage() {
                                             >
                                                 <UserAvatar user={sentRequestUser} hasStory={sentRequestUser.hasActiveStory} storyViewed={sentRequestUser.storyViewed} className="h-10 w-10 shrink-0" />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-sm text-zinc-100 truncate">{sentRequestUser.name}</p>
-                                                    <p className="text-xs text-zinc-400 truncate">{sentRequestUser.email}</p>
+                                                    <p className="font-semibold text-sm text-foreground truncate">{sentRequestUser.name}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">{sentRequestUser.email}</p>
                                                 </div>
                                             </div>
                                             <Button
@@ -572,7 +572,7 @@ export default function FriendsPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-center text-xs text-zinc-400 py-10">No sent friend requests.</p>
+                                <p className="text-center text-xs text-muted-foreground py-10">No sent friend requests.</p>
                             )}
                         </TabsContent>
                     </Tabs>

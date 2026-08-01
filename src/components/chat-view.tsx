@@ -407,14 +407,14 @@ const ChatViewComponent = ({
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
       {/* Top Header */}
-      <header className="flex items-center justify-between border-b border-zinc-800/40 bg-zinc-950/80 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
+      <header className="flex items-center justify-between border-b border-border/40 bg-background/80 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 shrink-0 z-10 w-full">
         <div className="flex items-center gap-3">
             {isMobileView && onBack ? (
-              <Button variant="ghost" size="icon" className="h-9 w-9 p-2 rounded-full text-zinc-300 hover:bg-zinc-800/60 shrink-0 select-none" onClick={onBack}>
+              <Button variant="ghost" size="icon" className="h-9 w-9 p-2 rounded-full text-muted-foreground hover:bg-muted/60 shrink-0 select-none" onClick={onBack}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             ) : (
-               <SidebarTrigger className="md:hidden text-zinc-300 hover:text-zinc-100" />
+               <SidebarTrigger className="md:hidden text-muted-foreground hover:text-foreground" />
             )}
           <button 
             className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
@@ -422,8 +422,8 @@ const ChatViewComponent = ({
           >
             <UserAvatar user={headerAvatarUser} isGroup={isGroupChat} className="h-10 w-10"/>
             <div>
-              <p className="font-semibold font-heading text-zinc-100">{displayName}</p>
-              <p className="text-xs text-zinc-400 capitalize flex items-center gap-1">
+              <p className="font-semibold font-heading text-foreground">{displayName}</p>
+              <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
                   {isAIChat && !isAiReplying && <Bot className="h-3 w-3 text-violet-400" />}
                   {displayStatus}
               </p>
@@ -437,7 +437,7 @@ const ChatViewComponent = ({
             <Button
               variant="ghost"
               size="icon"
-              className="w-9 h-9 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-300"
+              className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
               onClick={async () => {
                 if (!currentUser?.uid || !chat?.id) return;
                 try {
@@ -457,12 +457,12 @@ const ChatViewComponent = ({
           {/* 3-dots Menu Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full text-zinc-300 hover:bg-zinc-800 flex items-center justify-center">
+                <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full text-muted-foreground hover:bg-muted flex items-center justify-center">
                     <MoreVertical className="h-5 w-5" />
                     <span className="sr-only">More options</span>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-100">
+            <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
                 <DropdownMenuItem onClick={navigateToChatInfo}>
                     <Info className="mr-2 h-4 w-4 text-violet-400" />
                     Chat Info
@@ -470,7 +470,7 @@ const ChatViewComponent = ({
                 <DropdownMenuItem onClick={() => setIsProfileSheetOpen(true)}>
                     View Profile Sheet
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-zinc-800" />
+                <DropdownMenuSeparator className="bg-muted" />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-400 focus:text-red-300">
@@ -478,15 +478,15 @@ const ChatViewComponent = ({
                       Clear Chat
                     </DropdownMenuItem>
                   </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
+                  <AlertDialogContent className="bg-card border-border text-white">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription className="text-zinc-400">
+                      <AlertDialogDescription className="text-muted-foreground">
                         This will permanently delete all messages in this conversation.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-zinc-800 text-zinc-200 border-none">Cancel</AlertDialogCancel>
+                      <AlertDialogCancel className="bg-muted text-foreground/80 border-none">Cancel</AlertDialogCancel>
                       <AlertDialogAction onClick={() => handleClearChat(chat.id)} className="bg-red-600 text-white">
                         Clear Chat
                       </AlertDialogAction>
@@ -512,7 +512,7 @@ const ChatViewComponent = ({
               leaveVoice();
               setIsVoiceEnabled(false);
             }}
-            className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40"
+            className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border/40"
           />
         )}
          {chatBackground && (
@@ -555,7 +555,7 @@ const ChatViewComponent = ({
         <Button
           onClick={() => scrollToBottom(true)}
           size="icon"
-          className="h-10 w-10 rounded-full shadow-xl bg-zinc-900/90 hover:bg-zinc-800 text-violet-400 border border-violet-500/30 backdrop-blur-md active:scale-95 transition-transform relative"
+          className="h-10 w-10 rounded-full shadow-xl bg-card/90 hover:bg-muted text-violet-400 border border-violet-500/30 backdrop-blur-md active:scale-95 transition-transform relative"
           title="Scroll to bottom"
         >
           <ArrowDown className="h-5 w-5" />
@@ -569,7 +569,7 @@ const ChatViewComponent = ({
     </div>
 
     {/* Quoted Message Reply Banner & Input Container */}
-    <div className="flex-none shrink-0 p-3 bg-zinc-950/90 backdrop-blur-md border-t border-zinc-800/40 z-20 w-full pb-safe">
+    <div className="flex-none shrink-0 p-3 bg-background/90 backdrop-blur-md border-t border-border/40 z-20 w-full pb-safe">
       <div
         className={cn(
           "overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-in-out",
@@ -577,17 +577,17 @@ const ChatViewComponent = ({
         )}
       >
         {replyToMessage && (
-          <div className="p-2 px-4 bg-zinc-900/90 rounded-xl border border-violet-500/30 flex justify-between items-center">
+          <div className="p-2 px-4 bg-card/90 rounded-xl border border-violet-500/30 flex justify-between items-center">
             <div className="flex items-center gap-2 overflow-hidden">
               <Reply className="h-4 w-4 text-violet-400 shrink-0" />
               <div className="text-xs overflow-hidden">
                 <p className="font-medium text-violet-400">
                   {replyToMessage.senderId === currentUser.uid ? "Replying to yourself" : usersCache.get(replyToMessage.senderId)?.name || "Replying to message"}
                 </p>
-                <p className="text-zinc-300 truncate max-w-xs">{replyToMessage.text || 'Attachment'}</p>
+                <p className="text-muted-foreground truncate max-w-xs">{replyToMessage.text || 'Attachment'}</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white" onClick={() => setReplyToMessage(null)}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-white" onClick={() => setReplyToMessage(null)}>
               <X className="h-4 w-4" />
             </Button>
           </div>

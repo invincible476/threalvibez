@@ -60,14 +60,14 @@ export function MediaLightbox({
     >
       {/* Top Header */}
       <div className="flex items-center justify-between w-full z-10 p-2" onClick={(e) => e.stopPropagation()}>
-        <span className="text-sm font-medium text-zinc-300">
+        <span className="text-sm font-medium text-muted-foreground">
           {media.length > 1 ? `${currentIndex + 1} of ${media.length}` : (currentItem.name || 'Media')}
         </span>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
             onClick={handleDownload}
             title="Download"
           >
@@ -76,7 +76,7 @@ export function MediaLightbox({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
             onClick={onClose}
             title="Close"
           >
@@ -116,9 +116,9 @@ export function MediaLightbox({
               className="max-h-[85vh] max-w-[90vw] rounded-lg"
             />
           ) : (
-            <div className="text-zinc-300 p-8 text-center bg-zinc-900 rounded-xl">
+            <div className="text-muted-foreground p-8 text-center bg-card rounded-xl">
               <p className="font-semibold">{currentItem.name}</p>
-              <p className="text-sm text-zinc-400 mt-2">Cannot preview this media format.</p>
+              <p className="text-sm text-muted-foreground mt-2">Cannot preview this media format.</p>
               <Button onClick={handleDownload} className="mt-4 bg-violet-700 text-white">
                 Download File
               </Button>
@@ -139,7 +139,7 @@ export function MediaLightbox({
       </div>
 
       {/* Footer Title */}
-      <div className="text-center text-xs text-zinc-500 py-2 select-none" onClick={(e) => e.stopPropagation()}>
+      <div className="text-center text-xs text-muted-foreground py-2 select-none" onClick={(e) => e.stopPropagation()}>
         {currentItem.name && <p className="truncate max-w-md mx-auto">{currentItem.name}</p>}
       </div>
     </div>

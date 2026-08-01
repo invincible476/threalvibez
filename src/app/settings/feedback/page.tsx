@@ -57,14 +57,14 @@ export default function FeedbackPage() {
           }}
         >
             <motion.header variants={cardVariants}>
-                <p className="text-xs text-zinc-400 mb-2 max-w-md">We'd love to hear your thoughts!</p>
+                <p className="text-xs text-muted-foreground mb-2 max-w-md">We'd love to hear your thoughts!</p>
             </motion.header>
 
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Send Your Feedback</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
+                        <CardTitle className="text-sm font-medium text-foreground">Send Your Feedback</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
                             Your feedback helps us improve Vibez. Please fill out the form below.
                         </CardDescription>
                     </CardHeader>

@@ -123,11 +123,11 @@ function MessageBubble({
   if (!sender) {
     return (
       <div className={cn('group flex w-full items-end gap-2 relative my-1', isOutgoing ? 'justify-end ml-auto' : 'justify-start mr-auto')}>
-        {!isOutgoing && isGroupChat && <div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse shrink-0" />}
+        {!isOutgoing && isGroupChat && <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />}
         <div
           className={cn(
             'relative flex max-w-[70%] flex-col rounded-xl px-4 py-2',
-            isOutgoing ? 'rounded-tr-none bg-violet-700 text-white' : 'rounded-tl-none bg-zinc-800 text-zinc-100'
+            isOutgoing ? 'rounded-tr-none bg-violet-700 text-white' : 'rounded-tl-none bg-muted text-foreground'
           )}
         >
           <p className="text-base">{message.text}</p>
@@ -138,7 +138,7 @@ function MessageBubble({
 
   // Delivery status icons: single checkmark (sent), double checkmarks (delivered), indigo/violet double checkmarks (read)
   const renderReadReceiptIcon = () => {
-    if (message.status === 'sending') return <Clock className="h-3.5 w-3.5 text-zinc-400" />;
+    if (message.status === 'sending') return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
     if (message.status === 'error') {
       return (
         <button
@@ -157,8 +157,8 @@ function MessageBubble({
     }
     if (isRead) return <CheckCheck className="h-3.5 w-3.5 text-indigo-300 fill-indigo-300/20" />;
     if (message.status === 'sent' || message.status === 'delivered' || message.status === 'read')
-      return <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />;
-    return <Check className="h-3.5 w-3.5 text-zinc-400" />;
+      return <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />;
+    return <Check className="h-3.5 w-3.5 text-muted-foreground" />;
   };
 
   const getFormattedTimestamp = (timestamp: any) => {
@@ -219,7 +219,7 @@ function MessageBubble({
   // Render media attachments (including multi-image grid support)
   const renderMessageContent = () => {
     if (message.deleted) {
-      return <p className="text-sm italic text-zinc-400">This message was deleted.</p>;
+      return <p className="text-sm italic text-muted-foreground">This message was deleted.</p>;
     }
 
     if (message.file) {
@@ -230,7 +230,7 @@ function MessageBubble({
         const mediaList: LightboxMedia[] = [{ url: message.file.url, type: fileType, name: message.file.name }];
 
         return (
-          <div className="relative rounded-lg overflow-hidden my-1 bg-gradient-to-br from-zinc-900 via-zinc-800/60 to-zinc-950 animate-pulse">
+          <div className="relative rounded-lg overflow-hidden my-1 bg-muted animate-pulse">
             <img
               src={message.file.url}
               alt={message.file.name || 'Attached image'}
@@ -283,10 +283,10 @@ function MessageBubble({
         >
           <FileIcon className="h-7 w-7 text-violet-300 shrink-0" />
           <div className="flex-1 overflow-hidden text-xs">
-            <p className="font-medium truncate text-zinc-100">{message.file.name}</p>
-            <p className="text-zinc-400">Click to download</p>
+            <p className="font-medium truncate text-foreground">{message.file.name}</p>
+            <p className="text-muted-foreground">Click to download</p>
           </div>
-          <Download className="h-4 w-4 text-zinc-400 shrink-0" />
+          <Download className="h-4 w-4 text-muted-foreground shrink-0" />
         </a>
       );
     }
@@ -327,10 +327,10 @@ function MessageBubble({
           className={cn(
             'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-md transition-all overflow-hidden group/bubble select-text',
             message.isAiMessage
-              ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-zinc-100 border border-emerald-800/40 backdrop-blur-md'
+              ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-foreground border border-emerald-800/40 backdrop-blur-md'
               : isOutgoing
-              ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-zinc-100'
-              : 'rounded-2xl rounded-tl-xs bg-zinc-800 border border-zinc-800/40 text-zinc-100',
+              ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-white'
+              : 'rounded-2xl rounded-tl-xs bg-muted border border-border/40 text-foreground',
             message.file && !message.text ? 'p-1.5' : 'px-3.5 py-2 sm:px-4 sm:py-2.5'
           )}
         >
@@ -343,7 +343,7 @@ function MessageBubble({
           {message.replyTo && (
             <div className="p-2 mb-1.5 bg-black/25 rounded-lg text-xs border-l-2 border-violet-400 flex flex-col gap-0.5">
               <p className="font-medium text-violet-300 text-[11px] truncate">{message.replyTo.messageSender}</p>
-              <p className="text-zinc-200 line-clamp-1 text-[11px]">{message.replyTo.messageText}</p>
+              <p className="text-white/90 line-clamp-1 text-[11px]">{message.replyTo.messageText}</p>
             </div>
           )}
 
@@ -361,7 +361,7 @@ function MessageBubble({
               <Button size="sm" onClick={handleSaveEdit} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-500">
                 Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-8 text-xs text-zinc-300">
+              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-8 text-xs text-muted-foreground">
                 Cancel
               </Button>
             </div>
@@ -371,7 +371,7 @@ function MessageBubble({
                 className={cn(
                   'text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words chat-list-force-break',
                   message.file ? 'mt-1.5 px-0.5' : '',
-                  message.deleted && 'italic text-zinc-400'
+                  message.deleted && 'italic text-muted-foreground'
                 )}
               >
                 {formatText(message.text)}
@@ -391,14 +391,14 @@ function MessageBubble({
                   className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2 py-0.5 text-[11px] shadow-sm hover:scale-105 active:scale-125 transition-transform duration-150 ease-out select-none"
                 >
                   <span>{r.emoji}</span>
-                  <span className="ml-1 font-semibold text-zinc-200">{r.count}</span>
+                  <span className="ml-1 font-semibold text-foreground/80">{r.count}</span>
                 </motion.button>
               ))}
             </div>
           )}
 
           {/* Inline Bottom-Right Timestamp & Status Stacking */}
-          <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-zinc-400 ml-2 float-right select-none">
+          <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-muted-foreground ml-2 float-right select-none">
             <span>{formattedTimestamp}</span>
             {isOutgoing && renderReadReceiptIcon()}
           </div>
@@ -409,15 +409,15 @@ function MessageBubble({
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0">
-                <MoreHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+                <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align={isCurrentUser ? 'end' : 'start'}
-              className="w-56 bg-zinc-900/95 border-zinc-800 backdrop-blur-xl text-zinc-100 shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 pointer-events-auto"
+              className="w-56 bg-card/95 border-border backdrop-blur-xl text-foreground shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 pointer-events-auto"
             >
               {/* Quick Reaction Emoji Pill */}
-              <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-zinc-800">
+              <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-border">
                 {QUICK_REACTION_EMOJIS.map((emoji) => (
                   <motion.button
                     key={emoji}
@@ -441,7 +441,7 @@ function MessageBubble({
 
               {message.text && (
                 <DropdownMenuItem onClick={handleCopyText}>
-                  <Copy className="mr-2 h-4 w-4 text-zinc-400" />
+                  <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
                   <span>Copy Text</span>
                 </DropdownMenuItem>
               )}
@@ -460,7 +460,7 @@ function MessageBubble({
 
               {isCurrentUser && !message.deleted && (
                 <>
-                  <DropdownMenuSeparator className="bg-zinc-800" />
+                  <DropdownMenuSeparator className="bg-border" />
                   <DropdownMenuItem
                     className="text-red-400 focus:text-red-300 focus:bg-red-950/40"
                     onClick={() => {
@@ -479,15 +479,15 @@ function MessageBubble({
 
         {/* Delete Confirmation Alert Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
+          <AlertDialogContent className="bg-card border-border text-foreground">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Message?</AlertDialogTitle>
-              <AlertDialogDescription className="text-zinc-400">
+              <AlertDialogDescription className="text-muted-foreground">
                 This will delete the message for everyone in this chat. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-zinc-800 text-zinc-200 border-none">
+              <AlertDialogCancel className="bg-muted text-foreground border-none">
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction

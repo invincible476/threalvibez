@@ -347,7 +347,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-zinc-950 text-white">
+      <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
         <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
       </div>
     );
@@ -357,13 +357,13 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
   const isAdmin = authUser?.uid === chat?.createdBy;
 
   return (
-    <div className="min-h-screen w-full bg-zinc-950 text-zinc-100 flex flex-col">
+    <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
       {/* Header Bar */}
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-zinc-800/60 bg-zinc-950/80 px-4 py-3 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-md">
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-white"
+          className="h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-white"
           onClick={() => router.back()}
         >
           <ArrowLeft className="h-5 w-5" />
@@ -376,7 +376,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
       {/* Main Container */}
       <main className="flex-1 max-w-3xl w-full mx-auto p-4 space-y-6">
         {/* Profile Card */}
-        <div className="flex flex-col items-center justify-center p-6 bg-zinc-900/60 rounded-2xl border border-zinc-800/60 backdrop-blur-sm text-center space-y-3">
+        <div className="flex flex-col items-center justify-center p-6 bg-card/60 rounded-2xl border border-border/60 backdrop-blur-sm text-center space-y-3">
           <UserAvatar
             user={{
               name: chat?.name || 'Group',
@@ -388,16 +388,16 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
             className="w-24 h-24 text-3xl shadow-xl ring-2 ring-violet-500/20"
           />
           <div>
-            <h2 className="text-2xl font-bold font-heading text-zinc-100">{chat?.name}</h2>
+            <h2 className="text-2xl font-bold font-heading text-foreground">{chat?.name}</h2>
             {isGroup ? (
-              <p className="text-xs text-zinc-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Group · {chat?.participants?.length || 0} members
               </p>
             ) : (
-              <p className="text-xs text-zinc-400 mt-1">Direct Message</p>
+              <p className="text-xs text-muted-foreground mt-1">Direct Message</p>
             )}
             {chat?.description && (
-              <p className="text-sm text-zinc-300 mt-2 max-w-md mx-auto italic">
+              <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto italic">
                 "{chat.description}"
               </p>
             )}
@@ -408,7 +408,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
             <Button
               variant={isMuted ? 'secondary' : 'outline'}
               size="sm"
-              className="rounded-full gap-2 border-zinc-800 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-200"
+              className="rounded-full gap-2 border-border bg-muted/50 hover:bg-muted text-foreground/80"
               onClick={handleToggleMute}
             >
               {isMuted ? <BellOff className="h-4 w-4 text-amber-400" /> : <Bell className="h-4 w-4" />}
@@ -417,7 +417,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full gap-2 border-zinc-800 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-200"
+              className="rounded-full gap-2 border-border bg-muted/50 hover:bg-muted text-foreground/80"
               onClick={() => setIsSearchActive(!isSearchActive)}
             >
               <Search className="h-4 w-4" />
@@ -426,7 +426,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full gap-2 border-zinc-800 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-200"
+              className="rounded-full gap-2 border-border bg-muted/50 hover:bg-muted text-foreground/80"
               onClick={handleExportChat}
             >
               <Download className="h-4 w-4" />
@@ -437,14 +437,14 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
         {/* Search Drawer / Input */}
         {isSearchActive && (
-          <div className="p-4 bg-zinc-900/80 rounded-xl border border-zinc-800/60 space-y-3 animate-in fade-in duration-200">
+          <div className="p-4 bg-card/80 rounded-xl border border-border/60 space-y-3 animate-in fade-in duration-200">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search messages in this chat..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-zinc-950 border-zinc-800 text-white focus-visible:ring-violet-500"
+                className="pl-9 bg-background border-border text-foreground focus-visible:ring-violet-500"
               />
             </div>
             {searchQuery.trim() && (
@@ -453,16 +453,16 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   filteredMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className="p-2.5 bg-zinc-950/60 rounded-lg border border-zinc-800 text-xs flex flex-col gap-1"
+                      className="p-2.5 bg-background/60 rounded-lg border border-border text-xs flex flex-col gap-1"
                     >
                       <span className="font-semibold text-violet-400">
                         {participantsDetails.find((p) => p.uid === msg.senderId)?.name || 'User'}
                       </span>
-                      <p className="text-zinc-200">{msg.text}</p>
+                      <p className="text-foreground/80">{msg.text}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-zinc-500 text-center py-2">No matching messages found.</p>
+                  <p className="text-xs text-muted-foreground text-center py-2">No matching messages found.</p>
                 )}
               </div>
             )}
@@ -470,13 +470,13 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
         )}
 
         {/* Media & Shared Files Tabs */}
-        <div className="bg-zinc-900/60 rounded-2xl border border-zinc-800/60 p-4 space-y-4">
-          <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
+        <div className="bg-card/60 rounded-2xl border border-border/60 p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Shared Media & Links
           </h3>
 
           <Tabs defaultValue="photos" className="w-full">
-            <TabsList className="w-full bg-zinc-950 border border-zinc-800 p-1 rounded-xl grid grid-cols-3">
+            <TabsList className="w-full bg-background border border-border p-1 rounded-xl grid grid-cols-3">
               <TabsTrigger value="photos" className="data-[state=active]:bg-violet-700 data-[state=active]:text-white rounded-lg text-xs">
                 Photos / Videos ({mediaItems.length})
               </TabsTrigger>
@@ -495,7 +495,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   {mediaItems.map((item, idx) => (
                     <div
                       key={idx}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800/80 cursor-pointer group"
+                      className="relative aspect-square rounded-lg overflow-hidden bg-background border border-border/80 cursor-pointer group"
                       onClick={() => {
                         setLightboxIndex(idx);
                         setLightboxOpen(true);
@@ -508,7 +508,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-violet-400">
+                        <div className="w-full h-full flex items-center justify-center bg-card text-violet-400">
                           <VideoIcon className="h-8 w-8" />
                         </div>
                       )}
@@ -516,7 +516,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-zinc-500 text-center py-8">No photos or videos shared yet.</p>
+                <p className="text-xs text-muted-foreground text-center py-8">No photos or videos shared yet.</p>
               )}
             </TabsContent>
 
@@ -526,17 +526,17 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                 documentItems.map((msg) => (
                   <div
                     key={msg.id}
-                    className="flex items-center justify-between p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-colors"
+                    className="flex items-center justify-between p-3 bg-background/80 rounded-xl border border-border hover:border-border transition-colors"
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="p-2.5 bg-violet-950/50 rounded-lg text-violet-400 border border-violet-800/40">
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="overflow-hidden">
-                        <p className="font-medium text-sm text-zinc-100 truncate">
+                        <p className="font-medium text-sm text-foreground truncate">
                           {msg.file?.name || 'Document'}
                         </p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-muted-foreground">
                           {msg.file?.type || 'File'}
                         </p>
                       </div>
@@ -547,7 +547,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         target="_blank"
                         rel="noopener noreferrer"
                         download
-                        className="p-2 text-zinc-400 hover:text-violet-300"
+                        className="p-2 text-muted-foreground hover:text-violet-300"
                       >
                         <Download className="h-5 w-5" />
                       </a>
@@ -555,7 +555,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-zinc-500 text-center py-8">No documents shared yet.</p>
+                <p className="text-xs text-muted-foreground text-center py-8">No documents shared yet.</p>
               )}
             </TabsContent>
 
@@ -568,19 +568,19 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-colors"
+                    className="flex items-center justify-between p-3 bg-background/80 rounded-xl border border-border hover:border-border transition-colors"
                   >
                     <div className="overflow-hidden space-y-1">
                       <div className="flex items-center gap-1.5 text-xs text-violet-400 font-medium">
                         <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{link.domain}</span>
                       </div>
-                      <p className="text-xs text-zinc-300 truncate max-w-md">{link.url}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-md">{link.url}</p>
                     </div>
                   </a>
                 ))
               ) : (
-                <p className="text-xs text-zinc-500 text-center py-8">No links shared yet.</p>
+                <p className="text-xs text-muted-foreground text-center py-8">No links shared yet.</p>
               )}
             </TabsContent>
           </Tabs>
@@ -588,9 +588,9 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
         {/* Group Member Management Section */}
         {isGroup && (
-          <div className="bg-zinc-900/60 rounded-2xl border border-zinc-800/60 p-4 space-y-4">
+          <div className="bg-card/60 rounded-2xl border border-border/60 p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 Group Members ({participantsDetails.length})
               </h3>
               {isAdmin && (
@@ -613,20 +613,20 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                 return (
                   <div
                     key={participant.uid}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/40"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-background/60 border border-border/40"
                   >
                     <div className="flex items-center gap-3">
                       <UserAvatar user={participant} className="h-10 w-10" />
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm text-zinc-100">{participant.name}</p>
+                          <p className="font-semibold text-sm text-foreground">{participant.name}</p>
                           {isMemberAdmin && (
                             <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] py-0">
                               Admin
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-zinc-400">{participant.email || participant.username}</p>
+                        <p className="text-xs text-muted-foreground">{participant.email || participant.username}</p>
                       </div>
                     </div>
 
@@ -646,7 +646,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
               })}
             </div>
 
-            <div className="pt-4 border-t border-zinc-800/60 flex justify-end">
+            <div className="pt-4 border-t border-border/60 flex justify-end">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm" className="rounded-xl gap-2 text-xs">
@@ -654,15 +654,15 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                     Leave Group
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
+                <AlertDialogContent className="bg-card border-border text-white">
                   <AlertDialogHeader>
                     <AlertDialogTitle>Leave Group?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-zinc-400">
+                    <AlertDialogDescription className="text-muted-foreground">
                       Are you sure you want to leave this group conversation? You will not receive future messages.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-zinc-800 text-zinc-200 border-none">
+                    <AlertDialogCancel className="bg-muted text-foreground/80 border-none">
                       Cancel
                     </AlertDialogCancel>
                     <AlertDialogAction
@@ -681,9 +681,9 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
       {/* Multi-Select Friend Picker Modal for Group Addition */}
       <Dialog open={isAddMemberModalOpen} onOpenChange={setIsAddMemberModalOpen}>
-        <DialogContent className="sm:max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 shadow-2xl">
+        <DialogContent className="sm:max-w-md bg-background text-foreground border-border shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold font-heading text-zinc-100">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold font-heading text-foreground">
               <Users className="h-5 w-5 text-violet-400" />
               Add Group Members
             </DialogTitle>
@@ -691,29 +691,29 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
           <div className="space-y-4 py-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search friends by name or email..."
                 value={friendSearchQuery}
                 onChange={(e) => setFriendSearchQuery(e.target.value)}
-                className="pl-9 bg-zinc-900 border-zinc-800 text-zinc-100 text-sm h-9"
+                className="pl-9 bg-card border-border text-foreground text-sm h-9"
               />
             </div>
 
-            <ScrollArea className="h-64 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-2">
+            <ScrollArea className="h-64 rounded-xl border border-border/80 bg-card/40 p-2">
               {loadingFriends ? (
                 <div className="flex items-center justify-center h-48">
                   <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
                 </div>
               ) : availableFriends.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center p-4">
-                  <p className="text-sm text-zinc-400">
+                  <p className="text-sm text-muted-foreground">
                     No eligible friends found. All your friends may already be in this group.
                   </p>
                 </div>
               ) : filteredAvailableFriends.length === 0 ? (
-                <div className="p-6 text-center text-sm text-zinc-400">
+                <div className="p-6 text-center text-sm text-muted-foreground">
                   No friends match "{friendSearchQuery}"
                 </div>
               ) : (
@@ -727,7 +727,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
                           isSelected
                             ? 'bg-violet-950/40 border border-violet-800/50'
-                            : 'hover:bg-zinc-800/50 border border-transparent'
+                            : 'hover:bg-muted/50 border border-transparent'
                         }`}
                       >
                         <Checkbox
@@ -739,8 +739,8 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         />
                         <UserAvatar user={friend} isFriend={true} className="h-9 w-9 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-zinc-100 truncate">{friend.name}</p>
-                          <p className="text-xs text-zinc-400 truncate">
+                          <p className="font-semibold text-sm text-foreground truncate">{friend.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
                             {friend.username ? `@${friend.username}` : (friend.email || '')}
                           </p>
                         </div>
@@ -757,7 +757,7 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
               variant="ghost"
               onClick={() => setIsAddMemberModalOpen(false)}
               disabled={isAddingMember}
-              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 text-xs"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted text-xs"
             >
               Cancel
             </Button>

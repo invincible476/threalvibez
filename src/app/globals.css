@@ -8,35 +8,36 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── LIGHT MODE (default) ─────────────────────────────── */
   :root {
-    --background: 240 10% 3.9%; /* zinc-950 #09090b */
-    --foreground: 240 5% 96%; /* zinc-100 #f4f4f5 */
-    
-    --card: 240 5.9% 10%; /* zinc-900 #18181b */
-    --card-foreground: 240 5% 96%;
-    
-    --popover: 240 5.9% 10%;
-    --popover-foreground: 240 5% 96%;
-    
-    --primary: 263 70% 50%; /* Deep Violet #6d28d9 */
+    --background: 0 0% 97%;           /* zinc-50  #fafafa  */
+    --foreground: 240 10% 10%;        /* zinc-900 #18181b  */
+
+    --card: 0 0% 100%;                /* white    #ffffff  */
+    --card-foreground: 240 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    --primary: 263 70% 50%;           /* Deep Violet #6d28d9 */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 240 5.9% 16.5%; /* zinc-800 #27272a */
-    --secondary-foreground: 240 5% 96%;
-    
-    --muted: 240 5.9% 16.5%;
-    --muted-foreground: 240 5% 65%; /* zinc-400 #a1a1aa */
-    
+
+    --secondary: 240 5% 94%;          /* zinc-100 #f4f4f5  */
+    --secondary-foreground: 240 10% 10%;
+
+    --muted: 240 5% 94%;              /* zinc-100          */
+    --muted-foreground: 240 4% 46%;   /* zinc-500 #71717a  */
+
     --accent: 263 70% 50%;
     --accent-foreground: 0 0% 100%;
-    
+
     --destructive: 0 63% 50%;
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 240 5.9% 16.5% / 0.4; /* zinc-800/40 */
-    --input: 240 5.9% 16.5% / 0.6;
+
+    --border: 240 5.9% 84%;           /* zinc-200 #e4e4e7  */
+    --input: 240 5.9% 84%;
     --ring: 263 70% 50%;
-    
+
     --radius: 0.75rem;
 
     --chart-1: 263 70% 50%;
@@ -46,35 +47,46 @@
     --chart-5: 340 82% 52%;
 
     --gradient-from: 263 70% 50%;
-    --gradient-to: 240 5.9% 16.5%;
+    --gradient-to: 240 5.9% 70%;
+
+    /* Sidebar tokens */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 10% 10%;
+    --sidebar-primary: 263 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 94%;
+    --sidebar-accent-foreground: 240 10% 10%;
+    --sidebar-border: 240 5.9% 84%;
+    --sidebar-ring: 263 70% 50%;
   }
 
+  /* ── DARK MODE ────────────────────────────────────────── */
   .dark {
-    --background: 240 10% 3.9%; /* zinc-950 #09090b */
-    --foreground: 240 5% 96%; /* zinc-100 #f4f4f5 */
-    
-    --card: 240 5.9% 10%; /* zinc-900 #18181b */
+    --background: 240 10% 3.9%;       /* zinc-950 #09090b  */
+    --foreground: 240 5% 96%;         /* zinc-100 #f4f4f5  */
+
+    --card: 240 5.9% 10%;             /* zinc-900 #18181b  */
     --card-foreground: 240 5% 96%;
-    
+
     --popover: 240 5.9% 10%;
     --popover-foreground: 240 5% 96%;
-    
-    --primary: 263 70% 50%; /* Deep Violet #6d28d9 */
+
+    --primary: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 240 5.9% 16.5%;
+
+    --secondary: 240 5.9% 16.5%;      /* zinc-800 #27272a  */
     --secondary-foreground: 240 5% 96%;
-    
+
     --muted: 240 5.9% 16.5%;
-    --muted-foreground: 240 5% 65%; /* zinc-400 #a1a1aa */
-    
+    --muted-foreground: 240 5% 65%;   /* zinc-400 #a1a1aa  */
+
     --accent: 263 70% 50%;
     --accent-foreground: 0 0% 100%;
-    
+
     --destructive: 0 63% 50%;
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 240 5.9% 16.5% / 0.4;
+
+    --border: 240 5.9% 16.5% / 0.4;  /* zinc-800/40       */
     --input: 240 5.9% 16.5% / 0.6;
     --ring: 263 70% 50%;
 
@@ -86,39 +98,59 @@
 
     --gradient-from: 263 70% 50%;
     --gradient-to: 240 5.9% 16.5%;
+
+    /* Sidebar tokens */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 5% 96%;
+    --sidebar-primary: 263 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5.9% 16.5%;
+    --sidebar-accent-foreground: 240 5% 96%;
+    --sidebar-border: 240 5.9% 16.5% / 0.4;
+    --sidebar-ring: 263 70% 50%;
   }
 
+  /* ── AMOLED MODE ──────────────────────────────────────── */
   .amoled {
-    --background: 0 0% 0%; /* True Black */
+    --background: 0 0% 0%;            /* True Black         */
     --foreground: 240 5% 96%;
-    
+
     --card: 240 5.9% 10%;
     --card-foreground: 240 5% 96%;
-    
+
     --popover: 0 0% 5%;
     --popover-foreground: 240 5% 96%;
-    
+
     --primary: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
-    
+
     --secondary: 0 0% 12%;
     --secondary-foreground: 240 5% 96%;
-    
+
     --muted: 0 0% 10%;
     --muted-foreground: 240 5% 65%;
-    
+
     --accent: 263 70% 50%;
     --accent-foreground: 0 0% 100%;
-    
+
     --destructive: 0 70% 45%;
     --destructive-foreground: 0 0% 100%;
-    
+
     --border: 0 0% 15% / 0.4;
     --input: 0 0% 12%;
     --ring: 263 70% 50%;
 
     --gradient-from: 263 70% 50%;
     --gradient-to: 0 0% 12%;
+
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 240 5% 96%;
+    --sidebar-primary: 263 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 240 5% 96%;
+    --sidebar-border: 0 0% 15% / 0.4;
+    --sidebar-ring: 263 70% 50%;
   }
 }
 
@@ -144,6 +176,7 @@ html, body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
@@ -195,10 +228,6 @@ textarea:-webkit-autofill:focus {
   -webkit-text-fill-color: hsl(var(--foreground)) !important;
   -webkit-box-shadow: 0 0 0px 1000px hsl(var(--card)) inset !important;
   transition: background-color 5000s ease-in-out 0s;
-}
-
-body {
-  background-color: transparent;
 }
 
 /* GPU Acceleration & Performance Optimization */

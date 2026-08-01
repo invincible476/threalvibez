@@ -143,9 +143,9 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
       if (!open) resetForm();
     }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-zinc-950 text-zinc-100 border-zinc-800 shadow-2xl">
+      <DialogContent className="sm:max-w-md bg-background text-foreground border-border shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold font-heading text-zinc-100">
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold font-heading text-foreground">
             <Users className="h-5 w-5 text-violet-400" />
             Create Group Chat
           </DialogTitle>
@@ -154,7 +154,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
         <div className="space-y-4 py-2">
           {/* Group Name Input */}
           <div className="space-y-1.5">
-            <Label htmlFor="create-group-name" className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+            <Label htmlFor="create-group-name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Group Name
             </Label>
             <input
@@ -163,7 +163,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
               placeholder="e.g. Weekend Vibez, Dev Squad"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="w-full bg-zinc-900 text-zinc-100 placeholder:text-zinc-500 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-700/50 transition-all"
+              className="w-full bg-card text-foreground placeholder:text-muted-foreground border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-700/50 transition-all"
               autoComplete="off"
             />
           </div>
@@ -171,11 +171,11 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
           {/* Friends Selection Header */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Select Friends ({selectedFriendIds.length})
               </Label>
               {acceptedFriends.length > 0 && (
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-muted-foreground">
                   {acceptedFriends.length} friend{acceptedFriends.length !== 1 ? 's' : ''} available
                 </span>
               )}
@@ -184,13 +184,13 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
             {/* Friend Search Bar */}
             {acceptedFriends.length > 0 && (
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="Filter friends by name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 text-sm h-9"
+                  className="pl-9 bg-card border-border text-foreground placeholder:text-muted-foreground text-sm h-9"
                   autoComplete="off"
                 />
               </div>
@@ -198,13 +198,13 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
           </div>
 
           {/* Friends List */}
-          <ScrollArea className="h-56 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-1">
+          <ScrollArea className="h-56 rounded-xl border border-border/80 bg-card/40 p-1">
             {acceptedFriends.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center p-4 space-y-3">
-                <p className="text-sm text-zinc-400">
+                <p className="text-sm text-muted-foreground">
                   You don't have any accepted friends yet.
                 </p>
-                <Button asChild size="sm" variant="outline" className="border-zinc-700 text-zinc-200 hover:bg-zinc-800">
+                <Button asChild size="sm" variant="outline" className="border-zinc-700 text-foreground/80 hover:bg-muted">
                   <Link href="/friends" onClick={() => setIsOpen(false)}>
                     <UserPlus className="mr-2 h-4 w-4 text-violet-400" />
                     Find & Add Friends
@@ -212,7 +212,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                 </Button>
               </div>
             ) : filteredFriends.length === 0 ? (
-              <div className="p-6 text-center text-sm text-zinc-400">
+              <div className="p-6 text-center text-sm text-muted-foreground">
                 No friends match "{searchTerm}"
               </div>
             ) : (
@@ -226,7 +226,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                       className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
                         isSelected
                           ? 'bg-violet-950/40 border border-violet-800/50'
-                          : 'hover:bg-zinc-800/50 border border-transparent'
+                          : 'hover:bg-muted/50 border border-transparent'
                       }`}
                     >
                       <Checkbox
@@ -238,8 +238,8 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
                       />
                       <UserAvatar user={friend} isFriend={true} className="h-9 w-9 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-zinc-100 truncate">{friend.name}</p>
-                        <p className="text-xs text-zinc-400 truncate">
+                        <p className="font-semibold text-sm text-foreground truncate">{friend.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
                           {friend.username ? `@${friend.username}` : (friend.email || '')}
                         </p>
                       </div>
@@ -256,7 +256,7 @@ export function CreateGroupModal({ children }: CreateGroupModalProps) {
             variant="ghost"
             onClick={() => setIsOpen(false)}
             disabled={isSubmitting}
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             Cancel
           </Button>

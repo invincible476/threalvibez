@@ -471,14 +471,14 @@ export default function ProfilePage() {
         }}
     >
        <motion.header variants={cardVariants}>
-        <p className="text-xs text-zinc-400 mb-2 max-w-md">Manage your public profile information.</p>
+        <p className="text-xs text-muted-foreground mb-2 max-w-md">Manage your public profile information.</p>
       </motion.header>
 
       <motion.div variants={cardVariants}>
-        <Card className="border border-zinc-800/50 bg-zinc-900/60">
+        <Card className="border border-border/50 bg-card/60">
             <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-zinc-100">Your Profile</CardTitle>
-            <CardDescription className="text-xs text-zinc-400">Update your photo and personal details here.</CardDescription>
+            <CardTitle className="text-sm font-medium text-foreground">Your Profile</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">Update your photo and personal details here.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
             <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -590,19 +590,19 @@ export default function ProfilePage() {
       </motion.div>
 
       <motion.div variants={cardVariants}>
-        <Card className="border border-zinc-800/50 bg-zinc-900/60">
+        <Card className="border border-border/50 bg-card/60">
             <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-zinc-100">Privacy</CardTitle>
-                <CardDescription className="text-xs text-zinc-400">Control how others can find your account.</CardDescription>
+                <CardTitle className="text-sm font-medium text-foreground">Privacy</CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">Control how others can find your account.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-zinc-800/40 border border-zinc-800/50">
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-muted/40 border border-border/50">
                     <Label htmlFor="private-account-mode" className="flex flex-col space-y-0.5">
                         <div className="flex items-center gap-2">
-                            <Shield className="h-4 w-4 text-zinc-400" />
-                            <span className="text-sm font-medium text-zinc-100">Private Account</span>
+                            <Shield className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-foreground">Private Account</span>
                         </div>
-                        <span className="text-xs text-zinc-400 ml-6">
+                        <span className="text-xs text-muted-foreground ml-6">
                            When enabled, your account can only be found by your exact email address.
                         </span>
                     </Label>

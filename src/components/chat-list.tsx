@@ -181,14 +181,14 @@ export function ChatListSkeleton() {
       {[...Array(6)].map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-900/60 animate-pulse border border-zinc-800/20 my-0.5"
+          className="flex items-center gap-3 py-3 px-4 rounded-xl bg-muted/40 animate-pulse border border-border/20 my-0.5"
         >
-          <div className="h-10 w-10 rounded-full bg-zinc-800/80 shrink-0" />
+          <div className="h-10 w-10 rounded-full bg-muted shrink-0" />
           <div className="flex-1 space-y-2 min-w-0">
-            <div className="h-3.5 w-28 bg-zinc-800/80 rounded" />
-            <div className="h-3 w-40 bg-zinc-800/50 rounded" />
+            <div className="h-3.5 w-28 bg-muted rounded" />
+            <div className="h-3 w-40 bg-muted/60 rounded" />
           </div>
-          <div className="h-3 w-8 bg-zinc-800/40 rounded shrink-0" />
+          <div className="h-3 w-8 bg-muted/40 rounded shrink-0" />
         </div>
       ))}
     </div>
@@ -246,7 +246,7 @@ export function ChatList() {
   return (
     <>
     <div className="flex flex-col h-full min-h-0 w-full min-w-0 flex-1 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
-    <div className="flex items-center justify-between px-4 py-3 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-20 border-b border-zinc-800/40 shrink-0 flex-none gap-2">
+    <div className="flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-md sticky top-0 z-20 border-b border-border/40 shrink-0 flex-none gap-2">
          <VibezLogo className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden" />
          <div className="flex-1 flex justify-center group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
             {isWeatherVisible && <WeatherWidget />}
@@ -261,7 +261,7 @@ export function ChatList() {
 
     <div className="flex-none px-3 py-2 border-b border-border/50">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input 
             type="search"
             placeholder="Search existing chats..." 
@@ -269,7 +269,7 @@ export function ChatList() {
             autoCorrect="off"
             autoCapitalize="none"
             spellCheck={false}
-            className="pl-10 bg-zinc-900 border-none rounded-xl text-sm py-2.5 w-full text-zinc-100 placeholder:text-zinc-500 group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
+            className="pl-10 bg-muted/50 border-none rounded-xl text-sm py-2.5 w-full text-foreground placeholder:text-muted-foreground group-[[data-sidebar-state=collapsed]]/sidebar:hidden"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -299,7 +299,7 @@ export function ChatList() {
             <div className="">
             {favoriteChats.length > 0 && (
                 <div>
-                <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Favorites</h2>
+                <h2 className="my-2 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Favorites</h2>
                 <motion.ul 
                     className=""
                     variants={listVariants}
@@ -324,7 +324,7 @@ export function ChatList() {
             )}
             {unreadChats.length > 0 && (
                 <div>
-                <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Unread</h2>
+                <h2 className="my-2 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Unread</h2>
                 <motion.ul 
                     className=""
                     variants={listVariants}
@@ -348,7 +348,7 @@ export function ChatList() {
                 </div>
             )}
                 <div>
-                <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Chats</h2>
+                <h2 className="my-2 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">Chats</h2>
                 <motion.ul 
                     className=""
                     variants={listVariants}
@@ -394,7 +394,7 @@ export function ChatList() {
             
             {shouldShowAiChat && (
                 <div>
-                    <h2 className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">AI Assistant</h2>
+                    <h2 className="my-2 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider group-[[data-sidebar-state=collapsed]]/sidebar:hidden">AI Assistant</h2>
                     <ChatItem
                         conversation={aiConversation}
                         isSelected={selectedChat?.id === aiConversation.id}
@@ -411,7 +411,7 @@ export function ChatList() {
                     <div className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="archived" className="border-b-0">
-                            <AccordionTrigger className="my-2 px-4 text-xs font-medium text-zinc-400 uppercase tracking-wider hover:no-underline py-2">
+                            <AccordionTrigger className="my-2 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:no-underline py-2">
                                 Archived
                             </AccordionTrigger>
                             <AccordionContent>
@@ -514,7 +514,7 @@ const ChatItem = React.memo(
           <div
               onClick={onSelect}
               className={cn(
-                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3 px-4 text-left transition-all cursor-pointer overflow-x-hidden border-b border-zinc-800/40 active:scale-[0.98]',
+                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3 px-4 text-left transition-all cursor-pointer overflow-x-hidden border-b border-border/40 active:scale-[0.98]',
                   isSelected ? 'bg-primary/15' : 'hover:bg-muted/10'
               )}
           >
@@ -537,12 +537,12 @@ const ChatItem = React.memo(
           <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
               <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-zinc-100">{conversation.name}</p>
+                      <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-foreground">{conversation.name}</p>
                       {conversation.isFavorite && !isAiChat && <Star className="h-3.5 w-3.5 text-amber-400/80 fill-amber-400/80 shrink-0" />}
                       {isAiChat && <Bot className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0 min-w-[50px]">
-                      <p className="text-[11px] text-zinc-400 leading-none">{timestamp}</p>
+                      <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
                       {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
                           <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-violet-700 text-[10px] font-semibold text-white">
                               {conversation.unreadCount}
@@ -551,7 +551,7 @@ const ChatItem = React.memo(
                   </div>
               </div>
               <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
-                  <p className="text-xs text-zinc-400 line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
+                  <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
                       {text}
                   </p>
                   {!isAiChat && (

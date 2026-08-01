@@ -269,14 +269,14 @@ export default function AccountPage() {
           }}
         >
             <motion.header variants={cardVariants}>
-                <p className="text-xs text-zinc-400 mb-2 max-w-md">Manage your account settings and data.</p>
+                <p className="text-xs text-muted-foreground mb-2 max-w-md">Manage your account settings and data.</p>
             </motion.header>
 
              <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Security</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
+                        <CardTitle className="text-sm font-medium text-foreground">Security</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
                             Change your password and manage your account security.
                         </CardDescription>
                     </CardHeader>
@@ -298,10 +298,10 @@ export default function AccountPage() {
             </motion.div>
 
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Manage Data</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
+                        <CardTitle className="text-sm font-medium text-foreground">Manage Data</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
                             Export or import your account data. This allows you to take your information with you.
                         </CardDescription>
                     </CardHeader>
@@ -330,7 +330,7 @@ export default function AccountPage() {
                 <Card className="border border-red-900/40 bg-red-950/20">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-red-400">Delete Account</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
+                        <CardDescription className="text-xs text-muted-foreground">
                             Permanently delete your account and all of your content. This action is not reversible.
                         </CardDescription>
                     </CardHeader>

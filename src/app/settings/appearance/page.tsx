@@ -108,18 +108,18 @@ export default function AppearancePage() {
             }}
         >
              <motion.header variants={cardVariants}>
-                <p className="text-xs text-zinc-400 mb-2 max-w-md">Customize your themes, background styles, and frosted glass controls.</p>
+                <p className="text-xs text-muted-foreground mb-2 max-w-md">Customize your themes, background styles, and frosted glass controls.</p>
             </motion.header>
 
             {/* Background Style Toggle */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-sm font-medium text-zinc-100">
-                            <Sparkles className="h-4 w-4 text-zinc-400" />
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Sparkles className="h-4 w-4 text-muted-foreground" />
                             App Background Style
                         </CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
+                        <CardDescription className="text-xs text-muted-foreground">
                             Switch between True Black (#000000) and Starry Galaxy themes.
                         </CardDescription>
                     </CardHeader>
@@ -136,19 +136,19 @@ export default function AppearancePage() {
                                         className={cn(
                                             "w-full h-20 px-4 py-3 flex items-center justify-start gap-3 text-left border transition-all",
                                             isSelected 
-                                                ? "ring-1 ring-violet-700 bg-zinc-900 border-violet-700/50 text-zinc-100" 
-                                                : "border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/40 hover:border-zinc-700"
+                                                ? "ring-1 ring-violet-700 bg-card border-violet-700/50 text-foreground" 
+                                                : "border-border/60 bg-card/40 hover:bg-muted/40 hover:border-border"
                                         )}
                                     >
                                         <div className={cn(
                                             "p-2.5 rounded-lg shrink-0",
-                                            isSelected ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-zinc-800 text-zinc-400"
+                                            isSelected ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-muted text-muted-foreground"
                                         )}>
                                             <Icon className="h-5 w-5" />
                                         </div>
                                         <div className="flex-1 min-w-0 overflow-hidden pr-2">
-                                            <p className="font-medium text-sm truncate text-zinc-100">{style.label}</p>
-                                            <p className="text-xs text-zinc-400 break-words">{style.description}</p>
+                                            <p className="font-medium text-sm truncate text-foreground">{style.label}</p>
+                                            <p className="text-xs text-muted-foreground break-words">{style.description}</p>
                                         </div>
                                     </Button>
                                 </motion.div>
@@ -160,10 +160,10 @@ export default function AppearancePage() {
 
             {/* App Theme */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-100">App Theme</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">Select Light or Dark mode for the application.</CardDescription>
+                        <CardTitle className="text-sm font-medium text-foreground">App Theme</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">Select Light or Dark mode for the application.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {themes.map((t) => (
@@ -174,8 +174,8 @@ export default function AppearancePage() {
                                     className={cn(
                                         "w-full h-20 flex flex-col gap-2 items-center justify-center transition-colors",
                                         theme === t.value 
-                                            ? "ring-1 ring-violet-700 bg-zinc-900 border-violet-700/50 text-zinc-100" 
-                                            : "border-zinc-800/60 bg-zinc-900/40 hover:bg-zinc-800/40 text-zinc-400"
+                                            ? "ring-1 ring-violet-700 bg-card border-violet-700/50 text-foreground" 
+                                            : "border-border/60 bg-card/40 hover:bg-muted/40 text-muted-foreground"
                                     )}
                                 >
                                     <t.icon className="h-5 w-5"/>
@@ -186,10 +186,10 @@ export default function AppearancePage() {
                     </CardContent>
                     {theme === 'dark' && (
                         <CardContent className="pt-0">
-                            <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-zinc-800/40 border border-zinc-800/50">
+                            <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-muted/40 border border-border/50">
                                 <Label htmlFor="amoled-mode" className="flex flex-col space-y-0.5 flex-1 min-w-0 pr-2">
-                                    <span className="text-sm font-medium text-zinc-100">AMOLED True Black</span>
-                                    <span className="text-xs text-zinc-400 break-words">
+                                    <span className="text-sm font-medium text-foreground">AMOLED True Black</span>
+                                    <span className="text-xs text-muted-foreground break-words">
                                         Uses pure #000000 background for maximum OLED battery savings.
                                     </span>
                                 </Label>
@@ -202,16 +202,16 @@ export default function AppearancePage() {
 
             {/* Frosted Glass & Sliders */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-0">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Frosted Glass Controls</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">Adjust backdrop blur strength and card opacity in real time.</CardDescription>
+                        <CardTitle className="text-sm font-medium text-foreground">Frosted Glass Controls</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">Adjust backdrop blur strength and card opacity in real time.</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0">
-                        <div className="flex items-center justify-between py-3 px-4 border-b border-zinc-800/40">
+                        <div className="flex items-center justify-between py-3 px-4 border-b border-border/40">
                             <Label htmlFor="glass-enabled" className="flex flex-col space-y-0.5 flex-1 min-w-0 pr-2">
-                                <span className="text-sm font-medium text-zinc-100">Enable Frosted Glass Effect</span>
-                                <span className="text-xs text-zinc-400 break-words">
+                                <span className="text-sm font-medium text-foreground">Enable Frosted Glass Effect</span>
+                                <span className="text-xs text-muted-foreground break-words">
                                     Applies dynamic backdrop blur and glass translucency to UI cards.
                                 </span>
                             </Label>
@@ -222,7 +222,7 @@ export default function AppearancePage() {
                             <div className="space-y-4 pt-4 px-4 pb-4">
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
-                                        <Label htmlFor="blur-strength" className="text-sm font-medium text-zinc-100">Blur Strength</Label>
+                                        <Label htmlFor="blur-strength" className="text-sm font-medium text-foreground">Blur Strength</Label>
                                         <span className="text-xs text-violet-300 font-mono bg-violet-500/10 px-2 py-0.5 rounded">
                                             {glassBlur === 0 ? '0px (off)' : `${glassBlur}px`}
                                         </span>
@@ -239,7 +239,7 @@ export default function AppearancePage() {
 
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
-                                        <Label htmlFor="glass-opacity" className="text-sm font-medium text-zinc-100">Glass Card Opacity</Label>
+                                        <Label htmlFor="glass-opacity" className="text-sm font-medium text-foreground">Glass Card Opacity</Label>
                                         <span className="text-xs text-primary font-mono bg-primary/10 px-2 py-0.5 rounded">{glassOpacity}%</span>
                                     </div>
                                     <Slider
@@ -259,14 +259,14 @@ export default function AppearancePage() {
 
             {/* Chat List Transparency */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-0">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Chat List Sidebar Transparency</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">Adjust the opacity of the left chat navigation panel.</CardDescription>
+                        <CardTitle className="text-sm font-medium text-foreground">Chat List Sidebar Transparency</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">Adjust the opacity of the left chat navigation panel.</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 px-4 pb-4 space-y-2">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-zinc-100">Sidebar Opacity</span>
+                            <span className="text-sm font-medium text-foreground">Sidebar Opacity</span>
                             <span className="text-xs text-primary font-mono bg-primary/10 px-2 py-0.5 rounded">{chatListOpacity}%</span>
                         </div>
                         <Slider
@@ -282,18 +282,18 @@ export default function AppearancePage() {
 
             {/* Mobile Redesign Toggle */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-0">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Mobile Layout Optimization</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">
+                        <CardTitle className="text-sm font-medium text-foreground">Mobile Layout Optimization</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
                             Enable compact mobile redesign for smartphone viewports.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0">
                         <div className="flex items-center justify-between py-3 px-4">
                             <Label htmlFor="mobile-redesign-mode" className="flex flex-col space-y-0.5">
-                                <span className="text-sm font-medium text-zinc-100">Enable Compact Mobile Layout</span>
-                                <span className="text-xs text-zinc-400">
+                                <span className="text-sm font-medium text-foreground">Enable Compact Mobile Layout</span>
+                                <span className="text-xs text-muted-foreground">
                                     Optimizes navigation and spacing for mobile screens.
                                 </span>
                             </Label>
@@ -305,10 +305,10 @@ export default function AppearancePage() {
             
             {/* Accent Color Selection */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Accent Color</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">Pick an accent color for buttons, highlights, and icons.</CardDescription>
+                        <CardTitle className="text-sm font-medium text-foreground">Accent Color</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">Pick an accent color for buttons, highlights, and icons.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-wrap gap-3 px-4 pb-4">
                     {accentColors.map((color) => (
@@ -332,10 +332,10 @@ export default function AppearancePage() {
 
             {/* Chat Wallpapers */}
             <motion.div variants={cardVariants}>
-                <Card className="border border-zinc-800/50 bg-zinc-900/60">
+                <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-100">Chat Wallpapers</CardTitle>
-                        <CardDescription className="text-xs text-zinc-400">Choose a custom background wallpaper for conversation threads.</CardDescription>
+                        <CardTitle className="text-sm font-medium text-foreground">Chat Wallpapers</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">Choose a custom background wallpaper for conversation threads.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 px-4 pb-4">
                         <input
@@ -348,7 +348,7 @@ export default function AppearancePage() {
                         <motion.div className="relative group" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-full aspect-[9/16] rounded-xl border border-dashed border-zinc-700/50 flex flex-col items-center justify-center hover:border-violet-500/50 hover:text-violet-400 text-zinc-500 transition-colors"
+                                className="w-full aspect-[9/16] rounded-xl border border-dashed border-border/50 flex flex-col items-center justify-center hover:border-violet-500/50 hover:text-violet-400 text-muted-foreground transition-colors"
                             >
                                 <Plus className="h-7 w-7"/>
                                 <span className="mt-1 text-xs font-medium">Custom</span>

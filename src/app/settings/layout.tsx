@@ -51,16 +51,16 @@ function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex flex-col h-full h-[100dvh] w-full overflow-hidden min-h-0">
-            <header className="sticky top-0 z-10 w-full bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/40 px-4 py-3 flex items-center gap-2 shrink-0">
+            <header className="sticky top-0 z-10 w-full bg-background/80 backdrop-blur-md border-b border-border/40 px-4 py-3 flex items-center gap-2 shrink-0">
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 shrink-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 active:bg-zinc-800/50 hover:bg-zinc-800/50 text-zinc-300 hover:text-zinc-100 border-none outline-none select-none"
+                    className="h-9 w-9 shrink-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 active:bg-muted hover:bg-muted text-muted-foreground hover:text-foreground border-none outline-none select-none"
                     onClick={() => isRootSettings ? router.push('/') : router.push('/settings')}
                 >
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <h1 className="text-base font-semibold text-zinc-100">{title}</h1>
+                <h1 className="text-base font-semibold text-foreground">{title}</h1>
             </header>
             <main className="flex-1 overflow-y-auto min-h-0 w-full pb-20" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <SlideIn key={pathname}>

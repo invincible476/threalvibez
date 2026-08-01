@@ -241,9 +241,9 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
     <div className="flex flex-col gap-2 p-1.5 sm:p-2 w-full">
       {/* Upload Thumbnail Strip Preview */}
       {filePreviews.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto p-2 bg-zinc-900/90 rounded-xl border border-zinc-800">
+        <div className="flex items-center gap-2 overflow-x-auto p-2 bg-card/90 rounded-xl border border-border">
           {filePreviews.map((file, idx) => (
-            <div key={idx} className="relative shrink-0 w-16 h-16 rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden flex items-center justify-center group">
+            <div key={idx} className="relative shrink-0 w-16 h-16 rounded-lg bg-background border border-border overflow-hidden flex items-center justify-center group">
               {file.url ? (
                 <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
               ) : (
@@ -251,7 +251,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
               )}
               <button
                 onClick={() => removeSelectedFile(idx)}
-                className="absolute top-1 right-1 bg-black/70 rounded-full p-0.5 text-zinc-300 hover:text-white"
+                className="absolute top-1 right-1 bg-black/70 rounded-full p-0.5 text-foreground/80 hover:text-foreground"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -262,12 +262,12 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
 
       {/* Inline Emoji Picker Drawer */}
       {showEmojiPicker && (
-        <div className="p-2 bg-zinc-900/95 border border-zinc-800 rounded-xl shadow-xl grid grid-cols-8 gap-1 max-h-40 overflow-y-auto animate-in fade-in duration-150">
+        <div className="p-2 bg-card/95 border border-border rounded-xl shadow-xl grid grid-cols-8 gap-1 max-h-40 overflow-y-auto animate-in fade-in duration-150">
           {COMMON_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               onClick={() => handleEmojiSelect(emoji)}
-              className="text-xl hover:scale-125 transition-transform p-1.5 rounded-lg hover:bg-zinc-800"
+              className="text-xl hover:scale-125 transition-transform p-1.5 rounded-lg hover:bg-muted"
             >
               {emoji}
             </button>
@@ -287,12 +287,12 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
             {/* Attachment Picker Sheet / Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0 text-zinc-300 hover:bg-zinc-800">
+                <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:bg-muted">
                   <Paperclip className="h-5 w-5" />
                   <span className="sr-only">Attach File</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-zinc-900 border-zinc-800 text-zinc-100 w-44">
+              <DropdownMenuContent align="start" className="bg-card border-border text-foreground w-44">
                 <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2">
                   <ImageIcon className="h-4 w-4 text-violet-400" />
                   Photo / Video
@@ -312,7 +312,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
             <Button
               variant="ghost"
               size="icon"
-              className={cn("shrink-0 text-zinc-300 hover:bg-zinc-800", showEmojiPicker && "bg-zinc-800 text-violet-400")}
+              className={cn("shrink-0 text-muted-foreground hover:bg-muted", showEmojiPicker && "bg-muted text-violet-400")}
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             >
               <Smile className="h-5 w-5" />
@@ -324,7 +324,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
         {/* Textarea or Recording Display */}
         <div className="flex-1 relative">
           {recordingStatus === 'recording' ? (
-            <div className="flex-1 flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-2 h-10">
+            <div className="flex-1 flex items-center justify-between bg-card border border-border rounded-2xl px-4 py-2 h-10">
               <div className="flex items-center gap-2 text-red-500 font-medium text-sm">
                 <Mic className="h-5 w-5 animate-pulse" />
                 <span>{formatDuration(recordingDuration)}</span>
@@ -334,16 +334,16 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
               </Button>
             </div>
           ) : recordingStatus === 'recorded' && recordedAudio ? (
-            <div className="flex-1 flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-2 h-10">
+            <div className="flex-1 flex items-center justify-between bg-card border border-border rounded-2xl px-4 py-2 h-10">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="shrink-0 text-red-500 hover:text-red-600 h-8 w-8" onClick={cancelRecording}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
                 <audio ref={reviewAudioRef} src={recordedAudio.url} className="hidden" />
-                <Button variant="outline" size="icon" className="h-8 w-8 border-zinc-700" onClick={() => reviewAudioRef.current?.play()}>
-                  <Play className="h-4 w-4 text-zinc-100" />
+                <Button variant="outline" size="icon" className="h-8 w-8 border-border" onClick={() => reviewAudioRef.current?.play()}>
+                  <Play className="h-4 w-4 text-foreground" />
                 </Button>
-                <span className="text-xs text-zinc-400">{formatDuration(recordingDuration)}</span>
+                <span className="text-xs text-muted-foreground">{formatDuration(recordingDuration)}</span>
               </div>
               <Button size="icon" className="rounded-full shrink-0 h-8 w-8 bg-violet-700 hover:bg-violet-600 text-white" onClick={handleSendRecording}>
                 <SendHorizonal className="h-4 w-4" />
@@ -355,7 +355,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onTypin
               value={message}
               onChange={handleTypingChange}
               placeholder="Type a message..."
-              className="flex-1 resize-none rounded-2xl border-zinc-800 bg-zinc-900/90 py-2.5 px-4 pr-10 min-h-[40px] max-h-32 text-sm text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-violet-500 transition-[height,max-height] duration-200 ease-in-out"
+              className="flex-1 resize-none rounded-2xl border-border bg-card/90 py-2.5 px-4 pr-10 min-h-[40px] max-h-32 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-violet-500 transition-[height,max-height] duration-200 ease-in-out"
               rows={1}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {

@@ -1,10 +1,17 @@
 .auth-bg {
-    background-color: #0c0a1e; /* Deep indigo base */
+    /* Dark mode: Deep indigo base (default, since app defaults dark) */
+    background-color: hsl(var(--background));
     background-image: radial-gradient(at 20% 80%, hsla(255, 60%, 30%, 0.3) 0px, transparent 50%),
                       radial-gradient(at 80% 10%, hsla(280, 50%, 40%, 0.25) 0px, transparent 50%);
     overflow-x: hidden;
     overflow-y: auto;
     position: relative;
+}
+
+/* Light mode: softer pastel gradients */
+:root:not(.dark):not(.amoled) .auth-bg {
+    background-image: radial-gradient(at 20% 80%, hsla(263, 70%, 80%, 0.15) 0px, transparent 50%),
+                      radial-gradient(at 80% 10%, hsla(283, 50%, 75%, 0.10) 0px, transparent 50%);
 }
 
 .blob-container {
@@ -33,33 +40,33 @@
 
 /* Blob 1 (Violet) */
 .blob-container::before {
-    width: 550px; /* Increased size */
+    width: 550px;
     height: 550px;
-    background: hsla(283, 60%, 55%, 0.25); /* Increased opacity and vibrancy */
+    background: hsla(283, 60%, 55%, 0.25);
     animation: blob-float 15s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
 /* Blob 2 (Cyan Accent) */
 .blob-container::after {
-    width: 450px; /* Increased size */
+    width: 450px;
     height: 450px;
-    background: hsla(180, 80%, 50%, 0.2); /* Increased opacity */
+    background: hsla(180, 80%, 50%, 0.2);
     animation: blob-float 20s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55) 3s;
 }
 
 /* Blob 3 (Indigo) */
 .blob-container > div::before {
-    width: 500px; /* Increased size */
+    width: 500px;
     height: 500px;
-    background: hsla(260, 80%, 65%, 0.28); /* Increased opacity */
+    background: hsla(260, 80%, 65%, 0.28);
     animation: blob-float 18s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55) 1.5s;
 }
 
 /* Blob 4 (Deeper Violet) */
 .blob-container > div::after {
-    width: 400px; /* Increased size */
+    width: 400px;
     height: 400px;
-    background: hsla(275, 50%, 45%, 0.22); /* Increased opacity */
+    background: hsla(275, 50%, 45%, 0.22);
     animation: blob-float 25s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55) 5s;
 }
 

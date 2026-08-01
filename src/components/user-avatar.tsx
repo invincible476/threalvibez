@@ -111,7 +111,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, i
             />
             {isImageLoading && (
               <AvatarFallback className={cn(
-                "rounded-full animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 text-zinc-300",
+                "rounded-full animate-pulse bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950 text-muted-foreground",
                 isGroupChat && "bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 text-white font-bold"
               )}>
                 {fallback}
@@ -120,7 +120,7 @@ export function UserAvatar({ user, className, isFriend, hasStory, storyViewed, i
           </>
         ) : (
           <AvatarFallback className={cn(
-            "rounded-full bg-zinc-800 text-zinc-200 font-medium",
+            "rounded-full bg-muted text-foreground/80 font-medium",
             isGroupChat && "bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 text-white font-bold"
           )}>
             {fallback}

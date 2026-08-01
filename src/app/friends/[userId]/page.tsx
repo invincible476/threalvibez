@@ -128,8 +128,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
         <CardContent className="space-y-4">
           {profileUser.about && (
             <div className="space-y-1">
-              <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">About</h4>
-              <p className="text-sm text-zinc-200 leading-relaxed">{profileUser.about}</p>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">About</h4>
+              <p className="text-sm text-foreground/80 leading-relaxed">{profileUser.about}</p>
             </div>
           )}
 

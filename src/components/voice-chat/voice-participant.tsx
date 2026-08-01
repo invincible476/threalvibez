@@ -44,9 +44,9 @@ export function VoiceParticipant({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 p-3 rounded-xl transition-all border border-zinc-800/40',
-        'bg-zinc-900/60 backdrop-blur-sm',
-        isSpeaking ? 'bg-violet-950/40 ring-2 ring-violet-500 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'hover:bg-zinc-800/40'
+        'flex items-center gap-3 p-3 rounded-xl transition-all border border-border/40',
+        'bg-card/60 backdrop-blur-sm',
+        isSpeaking ? 'bg-violet-950/40 ring-2 ring-violet-500 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'hover:bg-muted/40'
       )}
     >
       <div className="relative">

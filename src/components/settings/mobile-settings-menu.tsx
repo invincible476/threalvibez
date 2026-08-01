@@ -70,16 +70,16 @@ export function MobileSettingsMenu() {
                         href={item.href} 
                         key={item.href} 
                         className={cn(
-                            "w-full flex items-center justify-between py-3.5 px-2 transition-all duration-200 relative border-b border-zinc-800/40 active:scale-[0.98]",
+                            "w-full flex items-center justify-between py-3.5 px-2 transition-all duration-200 relative border-b border-border/40 active:scale-[0.98]",
                             isActive 
-                                ? "bg-zinc-800/80 text-zinc-100" 
-                                : "hover:bg-zinc-800/30 text-zinc-100"
+                                ? "bg-muted/80 text-foreground" 
+                                : "hover:bg-muted/30 text-foreground"
                         )}
                     >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className={cn(
                                 "p-2 rounded-lg shrink-0 relative flex items-center justify-center",
-                                isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-zinc-800/80 text-zinc-400"
+                                isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-muted/80 text-muted-foreground"
                             )}>
                                 <Icon className="h-5 w-5" />
                                 {showBadge && (
@@ -87,7 +87,7 @@ export function MobileSettingsMenu() {
                                 )}
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
-                                <span className={cn("font-medium text-base truncate flex items-center gap-2 text-zinc-100")}>
+                                <span className={cn("font-medium text-base truncate flex items-center gap-2 text-foreground")}>
                                     {item.title}
                                     {showBadge && (
                                         <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
@@ -95,10 +95,10 @@ export function MobileSettingsMenu() {
                                         </span>
                                     )}
                                 </span>
-                                <span className="text-xs text-zinc-400 truncate mt-0.5">{item.description}</span>
+                                <span className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</span>
                             </div>
                         </div>
-                        <ChevronRight className={cn("h-5 w-5 shrink-0 ml-2", isActive ? "text-zinc-200" : "text-zinc-500")} />
+                        <ChevronRight className={cn("h-5 w-5 shrink-0 ml-2", isActive ? "text-foreground/80" : "text-muted-foreground")} />
                     </Link>
                 );
             })}

@@ -8,7 +8,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="h-full h-[100dvh] w-full overflow-y-auto overflow-x-hidden py-6 sm:py-8 px-4 flex flex-col items-center justify-start sm:justify-center bg-zinc-950 auth-bg antialiased selection:bg-primary/30 relative">
+    <main className="h-full h-[100dvh] w-full overflow-y-auto overflow-x-hidden py-6 sm:py-8 px-4 flex flex-col items-center justify-start sm:justify-center bg-background auth-bg antialiased selection:bg-primary/30 relative">
       <AnimatedAuthBackground />
       <div className="relative z-10 w-full max-w-md my-auto flex flex-col items-center py-4 pb-12">
         <div className="mb-6 flex justify-center">
