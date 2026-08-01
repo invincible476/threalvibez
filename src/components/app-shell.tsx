@@ -519,6 +519,7 @@ function useChatData() {
         updated.lastMessage?.text !== selectedChat.lastMessage?.text ||
         JSON.stringify(updated.typing) !== JSON.stringify(selectedChat.typing) ||
         JSON.stringify(updated.lastRead) !== JSON.stringify(selectedChat.lastRead) ||
+        JSON.stringify(updated.activeCall) !== JSON.stringify(selectedChat.activeCall) ||
         updated.isFavorite !== selectedChat.isFavorite ||
         updated.isArchived !== selectedChat.isArchived;
       if (changed) {
