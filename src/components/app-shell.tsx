@@ -210,6 +210,7 @@ function useChatData() {
   const [aiConversation, setAiConversation] = useState<Conversation>(initialAiConversation);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedChat, setSelectedChat] = useState<Conversation | undefined>(undefined);
+  const [autoOpenVoiceModalChatId, setAutoOpenVoiceModalChatId] = useState<string | null>(null);
   const [isAiReplying, setIsAiReplying] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [usersCache, setUsersCache] = useState<Map<string, User>>(new Map([[AI_USER_ID, aiUser]]));
@@ -2098,12 +2099,16 @@ function useChatData() {
     handleStoryReply,
     handleMuteToggle,
     handleClearChat,
+    autoOpenVoiceModalChatId,
+    setAutoOpenVoiceModalChatId,
   };
 }
 
 interface AppShellContextType {
   conversations: Conversation[];
   selectedChat: Conversation | undefined;
+  autoOpenVoiceModalChatId: string | null;
+  setAutoOpenVoiceModalChatId: (chatId: string | null) => void;
   isAiReplying: boolean;
   allUsers: User[];
   usersCache: Map<string, User>;
@@ -2266,7 +2271,10 @@ export function AppShell({ children }: { children: React.ReactNode }): JSX.Eleme
           <IncomingCallIndicator
             conversations={chatData.conversations}
             currentUser={chatData.currentUser}
-            onAcceptCall={(conversationId) => chatData.handleChatSelect(conversationId)}
+            onAcceptCall={async (conversationId) => {
+              await chatData.handleChatSelect(conversationId);
+              chatData.setAutoOpenVoiceModalChatId(conversationId);
+            }}
           />
         )}
       </StoriesContext.Provider>

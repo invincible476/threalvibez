@@ -28,8 +28,17 @@ function ActiveCallUI({ onClose }: { onClose: () => void }) {
   const connectionState = useConnectionState();
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full py-2">
-      <div className="text-center">
+    <div className="flex flex-col items-center gap-6 w-full py-2 relative">
+      <button
+        onClick={onClose}
+        className="absolute top-0 right-0 p-1 text-zinc-400 hover:text-white rounded-full bg-zinc-800/60 hover:bg-zinc-700 transition-colors"
+        title="Close"
+      >
+        <span className="sr-only">Close</span>
+        ✕
+      </button>
+
+      <div className="text-center pt-2">
         <h3 className="text-lg font-bold text-white mb-1">Voice Call</h3>
         <p className="text-xs text-emerald-400 font-medium capitalize">
           Status: {connectionState}
@@ -56,6 +65,13 @@ function ActiveCallUI({ onClose }: { onClose: () => void }) {
           }}
         />
       </div>
+
+      <button
+        onClick={onClose}
+        className="w-full mt-2 py-2.5 px-4 rounded-xl bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white font-medium text-xs border border-red-500/30 transition-all flex items-center justify-center gap-2"
+      >
+        Leave / End Call
+      </button>
     </div>
   );
 }
@@ -179,10 +195,8 @@ export function LiveKitVoiceModal({
               setConnectionStatus('connected');
             }}
             onDisconnected={() => {
-              if (hasConnectedRef.current) {
-                onClose();
-              }
               setConnectionStatus('disconnected');
+              onClose();
             }}
             onError={(err: any) => {
               console.error('[LiveKit Error]:', err);

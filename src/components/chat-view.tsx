@@ -176,7 +176,24 @@ const ChatViewComponent = ({
     handleBlockUser,
     handleMuteToggle,
     handleClearChat,
+    autoOpenVoiceModalChatId,
+    setAutoOpenVoiceModalChatId,
   } = useAppShell();
+
+  // Auto open voice call modal when call is accepted from global incoming call banner
+  useEffect(() => {
+    if (chat?.id && autoOpenVoiceModalChatId === chat.id) {
+      setIsLiveKitModalOpen(true);
+      setAutoOpenVoiceModalChatId(null);
+    }
+  }, [chat?.id, autoOpenVoiceModalChatId, setAutoOpenVoiceModalChatId]);
+
+  // Auto close voice modal when active call is ended or deleted from Firestore
+  useEffect(() => {
+    if (!chat?.activeCall || chat.activeCall.status === 'ended') {
+      setIsLiveKitModalOpen(false);
+    }
+  }, [chat?.activeCall]);
   
   const otherParticipant = useMemo(() => {
     if (!chat || !currentUser || chat.type !== 'private') return undefined;

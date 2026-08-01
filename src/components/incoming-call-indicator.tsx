@@ -31,12 +31,25 @@ export function IncomingCallIndicator({
     if (!currentUser?.uid) return false;
     if (call.callerId === currentUser.uid) return false;
     if (declinedCallIds.includes(call.callId)) return false;
-    // Call is active or calling within the last 2 minutes
-    const isRecent = call.startedAt && Date.now() - call.startedAt < 120000;
+    // Call is active or calling within the last 45 seconds
+    const isRecent = call.startedAt && Date.now() - call.startedAt < 45000;
     return (call.status === 'calling' || call.status === 'active') && isRecent;
   });
 
   const activeCall: ActiveCall | null = incomingConvo?.activeCall || null;
+
+  // Auto-expire unanswered ringing calls after 45s
+  useEffect(() => {
+    if (!incomingConvo || !activeCall || activeCall.status !== 'calling') return;
+    const elapsed = Date.now() - (activeCall.startedAt || Date.now());
+    const remaining = Math.max(0, 45000 - elapsed);
+
+    const timer = setTimeout(() => {
+      endVoiceCall(incomingConvo.id).catch(() => {});
+    }, remaining);
+
+    return () => clearTimeout(timer);
+  }, [activeCall?.callId, activeCall?.status, activeCall?.startedAt, incomingConvo?.id]);
 
   // Handle ringtone and system notification
   useEffect(() => {
@@ -84,7 +97,9 @@ export function IncomingCallIndicator({
     status: 'online',
   };
 
-  const handleAccept = async () => {
+  const handleAccept = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (ringtonePlayerRef.current) {
       ringtonePlayerRef.current.stop();
       ringtonePlayerRef.current = null;
@@ -93,7 +108,9 @@ export function IncomingCallIndicator({
     onAcceptCall(incomingConvo.id, activeCall.roomId);
   };
 
-  const handleDecline = async () => {
+  const handleDecline = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (ringtonePlayerRef.current) {
       ringtonePlayerRef.current.stop();
       ringtonePlayerRef.current = null;
