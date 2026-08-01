@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 import { UserProfileSheet } from './user-profile-sheet';
 import { SidebarTrigger } from './ui/sidebar';
 import { useAppearance } from './providers/appearance-provider';
+import { LiveKitVoiceModal } from './livekit-voice-modal';
+
 import Image from 'next/image';
 import { ImagePreviewDialog } from './image-preview-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +70,8 @@ const ChatViewComponent = ({
   const { viewportHeight } = useMobileKeyboardHeight();
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
+  const [isLiveKitModalOpen, setIsLiveKitModalOpen] = useState(false);
+
   const [showMicModal, setShowMicModal] = useState(false);
 
   
@@ -418,22 +422,34 @@ const ChatViewComponent = ({
         </div>
 
         <div className={cn("flex items-center gap-2", isAIChat && "hidden")}>
-          {/* Voice Call Button — Disabled / Placeholder Toast */}
+          {/* Voice Call Button — LiveKit Cloud Integration */}
           {!isAIChat && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-              onClick={() => {
-                toast({
-                  title: 'Voice Call',
-                  description: 'Voice calls are currently disabled.',
-                });
-              }}
-            >
-              <Phone className="h-4 w-4" />
-              <span className="sr-only">Voice Call</span>
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-emerald-400"
+                onClick={() => {
+                  if (!currentUser?.uid || !chat?.id) return;
+                  setIsLiveKitModalOpen(true);
+                }}
+              >
+                <Phone className="h-4 w-4" />
+                <span className="sr-only">Voice Call</span>
+              </Button>
+
+              {currentUser && chat && (
+                <LiveKitVoiceModal
+                  isOpen={isLiveKitModalOpen}
+                  roomId={`voice_room_${chat.id}`}
+                  userId={currentUser.uid}
+                  userName={currentUser.name || 'User'}
+                  userAvatar={currentUser.photoURL || undefined}
+                  targetUser={otherParticipant ? { name: otherParticipant.name, photoURL: otherParticipant.photoURL || undefined } : undefined}
+                  onClose={() => setIsLiveKitModalOpen(false)}
+                />
+              )}
+            </>
           )}
 
           {/* 3-dots Menu Button */}
