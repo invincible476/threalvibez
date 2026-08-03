@@ -286,12 +286,16 @@ export const authService = {
       try {
         result = await firebaseSignInPopup(auth, provider);
       } catch (popupError: any) {
-        console.error('Popup sign-in failed:', popupError);
+        console.error('Popup sign-in failed, attempting redirect fallback:', popupError);
         
-        // Fallback to redirect if popup was blocked
+        // Fallback to redirect if popup was blocked or hit internal cross-origin storage errors
         if (popupError.code === 'auth/popup-blocked' || 
-            popupError.code === 'auth/cancelled-popup-request') {
-          sessionStorage.setItem('expectingRedirect', 'true');
+            popupError.code === 'auth/cancelled-popup-request' ||
+            popupError.code === 'auth/internal-error') {
+          console.log('[Auth Service] Fallback to signInWithRedirect...');
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('expectingRedirect', 'true');
+          }
           await signInWithRedirect(auth, provider);
           return null;
         } else if (popupError.code === 'auth/popup-closed-by-user') {

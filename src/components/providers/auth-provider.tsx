@@ -144,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const isAuthRoute = AUTH_ROUTES.includes(pathname || '');
+    const activeUser = user || auth.currentUser;
     const isLoading = authLoading || isProcessingRedirect;
     const now = Date.now();
 
@@ -151,25 +152,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isLoading) return;
 
       // Handle authenticated user on auth routes (login, signup) -> redirect to home
-      if (user && isAuthRoute && pathname !== '/verify-email') {
+      if (activeUser && isAuthRoute && pathname !== '/verify-email') {
         if (typeof window !== 'undefined') {
-          sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
-          localStorage.setItem(`emailVerified_${user.uid}`, 'true');
-          localStorage.setItem('sessionUser', user.uid);
+          sessionStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
+          localStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
+          localStorage.setItem('sessionUser', activeUser.uid);
           localStorage.setItem('lastLogin', now.toString());
         }
         router.replace('/');
         return;
       }
 
-      if (user && !isAuthRoute) {
+      if (activeUser && !isAuthRoute) {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('sessionUser', user.uid);
+          localStorage.setItem('sessionUser', activeUser.uid);
           localStorage.setItem('lastLogin', now.toString());
         }
       }
 
-      if (!user && !isAuthRoute) {
+      const hasStoredSession = typeof window !== 'undefined' && !!localStorage.getItem('sessionUser');
+
+      if (!activeUser && !hasStoredSession && !isAuthRoute) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('sessionUser');
           localStorage.removeItem('lastLogin');
@@ -185,39 +188,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Handle email verification
-      if (user && !isAuthRoute && pathname !== '/verify-email') {
+      if (activeUser && !isAuthRoute && pathname !== '/verify-email') {
         try {
-          const isGoogleUser = user.providerData?.some(p => p.providerId === 'google.com');
-          const cachedSessionStatus = typeof window !== 'undefined' ? sessionStorage.getItem(`emailVerified_${user.uid}`) : null;
-          const cachedLocalStatus = typeof window !== 'undefined' ? localStorage.getItem(`emailVerified_${user.uid}`) : null;
+          const isGoogleUser = activeUser.providerData?.some(p => p.providerId === 'google.com');
+          const cachedSessionStatus = typeof window !== 'undefined' ? sessionStorage.getItem(`emailVerified_${activeUser.uid}`) : null;
+          const cachedLocalStatus = typeof window !== 'undefined' ? localStorage.getItem(`emailVerified_${activeUser.uid}`) : null;
           
           if (isGoogleUser || cachedSessionStatus === 'true' || cachedLocalStatus === 'true') {
             if (typeof window !== 'undefined' && cachedSessionStatus !== 'true') {
-              sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
+              sessionStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
             }
             if (typeof window !== 'undefined' && cachedLocalStatus !== 'true') {
-              localStorage.setItem(`emailVerified_${user.uid}`, 'true');
+              localStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
             }
             return;
           }
           
-          const lastVerificationCheck = parseInt(sessionStorage.getItem(`lastVerificationCheck_${user.uid}`) || '0');
+          const lastVerificationCheck = parseInt(sessionStorage.getItem(`lastVerificationCheck_${activeUser.uid}`) || '0');
           
           if (now - lastVerificationCheck < VERIFICATION_CHECK_COOLDOWN) {
             return; // Skip verification check if done recently
           }
           
-          sessionStorage.setItem(`lastVerificationCheck_${user.uid}`, now.toString());
+          sessionStorage.setItem(`lastVerificationCheck_${activeUser.uid}`, now.toString());
           
-          let userDoc = await getDoc(doc(db, 'users', user.uid));
+          let userDoc = await getDoc(doc(db, 'users', activeUser.uid));
           if (!userDoc.exists()) {
-            userDoc = await authService.ensureUserDocument(user);
+            userDoc = await authService.ensureUserDocument(activeUser);
           }
           const userData = userDoc.data() as DocumentData | undefined;
           
           const isVerified = Boolean(
             isGoogleUser ||
-            user.emailVerified ||
+            activeUser.emailVerified ||
             cachedSessionStatus === 'true' ||
             cachedLocalStatus === 'true' ||
             userData?.emailVerified !== false
@@ -225,11 +228,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (isVerified) {
             if (typeof window !== 'undefined') {
-              sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
-              localStorage.setItem(`emailVerified_${user.uid}`, 'true');
+              sessionStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
+              localStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
             }
             if (!userData?.emailVerified) {
-              await setDoc(doc(db, 'users', user.uid), {
+              await setDoc(doc(db, 'users', activeUser.uid), {
                 emailVerified: true,
                 verifiedAt: serverTimestamp(),
                 lastUpdated: serverTimestamp()
@@ -239,23 +242,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           // Clear cached verified state if not verified
-          sessionStorage.removeItem(`emailVerified_${user.uid}`);
-          localStorage.removeItem(`emailVerified_${user.uid}`);
+          sessionStorage.removeItem(`emailVerified_${activeUser.uid}`);
+          localStorage.removeItem(`emailVerified_${activeUser.uid}`);
 
           // Handle unverified user - only redirect if not in a navigation cooldown
-          const lastVerifyRedirect = parseInt(sessionStorage.getItem(`lastVerifyRedirect_${user.uid}`) || '0');
+          const lastVerifyRedirect = parseInt(sessionStorage.getItem(`lastVerifyRedirect_${activeUser.uid}`) || '0');
           if (now - lastVerifyRedirect >= REDIRECT_COOLDOWN && !navigationInProgress.current) {
-            sessionStorage.setItem(`lastVerifyRedirect_${user.uid}`, now.toString());
+            sessionStorage.setItem(`lastVerifyRedirect_${activeUser.uid}`, now.toString());
             lastRedirectTime.current = now;
             navigationInProgress.current = true;
-            router.replace(`/verify-email?email=${encodeURIComponent(user.email || '')}`);
+            router.replace(`/verify-email?email=${encodeURIComponent(activeUser.email || '')}`);
             setTimeout(() => { navigationInProgress.current = false; }, 500);
           }
         } catch (error) {
           console.error('Error checking email verification status from Firestore:', error);
-          if (user.emailVerified) {
-            sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
-            localStorage.setItem(`emailVerified_${user.uid}`, 'true');
+          if (activeUser.emailVerified) {
+            sessionStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
+            localStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
           }
         }
       }
