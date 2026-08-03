@@ -63,6 +63,18 @@ const nextConfig: NextConfig = {
     : [],
   // Optimize for Vercel deployment
   output: process.env.VERCEL ? 'standalone' : undefined,
+  // ── Same-Origin Firebase Auth Proxy ──────────────────────────────────────
+  // Routes /__/auth/* through Next.js to firebaseapp.com so that Chrome's
+  // third-party cookie / storage-partitioning rules are bypassed entirely.
+  // authDomain in firebase-init.ts is set to threalvibez.vercel.app on Vercel.
+  async rewrites() {
+    return [
+      {
+        source: '/__/auth/:path*',
+        destination: 'https://blackvienna-ea6c7.firebaseapp.com/__/auth/:path*',
+      },
+    ];
+  },
   // Replit environment configuration
   async headers() {
     // Get the Firebase auth domain from env

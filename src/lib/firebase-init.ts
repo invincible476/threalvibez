@@ -31,10 +31,10 @@ function validateFirebaseConfig() {
     throw new Error(`Missing required Firebase configuration keys: ${missingKeys.join(', ')}`);
   }
 
-  // Validate auth domain format
+  // Validate auth domain format — accepts any valid hostname (firebaseapp.com or custom domain)
   const authDomain = firebaseConfig.authDomain;
-  if (!authDomain || !authDomain.includes('.') || !authDomain.includes('firebaseapp.com')) {
-    throw new Error('Invalid authDomain format. Must be a valid Firebase domain');
+  if (!authDomain || !authDomain.includes('.')) {
+    throw new Error('Invalid authDomain format. Must be a valid hostname.');
   }
 }
 
@@ -47,10 +47,18 @@ function getServerSideFirebase() {
   };
 }
 
+// Determine authDomain:
+// - On Vercel: use threalvibez.vercel.app so auth is same-origin (bypasses 3rd-party cookie blocks)
+// - Locally / fallback: use official firebaseapp.com domain
+const isVercel = !!process.env.NEXT_PUBLIC_VERCEL_URL || !!process.env.VERCEL;
+const authDomainResolved = isVercel
+  ? 'threalvibez.vercel.app'
+  : (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'blackvienna-ea6c7.firebaseapp.com');
+
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'blackvienna-ea6c7.firebaseapp.com',
+  authDomain: authDomainResolved,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
@@ -129,12 +137,9 @@ export async function initializeFirebase() {
         throw new Error('Auth domain is not configured. Check NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN');
       }
 
-      // Validate current domain matches auth domain or is localhost
-      const currentDomain = window.location.hostname;
-      if (currentDomain !== 'localhost' && 
-          !auth.config.authDomain.includes(currentDomain)) {
-        console.warn(`[Firebase Init] Domain mismatch - current: ${currentDomain}, auth: ${auth.config.authDomain}`);
-      }
+      // Log resolved authDomain for debugging
+      console.log(`[Firebase Init] Auth domain resolved to: ${auth.config.authDomain}`);
+      console.log(`[Firebase Init] Current hostname: ${window.location.hostname}`);
 
     } catch (authError: any) {
       console.error('[Firebase Init] Auth initialization error:', {
