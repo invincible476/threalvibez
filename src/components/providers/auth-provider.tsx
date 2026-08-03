@@ -102,7 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Process redirect result (e.g. Google OAuth redirect) unconditionally on app load
     getRedirectResult(auth)
       .then(async (result) => {
+        const wasExpecting = typeof window !== 'undefined' && sessionStorage.getItem('expectingRedirect') === 'true';
         if (result?.user) {
+          console.log('[Auth Provider] Google redirect sign-in successful for:', result.user.email);
           if (typeof window !== 'undefined') {
             sessionStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
             localStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
@@ -112,10 +114,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await authService.ensureUserDocument(result.user);
           await setupPresence(result.user.uid);
           router.replace('/');
+        } else if (wasExpecting) {
+          console.error(`[Auth Provider] Google redirect completed but no user returned. Ensure "${window.location.hostname}" is listed under Firebase Console > Authentication > Settings > Authorized domains.`);
         }
       })
       .catch((error) => {
-        console.error('Error processing redirect:', error);
+        console.error('[Auth Provider] Error processing redirect:', error);
         if (error.code === 'auth/argument-error') {
           clearAuthState();
         }
