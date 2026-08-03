@@ -261,17 +261,6 @@ function LoginForm() {
       router.replace('/');
     } catch (e: any) {
       console.error("Google Sign-In error:", e);
-
-      // Force-push into the on-screen debug logger (bypasses console interception timing)
-      if (typeof window !== 'undefined' && window.__debugLog) {
-        window.__debugLog(
-          'error',
-          `[Google Sign-In] ${e?.code ?? 'unknown'}: ${e?.message ?? String(e)}`,
-          e?.stack ?? JSON.stringify(e, null, 2),
-          `code: ${e?.code ?? 'n/a'}`
-        );
-      }
-
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
       switch (e.code) {

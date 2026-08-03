@@ -12,7 +12,6 @@ import './mobile.css';
 import { FriendsProvider } from '@/components/providers/friends-provider';
 import { AppShell } from '@/components/app-shell';
 import { validateEnvironmentOnStartup } from '@/lib/environment-validation';
-import { GlobalErrorCapture } from '@/components/global-error-capture';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 const fontPoppins = Poppins({
@@ -93,7 +92,6 @@ export default function RootLayout({
           fontPtSans.variable
         )}
       >
-        <GlobalErrorCapture />
         <ErrorBoundary label="RootLayout">
           <AuthProvider>
             <ThemeProvider

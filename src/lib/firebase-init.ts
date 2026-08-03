@@ -132,15 +132,6 @@ export async function initializeFirebase() {
         await setPersistence(auth, browserLocalPersistence);
       }
 
-      // Validate auth configuration
-      if (!auth.config.authDomain) {
-        throw new Error('Auth domain is not configured. Check NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN');
-      }
-
-      // Log resolved authDomain for debugging
-      console.log(`[Firebase Init] Auth domain resolved to: ${auth.config.authDomain}`);
-      console.log(`[Firebase Init] Current hostname: ${window.location.hostname}`);
-
     } catch (authError: any) {
       console.error('[Firebase Init] Auth initialization error:', {
         code: authError.code,
