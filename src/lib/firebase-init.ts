@@ -33,8 +33,8 @@ function validateFirebaseConfig() {
 
   // Validate auth domain format
   const authDomain = firebaseConfig.authDomain;
-  if (!authDomain || !authDomain.includes('.') || !authDomain.includes('firebaseapp.com')) {
-    throw new Error('Invalid authDomain format. Must be a valid Firebase domain');
+  if (!authDomain || !authDomain.includes('.')) {
+    throw new Error('Invalid authDomain format. Must be a valid domain');
   }
 }
 
@@ -50,7 +50,7 @@ function getServerSideFirebase() {
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  authDomain: typeof window !== 'undefined' ? window.location.host : (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'blackvienna-ea6c7.firebaseapp.com'),
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,

@@ -63,6 +63,15 @@ const nextConfig: NextConfig = {
     : [],
   // Optimize for Vercel deployment
   output: process.env.VERCEL ? 'standalone' : undefined,
+  // Firebase Auth Proxy Rewrite for Same-Origin Auth on Vercel
+  async rewrites() {
+    return [
+      {
+        source: '/__/auth/:path*',
+        destination: 'https://blackvienna-ea6c7.firebaseapp.com/__/auth/:path*',
+      },
+    ];
+  },
   // Replit environment configuration
   async headers() {
     // Get the Firebase auth domain from env
