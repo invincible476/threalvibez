@@ -36,6 +36,14 @@ const LEVEL_CONFIG: Record<LogLevel, { label: string; color: string; bg: string;
   info:      { label: 'INFO',      color: '#60a5fa', bg: '#0b1626', border: '#1e3a5f' },
 };
 
+// ── Global helper: any module can call this to force-push into the debug panel ─
+// Usage: window.__debugLog?.('error', 'Something broke', 'stack trace here', 'file:line')
+declare global {
+  interface Window {
+    __debugLog?: (level: LogLevel, message: string, detail?: string, source?: string) => void;
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function uid() { return Math.random().toString(36).slice(2, 9); }
 function ts() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
@@ -62,6 +70,12 @@ export function GlobalErrorCapture() {
 
   useEffect(() => {
     if (!enabled) return;
+
+    // ── Register global helper so any module can force-push entries ───────
+    window.__debugLog = (level, message, detail, source) => {
+      push({ level, message, detail, source });
+      setMinimized(false);
+    };
 
     // ── window.onerror ────────────────────────────────────────────────────
     const onError = (event: ErrorEvent) => {
