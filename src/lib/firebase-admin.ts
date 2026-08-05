@@ -2,6 +2,7 @@
 import { getApps, initializeApp, cert, ServiceAccount } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getMessaging } from 'firebase-admin/messaging';
 
 let firebaseAdmin: any;
 
@@ -78,3 +79,14 @@ export function getAdminAuth() {
     throw new Error('Firebase Admin not properly configured');
   }
 }
+
+export function getAdminMessaging() {
+  try {
+    const app = initializeFirebaseAdmin();
+    return getMessaging(app);
+  } catch (error) {
+    console.error('Error getting Messaging admin:', error);
+    throw new Error('Firebase Admin messaging not properly configured');
+  }
+}
+

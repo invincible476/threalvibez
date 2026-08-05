@@ -5,11 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAppearance } from '@/components/providers/appearance-provider';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { Check, Upload } from 'lucide-react';
+import { Check, Upload, Bell, ShieldCheck, Smartphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { createToneAudio } from '@/lib/sound';
+import { requestFCMToken } from '@/lib/fcm-client';
+import { firebaseAuth } from '@/lib/firebase-init';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -19,6 +22,33 @@ const cardVariants = {
 export default function NotificationsPage() {
     const { notificationSound, setNotificationSound, areNotificationsMuted, setAreNotificationsMuted } = useAppearance();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+    const [isRegistering, setIsRegistering] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setPushPermission(Notification.permission);
+        }
+    }, []);
+
+    const handleEnablePush = async () => {
+        setIsRegistering(true);
+        try {
+            const user = firebaseAuth.currentUser;
+            if (user?.uid) {
+                await requestFCMToken(user.uid);
+            } else {
+                await Notification.requestPermission();
+            }
+            if (typeof window !== 'undefined' && 'Notification' in window) {
+                setPushPermission(Notification.permission);
+            }
+        } catch (err) {
+            console.error('Push notification enable failed:', err);
+        } finally {
+            setIsRegistering(false);
+        }
+    };
 
     const playSound = (sound: string) => {
         if (typeof window === 'undefined') return;
@@ -74,6 +104,56 @@ export default function NotificationsPage() {
                 <p className="text-xs text-muted-foreground mb-2 max-w-md">Manage how you get notified about new messages.</p>
             </motion.header>
 
+            {/* Push Notifications Card */}
+            <motion.div variants={cardVariants}>
+                <Card className="border border-border/50 bg-card/60">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center gap-2">
+                            <Bell className="h-4 w-4 text-primary" />
+                            <CardTitle className="text-sm font-medium text-foreground">Background Push Notifications</CardTitle>
+                        </div>
+                        <CardDescription className="text-xs text-muted-foreground">
+                            Receive notifications even when the app tab or browser is closed.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                            <div className="flex items-center gap-3">
+                                <Smartphone className="h-5 w-5 text-muted-foreground" />
+                                <div className="space-y-0.5">
+                                    <p className="text-xs font-medium">Push Status</p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {pushPermission === 'granted'
+                                            ? 'Active — Push notifications enabled for closed tabs.'
+                                            : pushPermission === 'denied'
+                                            ? 'Blocked in browser settings.'
+                                            : 'Not enabled yet.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {pushPermission === 'granted' ? (
+                                <div className="flex items-center gap-1 text-xs text-emerald-500 font-medium">
+                                    <ShieldCheck className="h-4 w-4" />
+                                    <span>Enabled</span>
+                                </div>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={handleEnablePush}
+                                    disabled={isRegistering || pushPermission === 'denied'}
+                                    className="text-xs h-8 px-3"
+                                >
+                                    {isRegistering ? 'Registering...' : 'Enable Push'}
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            {/* Sounds Card */}
             <motion.div variants={cardVariants}>
                 <Card className="border border-border/50 bg-card/60">
                     <CardHeader className="pb-3">
@@ -130,3 +210,4 @@ export default function NotificationsPage() {
         </motion.div>
     );
 }
+

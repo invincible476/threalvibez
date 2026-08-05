@@ -5,6 +5,7 @@ import { useAppearance } from '@/components/providers/appearance-provider';
 import { createToneAudio } from '@/lib/sound';
 import { safeGetMillis } from '@/lib/utils';
 import { safeShowNotification } from '@/lib/notification-utils';
+import { requestFCMToken } from '@/lib/fcm-client';
 
 interface UseNotificationsProps {
   conversations: Conversation[];
@@ -32,6 +33,16 @@ export function useNotifications({
       console.warn('Notification permission request failed:', e);
     }
   }, []);
+
+  // Register FCM Token for background push notifications when user is authenticated
+  useEffect(() => {
+    if (currentUser?.uid) {
+      requestFCMToken(currentUser.uid).catch((err) => {
+        console.warn('[useNotifications] FCM token registration notice:', err);
+      });
+    }
+  }, [currentUser?.uid]);
+
 
   const playSound = useCallback(() => {
     if (areNotificationsMuted || typeof window === 'undefined') return;

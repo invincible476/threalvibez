@@ -931,6 +931,21 @@ function useChatData() {
           timestamp: serverTimestamp(),
         },
       }).catch(console.error);
+
+      // Non-blocking background push notification dispatch to offline/tab-closed recipients
+      fetch('/api/notifications/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId,
+          senderId,
+          text: messageText.trim(),
+          senderName: currentUser.name || 'User',
+          senderPhoto: currentUser.photoURL || '',
+        }),
+      }).catch((pushErr) => {
+        console.warn('[AppShell] Background push dispatch notification notice:', pushErr);
+      });
       
       const docRef = await docPromise;
       return docRef.id;
