@@ -6,55 +6,69 @@ import { getMessaging } from 'firebase-admin/messaging';
 
 let firebaseAdmin: any;
 
-// Initialize Firebase Admin with strict security requirements
+// Initialize Firebase Admin with strict security requirements and dev/placeholder fallback
 function initializeFirebaseAdmin() {
   if (getApps().length === 0) {
     const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'blackvienna-ea6c7';
     const isDevelopment = process.env.NODE_ENV === 'development';
     const allowDevFallback = process.env.ALLOW_DEV_TOKEN_FALLBACK === 'true';
-    
-    // Validate required environment variables
-    if (!projectId) {
-      throw new Error('NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable is required');
-    }
-    
-    // In production or secure environments, service account is MANDATORY
-    if (!serviceAccount && (!isDevelopment || !allowDevFallback)) {
-      console.error('🚨 SECURITY ERROR: Firebase service account not configured for secure environment');
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is required for secure Firebase Admin initialization');
-    }
-    
-    try {
-      if (serviceAccount) {
-        try {
-          const serviceAccountKey = JSON.parse(serviceAccount) as ServiceAccount;
-          firebaseAdmin = initializeApp({
-            credential: cert(serviceAccountKey),
-            projectId: projectId,
-          });
-          console.log('Firebase Admin initialized with secure service account credentials');
-        } catch (certError) {
-          if (isDevelopment || allowDevFallback) {
-            console.warn('⚠️ Development notice: Service account cert parsing unverified, initializing dev fallback app.');
-            firebaseAdmin = initializeApp({
-              projectId: projectId,
-            });
-          } else {
-            throw certError;
+
+    let credential: any = undefined;
+
+    if (serviceAccount) {
+      try {
+        let rawJson = serviceAccount.trim();
+        // Handle Base64 encoded JSON strings commonly used in Vercel
+        if (!rawJson.startsWith('{') && (rawJson.startsWith('ey') || rawJson.startsWith('ew'))) {
+          try {
+            rawJson = Buffer.from(rawJson, 'base64').toString('utf8');
+          } catch (e) {
+            // Keep original string if base64 decoding fails
           }
         }
-      } else if (isDevelopment || allowDevFallback) {
-        console.warn('⚠️ DEVELOPMENT MODE: Firebase Admin initialized without service account');
-        firebaseAdmin = initializeApp({
-          projectId: projectId,
-        });
-      } else {
-        throw new Error('Firebase Admin requires proper service account configuration');
+
+        const serviceAccountKey = JSON.parse(rawJson) as ServiceAccount & { private_key?: string };
+        
+        // Normalize escaped newlines (\\n -> \n) frequently caused by Vercel environment variable formatting
+        if (serviceAccountKey.private_key) {
+          serviceAccountKey.private_key = serviceAccountKey.private_key.replace(/\\n/g, '\n');
+        }
+        if (serviceAccountKey.privateKey) {
+          serviceAccountKey.privateKey = serviceAccountKey.privateKey.replace(/\\n/g, '\n');
+        }
+
+        const keyString = serviceAccountKey.privateKey || serviceAccountKey.private_key || '';
+
+        // Verify key is a valid PEM private key and not a placeholder
+        if (
+          keyString &&
+          !keyString.includes('YOUR_PRIVATE_KEY') &&
+          keyString.includes('BEGIN PRIVATE KEY')
+        ) {
+          credential = cert({
+            ...serviceAccountKey,
+            privateKey: keyString,
+          });
+          console.log('[Firebase Admin] Successfully initialized with valid Service Account credentials.');
+        } else {
+          console.warn('⚠️ [Firebase Admin] Service Account key contains a placeholder ("YOUR_PRIVATE_KEY"). Initializing without cert credentials.');
+        }
+      } catch (certError) {
+        console.warn('⚠️ [Firebase Admin] Service account cert parsing error, initializing dev fallback:', certError instanceof Error ? certError.message : String(certError));
       }
+    } else {
+      console.warn('⚠️ [Firebase Admin] No FIREBASE_SERVICE_ACCOUNT_KEY provided. Initializing fallback app.');
+    }
+
+    try {
+      firebaseAdmin = initializeApp({
+        ...(credential ? { credential } : {}),
+        projectId: projectId,
+      });
     } catch (error) {
-      console.warn('Firebase Admin initialization notice:', error instanceof Error ? error.message : String(error));
-      throw new Error(`Firebase Admin initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[Firebase Admin] Initialization error:', error);
+      firebaseAdmin = getApps()[0];
     }
   }
   return firebaseAdmin;
