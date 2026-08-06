@@ -27,38 +27,20 @@ self.addEventListener('activate', (event) => {
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message: ', payload);
 
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message on Vibez';
-  const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || 'You have a new message.',
-    icon: payload.notification?.icon || payload.data?.icon || '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
-    tag: payload.data?.chatId ? `vibez-chat-${payload.data.chatId}` : 'vibez-notification',
-    renotify: true,
-    data: payload.data || {}
-  };
+  // If payload already contains a webpush/notification payload, Firebase FCM compat SDK automatically handles display.
+  // Otherwise display notification manually for data-only push messages.
+  if (!payload.notification) {
+    const notificationTitle = payload.data?.title || 'New Message on Vibez';
+    const notificationOptions = {
+      body: payload.data?.body || 'You have a new message.',
+      icon: payload.data?.icon || '/icons/icon-192x192.png',
+      badge: '/icons/icon-192x192.png',
+      tag: payload.data?.chatId ? `vibez-chat-${payload.data.chatId}` : 'vibez-notification',
+      renotify: true,
+      data: payload.data || {}
+    };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// Fallback push event handler for OS-level background wakeups when browser is closed
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-  try {
-    const payload = event.data.json();
-    if (payload && (payload.notification || payload.data)) {
-      const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message on Vibez';
-      const notificationOptions = {
-        body: payload.notification?.body || payload.data?.body || 'You have a new message.',
-        icon: payload.notification?.icon || payload.data?.icon || '/icons/icon-192x192.png',
-        badge: '/icons/icon-192x192.png',
-        tag: payload.data?.chatId ? `vibez-chat-${payload.data.chatId}` : 'vibez-notification',
-        renotify: true,
-        data: payload.data || {}
-      };
-      event.waitUntil(self.registration.showNotification(notificationTitle, notificationOptions));
-    }
-  } catch (err) {
-    console.log('[firebase-messaging-sw.js] Standard push event notice:', err);
+    self.registration.showNotification(notificationTitle, notificationOptions);
   }
 });
 
