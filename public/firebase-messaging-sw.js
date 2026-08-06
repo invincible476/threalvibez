@@ -14,6 +14,15 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Service worker lifecycle: activate immediately
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 // Handle background push messages received when tabs/browsers are closed
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message: ', payload);
@@ -29,6 +38,28 @@ messaging.onBackgroundMessage((payload) => {
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Fallback push event handler for OS-level background wakeups when browser is closed
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const payload = event.data.json();
+    if (payload && (payload.notification || payload.data)) {
+      const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message on Vibez';
+      const notificationOptions = {
+        body: payload.notification?.body || payload.data?.body || 'You have a new message.',
+        icon: payload.notification?.icon || payload.data?.icon || '/icons/icon-192x192.png',
+        badge: '/icons/icon-192x192.png',
+        tag: payload.data?.chatId ? `vibez-chat-${payload.data.chatId}` : 'vibez-notification',
+        renotify: true,
+        data: payload.data || {}
+      };
+      event.waitUntil(self.registration.showNotification(notificationTitle, notificationOptions));
+    }
+  } catch (err) {
+    console.log('[firebase-messaging-sw.js] Standard push event notice:', err);
+  }
 });
 
 // Handle notification click event: focus or navigate to the chat page

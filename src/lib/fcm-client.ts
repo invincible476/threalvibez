@@ -26,13 +26,14 @@ export async function requestFCMToken(userId: string): Promise<string | null> {
       return null;
     }
 
-    // Register FCM Service Worker explicitly
+    // Register FCM Service Worker explicitly & force update check
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    await registration.update().catch(() => {});
     await navigator.serviceWorker.ready;
 
     const messaging = getMessaging(app);
 
-    // Get FCM token (uses standard VAPID key if provided or default Firebase Web Push key)
+    // Get FCM token (uses VAPID key)
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
     const token = await getToken(messaging, {
       serviceWorkerRegistration: registration,
@@ -46,7 +47,12 @@ export async function requestFCMToken(userId: string): Promise<string | null> {
         fcmTokens: arrayUnion(token),
         lastFcmTokenUpdate: new Date().toISOString()
       }).catch(async (err) => {
-        console.warn('[FCM Client] Failed to update user FCM tokens, trying merge fallback:', err);
+        // Fallback for doc creation if doc doesn't exist
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(userRef, {
+          fcmTokens: [token],
+          lastFcmTokenUpdate: new Date().toISOString()
+        }, { merge: true }).catch(console.warn);
       });
       
       console.log('[FCM Client] Successfully registered FCM push token for user:', userId);

@@ -77,6 +77,7 @@ export async function POST(req: Request) {
       webpush: {
         headers: {
           Urgency: 'high',
+          TTL: '86400', // Retain push notification for 24h if browser is closed/offline
         },
         notification: {
           title,
