@@ -1,70 +1,114 @@
 import { db } from './firebase';
-import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, increment, runTransaction, Timestamp } from 'firebase/firestore';
+import { firebaseApp } from './firebase-init';
+import { getDatabase, ref, onValue, onDisconnect, set, serverTimestamp as rtServerTimestamp } from 'firebase/database';
+import { doc, setDoc, serverTimestamp as firestoreServerTimestamp } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 
-const HEARTBEAT_INTERVAL = 30 * 1000; // 30 seconds
+const rtdb = getDatabase(firebaseApp);
 
 export async function setupPresence(userId: string) {
-  // Generate a unique device ID safely (crypto.randomUUID requires secure context in some browsers)
-  const deviceId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  
-  // Get references to the user and device documents
-  const userRef = doc(db, 'users', userId);
-  const deviceRef = doc(db, 'users', userId, 'devices', deviceId);
-  
-  // Initialize presence
-  await runTransaction(db, async (transaction) => {
-    // Add this device and increment device count
-    transaction.set(deviceRef, {
-      lastSeen: Timestamp.now(),
-      updatedAt: serverTimestamp()
-    });
-    transaction.set(userRef, {
-      deviceCount: increment(1),
-      status: 'online',
-      lastSeen: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-  });
+  if (!userId) return () => {};
 
-  // Setup heartbeat interval
-  const heartbeatInterval = setInterval(async () => {
-    try {
-      await updateDoc(deviceRef, {
-        lastSeen: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error updating heartbeat:', error);
-    }
-  }, HEARTBEAT_INTERVAL);
+  const userDocRef = doc(db, 'users', userId);
+  const userStatusRef = ref(rtdb, `/status/${userId}`);
+  const connectedRef = ref(rtdb, '.info/connected');
 
-  // Cleanup function for disconnection
-  const cleanup = async () => {
-    clearInterval(heartbeatInterval);
-    
+  let unsubscribeConnected: (() => void) | null = null;
+  let capacitorAppListener: any = null;
+
+  const updateStatus = async (statusState: 'online' | 'away' | 'offline') => {
     try {
-      await runTransaction(db, async (transaction) => {
-        // Remove this device and decrement device count
-        transaction.delete(deviceRef);
-        transaction.update(userRef, {
-          deviceCount: increment(-1),
-          lastSeen: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      });
-    } catch (error) {
-      console.error('Error cleaning up presence:', error);
+      const rtPayload = {
+        state: statusState,
+        lastChanged: rtServerTimestamp(),
+      };
+
+      // 1. Update Firebase Realtime Database
+      await set(userStatusRef, rtPayload).catch(() => {});
+
+      // 2. Update Firestore user document
+      await setDoc(userDocRef, {
+        status: statusState,
+        lastSeen: firestoreServerTimestamp(),
+      }, { merge: true }).catch(() => {});
+    } catch (err) {
+      console.warn('[Presence] Error updating status:', err);
     }
   };
 
-  // Handle browser/tab close
-  window.addEventListener('beforeunload', cleanup);
-  
-  // Return cleanup function for component unmount
+  // ── 1. Listen for Realtime Database Connection State (.info/connected) ──────
+  unsubscribeConnected = onValue(connectedRef, async (snapshot) => {
+    if (snapshot.val() === false) {
+      return;
+    }
+
+    // Configure server-side onDisconnect trigger
+    try {
+      await onDisconnect(userStatusRef).set({
+        state: 'offline',
+        lastChanged: rtServerTimestamp(),
+      });
+
+      // Set online when connected
+      await updateStatus('online');
+    } catch (err) {
+      console.warn('[Presence] Error configuring onDisconnect:', err);
+    }
+  });
+
+  // ── 2. Handle Browser Tab Visibility Change ────────────────────────────────
+  const handleVisibilityChange = () => {
+    if (typeof document === 'undefined') return;
+    if (document.visibilityState === 'hidden') {
+      updateStatus('away');
+    } else if (document.visibilityState === 'visible') {
+      updateStatus('online');
+    }
+  };
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  }
+
+  // ── 3. Handle Native Android App Lifecycle (App Background / Foreground) ────
+  if (Capacitor.isNativePlatform()) {
+    import('@capacitor/app').then((m) => {
+      m.App.addListener('appStateChange', ({ isActive }) => {
+        console.log('[Presence Android] App state changed, isActive:', isActive);
+        if (isActive) {
+          updateStatus('online');
+        } else {
+          updateStatus('away');
+        }
+      }).then(l => {
+        capacitorAppListener = l;
+      }).catch(console.warn);
+    }).catch(console.warn);
+  }
+
+  // ── 4. Handle Window Unload / Close ─────────────────────────────────────────
+  const handleUnload = () => {
+    updateStatus('offline');
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+  }
+
+  // ── 5. Cleanup Function ─────────────────────────────────────────────────────
   return () => {
-    window.removeEventListener('beforeunload', cleanup);
-    cleanup();
+    if (unsubscribeConnected) unsubscribeConnected();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+    }
+    if (capacitorAppListener && typeof capacitorAppListener.remove === 'function') {
+      capacitorAppListener.remove();
+    }
+    updateStatus('offline');
   };
 }

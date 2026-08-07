@@ -454,8 +454,32 @@ const ChatViewComponent = ({
     if (chat?.type === 'group') {
       const uniqueParticipants = new Set(chat.participants ?? []);
       return `${uniqueParticipants.size} members`;
+    if (otherParticipant?.status === 'online') return 'Online';
+    if (otherParticipant?.status === 'away') return 'Away';
+    
+    if (otherParticipant?.lastSeen) {
+      try {
+        const lastSeenDate = typeof (otherParticipant.lastSeen as any)?.toDate === 'function'
+          ? (otherParticipant.lastSeen as any).toDate()
+          : new Date(otherParticipant.lastSeen as any);
+        
+        const now = new Date();
+        const diffMs = now.getTime() - lastSeenDate.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'Last seen just now';
+        if (diffMins < 60) return `Last seen ${diffMins}m ago`;
+        
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `Last seen ${diffHours}h ago`;
+        
+        return `Last seen ${lastSeenDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+      } catch (e) {
+        // Fallback if date parsing fails
+      }
     }
-    return otherParticipant?.status;
+    
+    return otherParticipant?.status || 'Offline';
   };
 
   const scrollToBottom = (smooth = true) => {
