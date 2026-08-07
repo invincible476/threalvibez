@@ -1257,13 +1257,39 @@ function useChatData() {
         // Store the message in Firebase
         const messageCollectionRef = collection(db, 'conversations', chatId, 'messages');
         await addDoc(messageCollectionRef, finalMessageData);
+        const fileLabelText = messageText || (
+          file.type.startsWith('audio/') ? '🎤 Voice note' :
+          file.type.startsWith('image/') ? '📷 Photo' :
+          file.type.startsWith('video/') ? '📹 Video' : '📎 Attachment'
+        );
+
         await updateDoc(doc(db, 'conversations', chatId), { 
           lastMessage: { 
-            text: messageText || `Sent a ${file.type.split('/')[0]}`, 
+            text: fileLabelText, 
             senderId, 
             timestamp: serverTimestamp() 
           } 
         });
+
+        // Dispatch Push Notification for uploaded file / voice note
+        const targetConvo = conversations.find(c => c.id === chatId);
+        const recipientIds = (targetConvo?.participants || []).filter(id => id !== senderId);
+
+        if (recipientIds.length > 0) {
+          fetch('/api/notifications/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'message',
+              chatId,
+              senderId,
+              senderName: currentUser?.name || 'User',
+              senderPhoto: currentUser?.photoURL || '',
+              text: fileLabelText,
+              recipientIds,
+            }),
+          }).catch(err => console.warn('[Push Notification] Media upload dispatch error:', err));
+        }
 
         // Cleanup
         xhrRequests.current.delete(tempId);
@@ -1464,6 +1490,26 @@ function useChatData() {
                           timestamp: serverTimestamp(),
                       },
                   });
+
+                  // Dispatch Push Notification for Storage file / voice note
+                  const targetConvo = conversations.find(c => c.id === chatId);
+                  const recipientIds = (targetConvo?.participants || []).filter(id => id !== senderId);
+
+                  if (recipientIds.length > 0) {
+                    fetch('/api/notifications/send', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        type: 'message',
+                        chatId,
+                        senderId,
+                        senderName: currentUser?.name || 'User',
+                        senderPhoto: currentUser?.photoURL || '',
+                        text: lastMessageText,
+                        recipientIds,
+                      }),
+                    }).catch(err => console.warn('[Push Notification] Storage upload dispatch error:', err));
+                  }
               } catch(e) {
                   console.error('Error saving message after upload:', e);
                   setMessages(prev => prev.map(m => m.clientTempId === tempId ? {...m, status: 'error'} : m));
