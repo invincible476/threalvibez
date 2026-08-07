@@ -4,6 +4,7 @@ import { Paperclip, SendHorizonal, Mic, Trash2, StopCircle, Play, Smile, X, Imag
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { GifPicker } from './gif-picker';
@@ -136,6 +137,39 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
     setFilePreviews((prev) => [...prev, ...newPreviews]);
 
     if (event.target) event.target.value = '';
+  };
+
+  const handleCameraClick = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+        const photo = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: CameraSource.Camera,
+        });
+
+        if (photo?.webPath) {
+          const response = await fetch(photo.webPath);
+          const blob = await response.blob();
+          const file = new File([blob], `camera-${Date.now()}.${photo.format || 'jpg'}`, {
+            type: `image/${photo.format || 'jpeg'}`,
+          });
+          onFileSelect(file);
+          return;
+        }
+      } catch (err: any) {
+        console.warn('[Camera] Native camera dismissed or failed:', err);
+        if (err?.message?.includes('cancelled') || err?.message?.includes('User cancelled')) {
+          return;
+        }
+      }
+    }
+
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click();
+    }
   };
 
   const removeSelectedFile = (index: number) => {
@@ -304,7 +338,7 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
                     <FileText className="h-4 w-4 text-blue-400" />
                     Document
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => cameraInputRef.current?.click()} className="gap-2">
+                  <DropdownMenuItem onClick={handleCameraClick} className="gap-2 cursor-pointer">
                     <Camera className="h-4 w-4 text-emerald-400" />
                     Camera
                   </DropdownMenuItem>
