@@ -94,9 +94,17 @@ export function useAndroidPush(uid: string | null | undefined) {
           console.log('[PushNotifications] Notification tapped, type:', type);
 
           if (type === 'message' && chatId) {
-            window.location.href = `/?chatId=${chatId}`;
+            if (typeof (window as any).openNotificationChat === 'function') {
+              (window as any).openNotificationChat(chatId);
+            } else {
+              window.history.replaceState({}, '', `/?chatId=${chatId}`);
+            }
           } else if (type === 'call' && callId) {
-            window.location.href = `/?call=${callId}&room=${roomId ?? ''}`;
+            if (typeof (window as any).openNotificationCall === 'function') {
+              (window as any).openNotificationCall(callId, roomId);
+            } else {
+              window.history.replaceState({}, '', `/?call=${callId}&room=${roomId ?? ''}`);
+            }
           } else if (type === 'story' && storyId) {
             window.location.href = `/stories?storyId=${storyId}`;
           }

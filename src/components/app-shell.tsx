@@ -489,17 +489,13 @@ function useChatData() {
       convos.sort((a, b) => safeGetMillis(b.lastMessage?.timestamp) - safeGetMillis(a.lastMessage?.timestamp));
       setConversations(convos);
 
-      // Auto-open chat if navigated from notification tap (e.g. /?chatId=xyz)
+      // Bind global window handler for smooth notification tap opening (0ms hard reload delay)
       if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetChatId = urlParams.get('chatId');
-        if (targetChatId && !selectedChatRef.current) {
-          const targetConvo = convos.find(c => c.id === targetChatId);
-          if (targetConvo) {
-            window.history.replaceState({}, '', window.location.pathname);
-            handleChatSelect(targetChatId);
-          }
-        }
+        (window as any).openNotificationChat = (targetChatId: string) => {
+          console.log('[AppShell] openNotificationChat triggered for:', targetChatId);
+          window.history.replaceState({}, '', window.location.pathname);
+          handleChatSelect(targetChatId);
+        };
       }
     });
 
