@@ -13,6 +13,7 @@ import { MessageSquare, UserPlus, UserCheck, UserX, Shield, Ban } from 'lucide-r
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ImageViewerModal } from '@/components/image-viewer-modal';
 
 export default function UserProfilePage({ params }: { params: Promise<{ userId: string }> | { userId: string } }) {
   const resolvedParams = params && 'then' in params ? use(params) : params;
@@ -24,6 +25,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
   const { handleCreateChat, handleFriendAction, handleBlockUser } = useAppShell();
   const router = useRouter();
   const { toast } = useToast();
+  const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -115,11 +117,21 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <UserAvatar 
-              user={profileUser} 
-              className="h-24 w-24" 
-              isFriend={isFriend}
-            />
+            <div 
+              className="relative group cursor-pointer active:scale-95 transition-transform shrink-0"
+              onClick={() => {
+                const photo = profileUser.photoURL || (profileUser as any).avatarUrl;
+                const src = photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profileUser.name)}`;
+                setPreviewImage({ src, title: `${profileUser.name}'s Profile Picture` });
+              }}
+              title="Click to view profile picture"
+            >
+              <UserAvatar 
+                user={profileUser} 
+                className="h-24 w-24" 
+                isFriend={isFriend}
+              />
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle>{profileUser.name}</CardTitle>
@@ -256,6 +268,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
           </div>
         </CardContent>
       </Card>
+
+      {/* Full-Screen PFP Preview Modal */}
+      <ImageViewerModal
+        isOpen={!!previewImage}
+        src={previewImage?.src || ''}
+        title={previewImage?.title || 'Profile Picture'}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 }

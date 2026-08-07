@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/sheet';
 import { Conversation, User } from '@/lib/types';
 import { UserAvatar } from './user-avatar';
+import { ImageViewerModal } from './image-viewer-modal';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
@@ -38,6 +39,7 @@ export function GroupProfileSheet({
   const [name, setName] = useState(chat.name || '');
   const [description, setDescription] = useState(chat.description || '');
   const [isEditing, setIsEditing] = useState(false);
+  const [isPfpModalOpen, setIsPfpModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   
@@ -161,24 +163,35 @@ export function GroupProfileSheet({
         </SheetHeader>
 
         <div className="flex flex-col items-center justify-center p-6 pt-0 space-y-4 border-b">
-            <div className="relative">
-                <UserAvatar user={{ name: isEditing ? name : chat.name, photoURL: currentAvatar }} className="w-32 h-32 text-4xl" />
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={onSelectFile}
-                    accept="image/*"
-                    className="hidden"
-                />
-            </div>
-            <div className="text-center">
-              <h2 className="text-2xl font-bold">{isEditing ? name : chat.name}</h2>
-              <p className="text-sm text-muted-foreground">{isEditing ? description : (chat.description || "No description.")}</p>
-              <p className="text-xs text-muted-foreground pt-2">{participants.length} members</p>
-            </div>
-             {isAdmin && !isEditing && (
-                <Button variant="outline" onClick={() => setIsEditing(true)}>Edit Info</Button>
-            )}
+          <div 
+            className="relative cursor-pointer active:scale-95 transition-transform"
+            onClick={() => !isEditing && setIsPfpModalOpen(true)}
+            title="Click to view group photo"
+          >
+              <UserAvatar user={{ name: isEditing ? name : chat.name, photoURL: currentAvatar }} className="w-32 h-32 text-4xl" />
+              <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={onSelectFile}
+                  accept="image/*"
+                  className="hidden"
+              />
+          </div>
+
+          <ImageViewerModal
+            isOpen={isPfpModalOpen}
+            src={currentAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(chat.name || 'Group')}`}
+            title={`${chat.name || 'Group'}'s Picture`}
+            onClose={() => setIsPfpModalOpen(false)}
+          />
+          <div className="text-center">
+            <h2 className="text-2xl font-bold">{isEditing ? name : chat.name}</h2>
+            <p className="text-sm text-muted-foreground">{isEditing ? description : (chat.description || "No description.")}</p>
+            <p className="text-xs text-muted-foreground pt-2">{participants.length} members</p>
+          </div>
+            {isAdmin && !isEditing && (
+              <Button variant="outline" onClick={() => setIsEditing(true)}>Edit Info</Button>
+          )}
         </div>
 
         <ScrollArea className="flex-1">

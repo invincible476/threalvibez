@@ -36,6 +36,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Conversation, Message, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { MediaLightbox, LightboxMedia } from '@/components/media-lightbox';
+import { ImageViewerModal } from '@/components/image-viewer-modal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,9 +82,10 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
 
-  // Lightbox state
+  // Lightbox & PFP preview state
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
 
   // Friend Picker Modal State
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
@@ -389,7 +391,15 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
             return (
               <>
-                <div className="relative group">
+                <div 
+                  className="relative group cursor-pointer active:scale-95 transition-transform"
+                  onClick={() => {
+                    const photo = chat?.avatar || (chat as any)?.avatarUrl || targetUser?.photoURL || (targetUser as any)?.avatarUrl;
+                    const src = photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(chat?.name || 'User')}`;
+                    setPreviewImage({ src, title: `${chat?.name || 'Contact'}'s Profile Picture` });
+                  }}
+                  title="Click to view profile picture"
+                >
                   <UserAvatar
                     user={{
                       name: chat?.name || 'Group',
@@ -754,7 +764,17 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                     className="flex items-center justify-between p-2.5 rounded-xl bg-background/60 border border-border/40"
                   >
                     <div className="flex items-center gap-3">
-                      <UserAvatar user={participant} className="h-10 w-10" />
+                      <div 
+                        className="cursor-pointer active:scale-95 transition-transform"
+                        onClick={() => {
+                          const photo = participant.photoURL || (participant as any).avatarUrl;
+                          const src = photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(participant.name)}`;
+                          setPreviewImage({ src, title: `${participant.name}'s Profile Picture` });
+                        }}
+                        title="Click to view profile picture"
+                      >
+                        <UserAvatar user={participant} className="h-10 w-10" />
+                      </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-sm text-foreground">{participant.name}</p>
@@ -923,6 +943,14 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
         initialIndex={lightboxIndex}
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
+      />
+
+      {/* Full-Screen PFP Preview Modal */}
+      <ImageViewerModal
+        isOpen={!!previewImage}
+        src={previewImage?.src || ''}
+        title={previewImage?.title || 'Profile Picture'}
+        onClose={() => setPreviewImage(null)}
       />
     </div>
   );
