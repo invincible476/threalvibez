@@ -68,6 +68,7 @@ export async function POST(req: Request) {
         body: messageBody,
       },
       data: {
+        type: 'message',
         chatId: String(chatId),
         senderId: String(senderId),
         title,

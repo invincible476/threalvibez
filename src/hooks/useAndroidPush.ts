@@ -52,38 +52,7 @@ export function useAndroidPush(uid: string | null | undefined) {
         PushNotifications = m.PushNotifications;
       }
 
-      // ── 1. Attach listeners BEFORE registering ─────────────────────────────
-      PushNotifications.addListener('registration', async (token: { value: string }) => {
-        console.log('[PushNotifications] Token received:', token.value.slice(0, 20));
-        await saveFcmToken(token.value);
-      });
-
-      PushNotifications.addListener('registrationError', (error: any) => {
-        console.error('[PushNotifications] Registration error:', error);
-      });
-
-      // ── 2. Request OS permission ──────────────────────────────────────────
-      const permResult = await PushNotifications.requestPermissions();
-      if (permResult.receive !== 'granted') {
-        console.warn('[PushNotifications] Permission not granted.');
-        return;
-      }
-
-      // ── 3. Register with FCM ──────────────────────────────────────────────
-      await PushNotifications.register();
-
-      // ── 4. Foreground notification received ──────────────────────────────
-      PushNotifications.addListener(
-        'pushNotificationReceived',
-        (notification: { title?: string; body?: string; data?: Record<string, string> }) => {
-          const { title, body, data } = notification;
-          console.log('[PushNotifications] Foreground notification:', title, body, data);
-          // Capacitor v8 shows foreground notifications natively on Android 13+
-          // No extra action needed here unless you want custom in-app UI
-        }
-      );
-
-      // ── 5. User tapped a notification ────────────────────────────────────
+      // ── 1. Attach listeners FIRST (including tap action) so cold-start events are captured ──
       PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (action: { notification: { data?: Record<string, string> } }) => {
@@ -91,9 +60,10 @@ export function useAndroidPush(uid: string | null | undefined) {
           if (!data) return;
 
           const { type, chatId, callId, roomId, storyId } = data;
-          console.log('[PushNotifications] Notification tapped, type:', type);
+          console.log('[PushNotifications] Notification tapped, type:', type, 'data:', data);
 
-          if (type === 'message' && chatId) {
+          const isMessage = type === 'message' || (!type && !!chatId);
+          if (isMessage && chatId) {
             (window as any).pendingNotificationChatId = chatId;
             if (typeof sessionStorage !== 'undefined') {
               sessionStorage.setItem('pendingNotificationChatId', chatId);
@@ -114,6 +84,33 @@ export function useAndroidPush(uid: string | null | undefined) {
           }
         }
       );
+
+      PushNotifications.addListener(
+        'pushNotificationReceived',
+        (notification: { title?: string; body?: string; data?: Record<string, string> }) => {
+          const { title, body, data } = notification;
+          console.log('[PushNotifications] Foreground notification:', title, body, data);
+        }
+      );
+
+      PushNotifications.addListener('registration', async (token: { value: string }) => {
+        console.log('[PushNotifications] Token received:', token.value.slice(0, 20));
+        await saveFcmToken(token.value);
+      });
+
+      PushNotifications.addListener('registrationError', (error: any) => {
+        console.error('[PushNotifications] Registration error:', error);
+      });
+
+      // ── 2. Request OS permission ──────────────────────────────────────────
+      const permResult = await PushNotifications.requestPermissions();
+      if (permResult.receive !== 'granted') {
+        console.warn('[PushNotifications] Permission not granted.');
+        return;
+      }
+
+      // ── 3. Register with FCM ──────────────────────────────────────────────
+      await PushNotifications.register();
     };
 
     setup();

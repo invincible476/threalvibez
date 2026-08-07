@@ -489,6 +489,9 @@ function useChatData() {
       convos.sort((a, b) => safeGetMillis(b.lastMessage?.timestamp) - safeGetMillis(a.lastMessage?.timestamp));
       setConversations(convos);
 
+      // Synchronously update conversationsRef so handleChatSelect sees the new convos array immediately
+      conversationsRef.current = convos;
+
       // Bind global window handler and process pending notification chat taps
       if (typeof window !== 'undefined') {
         (window as any).openNotificationChat = (targetChatId: string) => {
@@ -497,8 +500,13 @@ function useChatData() {
           handleChatSelect(targetChatId);
         };
 
-        const pendingId = (window as any).pendingNotificationChatId ||
+        let pendingId = (window as any).pendingNotificationChatId ||
           (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pendingNotificationChatId'));
+
+        if (!pendingId && typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          pendingId = urlParams.get('chatId');
+        }
 
         if (pendingId) {
           delete (window as any).pendingNotificationChatId;
@@ -619,7 +627,36 @@ function useChatData() {
         setIsAiReplying(false);
     }
 
-    const chat = conversations.find(c => c.id === chatId) || (chatId === AI_USER_ID ? aiConversation : undefined);
+    let chat = conversations.find(c => c.id === chatId) || (chatId === AI_USER_ID ? aiConversation : undefined);
+
+    if (!chat && chatId !== AI_USER_ID) {
+      try {
+        const convoSnap = await getDoc(doc(db, 'conversations', chatId));
+        if (convoSnap.exists()) {
+          const data = convoSnap.data();
+          const participants: string[] = data?.participants || [];
+          const otherUserId = participants.find((p: string) => p !== authUser?.uid);
+          let otherUser = otherUserId ? usersCache.get(otherUserId) : undefined;
+          if (otherUserId && !otherUser) {
+            const details = getParticipantDetails([otherUserId]);
+            otherUser = details && details.length > 0 ? details[0] : undefined;
+          }
+          chat = {
+            id: convoSnap.id,
+            name: data?.name || otherUser?.name || 'Chat',
+            avatar: data?.avatar || otherUser?.photoURL || '/placeholder-avatar.png',
+            type: data?.type || (participants.length > 2 ? 'group' : 'private'),
+            participants,
+            participantsDetails: otherUser ? [otherUser] : [],
+            lastMessage: data?.lastMessage,
+            unreadCount: 0,
+            messages: [],
+          };
+        }
+      } catch (err) {
+        console.error('[AppShell] Error fetching fallback chat for notification:', err);
+      }
+    }
 
     if (!chat) {
         setSelectedChat(undefined);
