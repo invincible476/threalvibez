@@ -496,7 +496,7 @@ function useChatData() {
         if (targetChatId && !selectedChatRef.current) {
           const targetConvo = convos.find(c => c.id === targetChatId);
           if (targetConvo) {
-            setSelectedChat(targetConvo);
+            handleChatSelect(targetChatId);
           }
         }
       }
