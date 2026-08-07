@@ -486,8 +486,19 @@ function useChatData() {
         if (typeof ts.seconds === 'number') return ts.seconds * 1000;
         return 0;
       };
-      convos.sort((a, b) => safeGetMillis(b.lastMessage?.timestamp) - safeGetMillis(a.lastMessage?.timestamp));
       setConversations(convos);
+
+      // Auto-open chat if navigated from notification tap (e.g. /?chatId=xyz)
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetChatId = urlParams.get('chatId');
+        if (targetChatId && !selectedChatRef.current) {
+          const targetConvo = convos.find(c => c.id === targetChatId);
+          if (targetConvo) {
+            setSelectedChat(targetConvo);
+          }
+        }
+      }
     });
 
     return () => {

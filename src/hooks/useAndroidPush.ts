@@ -94,10 +94,9 @@ export function useAndroidPush(uid: string | null | undefined) {
           console.log('[PushNotifications] Notification tapped, type:', type);
 
           if (type === 'message' && chatId) {
-            // Navigate to chat — works with Next.js router or window.location
-            window.location.href = `/chat/${chatId}`;
+            window.location.href = `/?chatId=${chatId}`;
           } else if (type === 'call' && callId) {
-            window.location.href = `/chat?call=${callId}&room=${roomId ?? ''}`;
+            window.location.href = `/?call=${callId}&room=${roomId ?? ''}`;
           } else if (type === 'story' && storyId) {
             window.location.href = `/stories?storyId=${storyId}`;
           }
