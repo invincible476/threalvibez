@@ -489,13 +489,23 @@ function useChatData() {
       convos.sort((a, b) => safeGetMillis(b.lastMessage?.timestamp) - safeGetMillis(a.lastMessage?.timestamp));
       setConversations(convos);
 
-      // Bind global window handler for smooth notification tap opening (0ms hard reload delay)
+      // Bind global window handler and process pending notification chat taps
       if (typeof window !== 'undefined') {
         (window as any).openNotificationChat = (targetChatId: string) => {
           console.log('[AppShell] openNotificationChat triggered for:', targetChatId);
           window.history.replaceState({}, '', window.location.pathname);
           handleChatSelect(targetChatId);
         };
+
+        const pendingId = (window as any).pendingNotificationChatId ||
+          (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pendingNotificationChatId'));
+
+        if (pendingId) {
+          delete (window as any).pendingNotificationChatId;
+          if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('pendingNotificationChatId');
+          window.history.replaceState({}, '', window.location.pathname);
+          handleChatSelect(pendingId);
+        }
       }
     });
 

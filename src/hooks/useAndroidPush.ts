@@ -94,6 +94,10 @@ export function useAndroidPush(uid: string | null | undefined) {
           console.log('[PushNotifications] Notification tapped, type:', type);
 
           if (type === 'message' && chatId) {
+            (window as any).pendingNotificationChatId = chatId;
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('pendingNotificationChatId', chatId);
+            }
             if (typeof (window as any).openNotificationChat === 'function') {
               (window as any).openNotificationChat(chatId);
             } else {
