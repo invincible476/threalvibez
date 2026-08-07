@@ -242,8 +242,6 @@ function useChatData() {
   useAndroidBackButton({
     selectedChat,
     setSelectedChat,
-    selectedStory,
-    setSelectedStory,
   });
 
   const updateUserInCache = useCallback((userToCache: User) => {
