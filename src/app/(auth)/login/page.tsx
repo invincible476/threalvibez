@@ -235,9 +235,9 @@ function LoginForm() {
     try {
       await setPersistence(auth, browserLocalPersistence);
       
-      const user = await authService.signInWithGoogle();
+      const user: any = await authService.signInWithGoogle();
       
-      if (!user) {
+      if (!user || !user.uid) {
         toast({
           title: 'Redirecting to Google',
           description: 'Please complete sign in in the Google window...',

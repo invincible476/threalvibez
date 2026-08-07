@@ -454,6 +454,7 @@ const ChatViewComponent = ({
     if (chat?.type === 'group') {
       const uniqueParticipants = new Set(chat.participants ?? []);
       return `${uniqueParticipants.size} members`;
+    }
     if (otherParticipant?.status === 'online') return 'Online';
     if (otherParticipant?.status === 'away') return 'Away';
     

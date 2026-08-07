@@ -216,9 +216,9 @@ export default function SignupPage() {
     if (isSendingCode || isVerifying || loading || googleLoading) return;
     try {
       console.log('Starting Google signup...');
-      const user = await authService.signInWithGoogle();
+      const user: any = await authService.signInWithGoogle();
 
-      if (user) {
+      if (user && user.uid) {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(`emailVerified_${user.uid}`, 'true');
           localStorage.setItem(`emailVerified_${user.uid}`, 'true');

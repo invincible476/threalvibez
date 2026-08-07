@@ -15,7 +15,8 @@ export type User = {
   name: string;
   username?: string;
   photoURL?: string | null;
-  status: 'online' | 'offline';
+  status: 'online' | 'away' | 'offline';
+  lastSeen?: Timestamp | Date | any;
   email?: string;
   isPrivate?: boolean;
   friends?: string[];

@@ -1,6 +1,7 @@
 import { 
   createUserWithEmailAndPassword as firebaseCreateUser,
   signInWithEmailAndPassword as firebaseSignIn,
+  signInWithCredential as firebaseSignInCredential,
   signInWithPopup as firebaseSignInPopup,
   signInWithRedirect,
   GoogleAuthProvider,
@@ -279,7 +280,7 @@ export const authService = {
           (window as any).handleNativeGoogleSignIn = async (idToken: string) => {
             try {
               const credential = GoogleAuthProvider.credential(idToken);
-              const result = await firebaseSignIn(auth, credential as any);
+              const result = await firebaseSignInCredential(auth, credential);
               await this.ensureUserDocument(result.user);
               await setupPresence(result.user.uid);
               resolve(result.user);
