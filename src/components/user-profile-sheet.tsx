@@ -14,6 +14,7 @@ import { BellOff, Ban, Bell, MessageSquareText, Shield, UserPlus, Check, UserChe
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './ui/tooltip';
+import { ImageViewerModal } from './image-viewer-modal';
 import React from 'react';
 
 interface UserProfileSheetProps {
@@ -96,52 +97,38 @@ export function UserProfileSheet({
     )
   }
 
-  // Main render
+  const [isPfpModalOpen, setIsPfpModalOpen] = React.useState(false);
+
   return (
     <TooltipProvider>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full max-w-md bg-zinc-950/95 border-l border-zinc-800/80 backdrop-blur-xl text-white p-0 flex flex-col shadow-2xl">
-          <SheetHeader className="p-6 pb-2 text-left border-b border-zinc-800/60">
+        <SheetContent className="w-full max-w-md bg-zinc-950/95 border-l border-zinc-800/80 backdrop-blur-xl text-white p-0 flex flex-col shadow-2xl h-[100dvh]">
+          <SheetHeader className="p-6 pb-2 text-left border-b border-zinc-800/60 shrink-0">
             <SheetTitle className="text-lg font-bold font-heading text-white">Contact Info</SheetTitle>
           </SheetHeader>
           
-          <div className="flex-1 overflow-y-auto space-y-6 p-6">
+          <div className="flex-1 overflow-y-auto space-y-6 p-6 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent overscroll-contain max-h-[calc(100dvh-80px)]">
             {/* User Profile Header Card */}
             <div className="flex flex-col items-center justify-center p-6 bg-zinc-900/80 border border-zinc-800/80 rounded-3xl shadow-xl backdrop-blur-md text-center space-y-4">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <div className="relative group cursor-pointer">
-                    <UserAvatar user={user} isFriend={isFriend} className="w-28 h-28 text-4xl shadow-2xl ring-4 ring-zinc-800/80 transition-transform duration-300 group-hover:scale-105" />
-                    <span
-                      className={`absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-zinc-950 shadow-md ${
-                        user.status === 'online' ? 'bg-emerald-500' : 'bg-zinc-500'
-                      }`}
-                    />
-                  </div>
-                </DialogTrigger>
-                {user.photoURL && (
-                  <DialogContent className="p-0 bg-transparent border-0 max-w-screen-md w-auto h-auto">
-                    <DialogTitle className="sr-only">Full-size avatar for {user.name}</DialogTitle>
-                    <Image
-                      src={user.photoURL}
-                      alt={user.name}
-                      width={800}
-                      height={800}
-                      className="rounded-2xl max-h-[80vh] w-auto mx-auto shadow-2xl border border-zinc-800"
-                      style={{
-                        objectFit: "contain",
-                        maxWidth: "90vw"
-                      }}
-                      priority
-                      quality={95}
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        img.style.display = 'none';
-                      }}
-                    />
-                  </DialogContent>
-                )}
-              </Dialog>
+              <div 
+                className="relative group cursor-pointer active:scale-95 transition-transform"
+                onClick={() => setIsPfpModalOpen(true)}
+              >
+                <UserAvatar user={user} isFriend={isFriend} className="w-28 h-28 text-4xl shadow-2xl ring-4 ring-zinc-800/80 transition-transform duration-300 group-hover:scale-105" />
+                <span
+                  className={`absolute bottom-1 right-1 block h-4.5 w-4.5 rounded-full ring-4 ring-zinc-950 shadow-md ${
+                    user.status === 'online' ? 'bg-emerald-500' : (user.status === 'away' ? 'bg-amber-500' : 'bg-zinc-500')
+                  }`}
+                />
+              </div>
+
+              {/* Full Screen Avatar Popup Modal */}
+              <ImageViewerModal
+                isOpen={isPfpModalOpen}
+                src={user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+                title={`${user.name}'s Profile Picture`}
+                onClose={() => setIsPfpModalOpen(false)}
+              />
 
               <div className="space-y-1.5 text-center">
                 <div className="flex items-center gap-2 justify-center">

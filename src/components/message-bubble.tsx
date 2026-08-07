@@ -22,6 +22,7 @@ import { Timestamp } from 'firebase/firestore';
 import Image from 'next/image';
 import { motion, PanInfo } from 'framer-motion';
 import { UploadProgress } from './upload-progress';
+import { VoiceNotePlayer } from './voice-note-player';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Button } from './ui/button';
 import {
@@ -320,7 +321,11 @@ function MessageBubble({
 
       if (isAudio(fileType)) {
         return message.file.url ? (
-          <audio controls src={message.file.url} className={cn('w-full max-w-xs my-1', isSending && 'opacity-60')} />
+          <VoiceNotePlayer
+            src={message.file.url}
+            duration={message.file.duration}
+            isOutgoing={isOutgoing}
+          />
         ) : null;
       }
 
