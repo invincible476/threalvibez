@@ -548,7 +548,7 @@ const ChatViewComponent = ({
                   e.stopPropagation();
                   if (!currentUser?.uid || !chat?.id) return;
                   setIsLiveKitModalOpen(true);
-                  await startVoiceCall(chat.id, currentUser);
+                  await startVoiceCall(chat.id, currentUser, chat.participants);
                 }}
               >
                 <Phone className="h-4 w-4" />

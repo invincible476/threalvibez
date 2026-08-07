@@ -328,7 +328,8 @@ export async function deleteChatMessage(
  */
 export async function startVoiceCall(
   chatId: string,
-  caller: { uid: string; name?: string | null; photoURL?: string | null }
+  caller: { uid: string; name?: string | null; photoURL?: string | null },
+  targetRecipientIds?: string[]
 ): Promise<void> {
   if (!chatId || !caller.uid) return;
   const callId = `${chatId}_${Date.now()}`;
@@ -347,32 +348,40 @@ export async function startVoiceCall(
     },
   });
 
-  // Fetch recipients to dispatch call push notification (wakes phone screen)
+  // Dispatch call push notification (wakes phone screen and triggers ringtone)
   try {
-    const chatSnap = await getDoc(chatRef);
-    if (chatSnap.exists()) {
-      const participants: string[] = chatSnap.data()?.participants || [];
-      const recipientIds = participants.filter(id => id !== caller.uid);
-      if (recipientIds.length > 0) {
-        fetch('/api/notifications/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'call',
-            senderId: caller.uid,
-            senderName: caller.name || 'User',
-            senderPhoto: caller.photoURL || '',
-            callId,
-            roomId,
-            recipientIds,
-          }),
-        }).catch(err => console.warn('[Call Push Notification] Send error:', err));
+    let recipientIds = targetRecipientIds && targetRecipientIds.length > 0
+      ? targetRecipientIds.filter(id => id !== caller.uid)
+      : [];
+
+    if (recipientIds.length === 0) {
+      const chatSnap = await getDoc(chatRef);
+      if (chatSnap.exists()) {
+        const participants: string[] = chatSnap.data()?.participants || [];
+        recipientIds = participants.filter(id => id !== caller.uid);
       }
+    }
+
+    if (recipientIds.length > 0) {
+      fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'call',
+          senderId: caller.uid,
+          senderName: caller.name || 'User',
+          senderPhoto: caller.photoURL || '',
+          callId,
+          roomId,
+          recipientIds,
+        }),
+      }).catch(err => console.warn('[Call Push Notification] Send error:', err));
     }
   } catch (err) {
     console.warn('[Call Push Notification] Chat fetch error:', err);
   }
 }
+
 
 
 /**

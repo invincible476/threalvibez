@@ -161,7 +161,7 @@ export async function POST(req: Request) {
           priority: 'high',                // Wakes device even in Doze mode
           notification: {
             channelId: 'calls',            // High-importance channel → full-screen
-            sound: 'ringtone',
+            sound: 'default',
             icon: 'ic_launcher',
             color: '#10B981',
             tag: `call-${callId}`,
