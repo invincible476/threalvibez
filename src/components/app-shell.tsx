@@ -479,13 +479,14 @@ function useChatData() {
 
       // Safe sort that handles both Firestore Timestamps and JS Dates
       const safeGetMillis = (ts: any): number => {
-        if (!ts) return 0;
+        if (!ts) return Date.now();
         if (typeof ts.toMillis === 'function') return ts.toMillis();
         if (ts instanceof Date) return ts.getTime();
         if (typeof ts === 'number') return ts;
-        if (typeof ts.seconds === 'number') return ts.seconds * 1000;
-        return 0;
+        if (typeof ts.seconds === 'number') return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+        return Date.now();
       };
+      convos.sort((a, b) => safeGetMillis(b.lastMessage?.timestamp) - safeGetMillis(a.lastMessage?.timestamp));
       setConversations(convos);
 
       // Auto-open chat if navigated from notification tap (e.g. /?chatId=xyz)
