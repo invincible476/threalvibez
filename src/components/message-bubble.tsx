@@ -23,6 +23,7 @@ import Image from 'next/image';
 import { motion, PanInfo } from 'framer-motion';
 import { UploadProgress } from './upload-progress';
 import { VoiceNotePlayer } from './voice-note-player';
+import { ImageViewerModal } from './image-viewer-modal';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Button } from './ui/button';
 import {
@@ -281,10 +282,8 @@ function MessageBubble({
       const isSending = message.status === 'sending';
 
       if (isImage(fileType)) {
-        const mediaList: LightboxMedia[] = [{ url: message.file.url, type: fileType, name: message.file.name }];
-
         return (
-          <div className="relative rounded-2xl overflow-hidden bg-muted animate-pulse max-w-[260px] max-h-[320px]">
+          <div className="relative rounded-2xl overflow-hidden bg-zinc-900/60 border border-white/10 shadow-md max-w-[280px] sm:max-w-[340px] group transition-transform duration-200">
             <img
               src={message.file.url}
               alt={message.file.name || 'Attached image'}
@@ -293,7 +292,7 @@ function MessageBubble({
                 if (parent) parent.classList.remove('animate-pulse');
               }}
               className={cn(
-                'rounded-2xl object-cover max-w-full max-h-72 cursor-pointer hover:opacity-95 transition-opacity block',
+                'rounded-2xl w-full h-auto max-h-[380px] object-contain cursor-pointer hover:opacity-95 transition-opacity block bg-black/20',
                 isSending && 'opacity-60'
               )}
               onClick={() => {
@@ -302,15 +301,15 @@ function MessageBubble({
               }}
             />
             {isSending && <UploadProgress progress={progress} onCancel={onCancelUpload} />}
-            <MediaLightbox
-              media={mediaList}
-              initialIndex={lightboxIndex}
+            <ImageViewerModal
               isOpen={lightboxOpen}
+              src={message.file.url}
+              title={message.file.name || 'Photo'}
               onClose={() => setLightboxOpen(false)}
             />
             {/* Overlay timestamp for media only */}
             {isMediaOnly && (
-              <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white/90 flex items-center gap-1 z-10 select-none shadow-sm">
+              <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-white/90 flex items-center gap-1 z-10 select-none shadow-sm pointer-events-none">
                 <span>{formattedTimestamp}</span>
                 {isOutgoing && renderReadReceiptIcon()}
               </div>
