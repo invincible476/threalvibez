@@ -4,12 +4,17 @@ import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messagi
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { app, db } from './firebase';
 
+import { Capacitor } from '@capacitor/core';
+
 /**
  * Register FCM Web Push Service Worker and request Push Notification permission.
  * Saves the generated FCM token to the user's Firestore document (`users/{userId}.fcmTokens`).
  */
 export async function requestFCMToken(userId: string): Promise<string | null> {
   if (typeof window === 'undefined') return null;
+
+  // On Android/iOS native app, Capacitor push plugin (useAndroidPush) handles native FCM
+  if (Capacitor.isNativePlatform()) return null;
 
   try {
     // Check if browser supports Firebase Messaging & Service Workers

@@ -272,6 +272,25 @@ export const authService = {
     try {
       logDebug('Starting Google sign-in process');
 
+      // ── Native Android Google Account Picker Bridge ─────────────────────────
+      if (typeof window !== 'undefined' && (window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
+        console.log('[Auth Service] Triggering Native Android Google Account Picker...');
+        return new Promise((resolve, reject) => {
+          (window as any).handleNativeGoogleSignIn = async (idToken: string) => {
+            try {
+              const credential = GoogleAuthProvider.credential(idToken);
+              const result = await firebaseSignIn(auth, credential as any);
+              await this.ensureUserDocument(result.user);
+              await setupPresence(result.user.uid);
+              resolve(result.user);
+            } catch (err) {
+              reject(err);
+            }
+          };
+          (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
+        });
+      }
+
       // Initialize Google Auth Provider
       const provider = new GoogleAuthProvider();
       provider.addScope('profile');
@@ -288,21 +307,33 @@ export const authService = {
       } catch (popupError: any) {
         console.error('Popup sign-in error:', popupError);
         
-        // Fallback to redirect ONLY if popup is blocked by browser popup blocker
-        if (popupError.code === 'auth/popup-blocked' || 
+        // Check for missing-initial-state or popup blocked error
+        if (popupError.code === 'auth/missing-initial-state' || popupError.message?.includes('missing initial state')) {
+          console.warn('[Auth Service] Missing initial state detected (storage partitioned). Retrying with popup authentication...');
+          result = await firebaseSignInPopup(auth, provider);
+        } else if (popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/cancelled-popup-request') {
-          console.log('[Auth Service] Popup blocked by browser, trying signInWithRedirect...');
+          console.log('[Auth Service] Popup blocked by browser, attempting redirect fallback...');
           if (typeof window !== 'undefined') {
             sessionStorage.setItem('expectingRedirect', 'true');
           }
-          await signInWithRedirect(auth, provider);
-          return null;
+          try {
+            await signInWithRedirect(auth, provider);
+            return null;
+          } catch (redirectErr: any) {
+            if (redirectErr.code === 'auth/missing-initial-state' || redirectErr.message?.includes('missing initial state')) {
+              console.warn('[Auth Service] Redirect failed due to storage partitioning. Falling back to popup...');
+              result = await firebaseSignInPopup(auth, provider);
+            } else {
+              throw redirectErr;
+            }
+          }
         } else if (popupError.code === 'auth/popup-closed-by-user') {
           // User manually closed popup, don't force redirect
           throw popupError;
+        } else {
+          throw popupError;
         }
-        
-        throw popupError;
       }
       
       if (!result?.user) {

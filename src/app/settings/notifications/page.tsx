@@ -132,22 +132,42 @@ export default function NotificationsPage() {
                                 </div>
                             </div>
 
-                            {pushPermission === 'granted' ? (
-                                <div className="flex items-center gap-1 text-xs text-emerald-500 font-medium">
-                                    <ShieldCheck className="h-4 w-4" />
-                                    <span>Enabled</span>
-                                </div>
-                            ) : (
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Button
                                     size="sm"
                                     variant="default"
                                     onClick={handleEnablePush}
-                                    disabled={isRegistering || pushPermission === 'denied'}
+                                    disabled={isRegistering}
                                     className="text-xs h-8 px-3"
                                 >
-                                    {isRegistering ? 'Registering...' : 'Enable Push'}
+                                    {isRegistering ? 'Registering...' : 'Enable / Register Push'}
                                 </Button>
-                            )}
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={async () => {
+                                        const user = firebaseAuth.currentUser;
+                                        if (!user?.uid) {
+                                            alert('Not logged in!');
+                                            return;
+                                        }
+                                        try {
+                                            const res = await fetch('/api/notifications/test-push', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ userId: user.uid }),
+                                            });
+                                            const data = await res.json();
+                                            alert(`[Push Test Diagnostic Result]\nStatus: ${data.status}\nTokens Found: ${data.tokensFound || 0}\nSuccess: ${data.successCount || 0}, Fail: ${data.failureCount || 0}\nServiceAccountKey Set: ${data.hasServiceAccountEnv}\n\nDetails: ${JSON.stringify(data, null, 2)}`);
+                                        } catch (err: any) {
+                                            alert(`Error testing push: ${err?.message || err}`);
+                                        }
+                                    }}
+                                    className="text-xs h-8 px-3"
+                                >
+                                    Send Test Push
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

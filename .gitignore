@@ -53,3 +53,9 @@ database-debug.log
 .git_backup/
 
 .vercel
+
+# Android App
+android-app/
+android/
+*.apk
+

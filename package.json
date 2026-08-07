@@ -30,6 +30,10 @@
     "monitor:auth": "node scripts/auth-monitor-loop.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/push-notifications": "^8.1.2",
+    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@ducanh2912/next-pwa": "^10.2.7",
     "@genkit-ai/googleai": "^1.14.1",
@@ -96,6 +100,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

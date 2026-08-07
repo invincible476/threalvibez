@@ -1,0 +1,26 @@
+{
+  "appId": "com.threalvibez.app",
+  "appName": "ThrealVibez",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://threalvibez.vercel.app",
+    "cleartext": true,
+    "allowNavigation": [
+      "threalvibez.vercel.app",
+      "*.firebaseapp.com",
+      "*.googleapis.com",
+      "*.livekit.cloud"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

@@ -74,6 +74,16 @@ export async function POST(req: Request) {
         body: messageBody,
         icon,
       },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'messages',
+          sound: 'default',
+          icon: 'ic_launcher',
+          color: '#6366F1',
+          tag: `msg-${chatId}`,
+        },
+      },
       webpush: {
         headers: {
           Urgency: 'high',

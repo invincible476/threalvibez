@@ -16,6 +16,7 @@ import { continueConversation } from '@/ai/flows/ai-chat-flow';
 import { useAuth } from '@/hooks/use-auth';
 import { authService } from '@/lib/auth-service';
 import { useNotifications } from '@/hooks/use-notifications';
+import { useAndroidPush } from '@/hooks/useAndroidPush';
 import { type Firestore } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import type { Conversation, Message, Story, User, StoryReaction } from '@/lib/types';
@@ -236,6 +237,7 @@ function useChatData() {
 
 
   useNotifications({ conversations, usersCache, currentUser, activeChatId: selectedChat?.id });
+  useAndroidPush(currentUser?.uid);
 
   const updateUserInCache = useCallback((userToCache: User) => {
     if (!userToCache) return;
@@ -933,19 +935,24 @@ function useChatData() {
       }).catch(console.error);
 
       // Non-blocking background push notification dispatch to offline/tab-closed recipients
-      fetch('/api/notifications/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId,
-          senderId,
-          text: messageText.trim(),
-          senderName: currentUser.name || 'User',
-          senderPhoto: currentUser.photoURL || '',
-        }),
-      }).catch((pushErr) => {
-        console.warn('[AppShell] Background push dispatch notification notice:', pushErr);
-      });
+      const recipientIds = selectedChat.participants ? selectedChat.participants.filter((pId: string) => pId !== senderId) : [];
+      if (recipientIds.length > 0) {
+        fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'message',
+            chatId,
+            senderId,
+            senderName: currentUser.name || 'User',
+            senderPhoto: currentUser.photoURL || '',
+            text: messageText.trim(),
+            recipientIds,
+          }),
+        }).catch((pushErr) => {
+          console.warn('[AppShell] Background push dispatch notification notice:', pushErr);
+        });
+      }
       
       const docRef = await docPromise;
       return docRef.id;
@@ -1913,8 +1920,26 @@ function useChatData() {
         storyData.duration = duration;
       }
 
-      await addDoc(collection(db, 'stories'), storyData);
-      
+      const newStoryRef = await addDoc(collection(db, 'stories'), storyData);
+
+      // Dispatch story push notification to friends
+      const friendIds = currentUser.friends || Array.from(usersCache.keys()).filter(id => id !== currentUser.uid);
+      if (friendIds.length > 0) {
+        fetch('/api/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'story',
+            senderId: currentUser.uid,
+            senderName: currentUser.name || 'Friend',
+            senderPhoto: currentUser.photoURL || '',
+            storyId: newStoryRef.id,
+            storyMedia: secure_url,
+            recipientIds: friendIds,
+          }),
+        }).catch(pErr => console.warn('[Story Push Notification] Dispatch error:', pErr));
+      }
+
       toast({ title: "Story posted!" });
       cleanup();
     } catch (err) {
