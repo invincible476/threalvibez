@@ -36,7 +36,7 @@ import { MobileGalaxyBackground } from './mobile-galaxy-background';
 import { useTheme } from 'next-themes';
 import { normalizeUser, fetchMissingUsers } from '@/lib/user-service';
 import { safeGetMillis } from '@/lib/utils';
-import { debouncedUpdateTypingStatus, debouncedMarkAsRead, trimMessagePayload, sendChatMessage } from '@/lib/firebase/chat';
+import { debouncedUpdateTypingStatus, markAsRead, debouncedMarkAsRead, trimMessagePayload, sendChatMessage } from '@/lib/firebase/chat';
 
 
 
@@ -351,6 +351,8 @@ function useChatData() {
     selectedChatRef.current = selectedChat;
   }, [selectedChat]);
 
+  const locallyReadTimestampsRef = useRef<Map<string, number>>(new Map());
+
   const getParticipantDetails = useCallback((participantIds: string[]): User[] => {
     return participantIds.map(id => usersCacheRef.current.get(id)).filter(Boolean) as User[];
   }, []);
@@ -424,6 +426,7 @@ function useChatData() {
           
           let unreadCount = 0;
           const isCurrentActiveChat = docSnap.id === selectedChatRef.current?.id;
+          const localReadTime = locallyReadTimestampsRef.current.get(docSnap.id) || 0;
           
           if (isCurrentActiveChat) {
               unreadCount = 0;
@@ -445,9 +448,10 @@ function useChatData() {
               // lastMessage.timestamp may be null during a pending write (serverTimestamp sentinel);
               // safeGetMillis returns 0 in that case so the sort/comparison is still safe.
               const lastMsgTime = getMillis(data.lastMessage?.timestamp ?? null);
-              const lastReadTime = getMillis(lastReadTimestamp);
+              const dbLastReadTime = getMillis(lastReadTimestamp);
+              const effectiveLastReadTime = Math.max(dbLastReadTime, localReadTime);
 
-              if (lastReadTime === 0 || lastMsgTime > lastReadTime) {
+              if (effectiveLastReadTime === 0 || lastMsgTime > effectiveLastReadTime) {
                   unreadCount = 1;
               }
           }
@@ -684,7 +688,9 @@ function useChatData() {
     const messagesColRef = collection(db, 'conversations', chat.id, 'messages');
     
     if (chat && authUser) {
-        debouncedMarkAsRead(chat.id, authUser.uid, 1500);
+        locallyReadTimestampsRef.current.set(chat.id, Date.now());
+        markAsRead(chat.id, authUser.uid);
+        setConversations(prev => prev.map(c => c.id === chat.id ? { ...c, unreadCount: 0 } : c));
     }
 
     // Shared timestamp parser used by both phases

@@ -170,6 +170,26 @@ export function debouncedUpdateTypingStatus(
 }
 
 /**
+ * Immediately marks a conversation as read in Firestore without debounce delay.
+ */
+export async function markAsRead(chatId: string, userId: string): Promise<void> {
+  if (!chatId || !userId) return;
+  const timerKey = `${chatId}_${userId}`;
+  if (readReceiptDebounceTimers.has(timerKey)) {
+    clearTimeout(readReceiptDebounceTimers.get(timerKey)!);
+    readReceiptDebounceTimers.delete(timerKey);
+  }
+  try {
+    const chatRef = doc(db, 'conversations', chatId);
+    await updateDoc(chatRef, {
+      [`lastRead.${userId}`]: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error marking conversation as read:', error);
+  }
+}
+
+/**
  * Batches and debounces read receipt update calls (`markAsRead`) by 1500ms
  * so they don't fire continuously while scrolling through unread messages.
  */
