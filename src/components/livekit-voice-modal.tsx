@@ -92,6 +92,7 @@ export function LiveKitVoiceModal({
   const [connectionStatus, setConnectionStatus] = useState<string>('connecting');
   const abortRef = useRef<AbortController | null>(null);
   const hasConnectedRef = useRef(false);
+  const fetchedKeyRef = useRef<string>('');
 
   useEffect(() => {
     setMounted(true);
@@ -103,17 +104,28 @@ export function LiveKitVoiceModal({
       setErrorMessage('');
       setConnectionStatus('connecting');
       hasConnectedRef.current = false;
-      abortRef.current?.abort();
-      abortRef.current = null;
+      fetchedKeyRef.current = '';
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
       return;
     }
 
+    const currentKey = `${roomId}_${isOpen}`;
+    if (fetchedKeyRef.current === currentKey) {
+      // Token already fetched or currently fetching for this call session
+      return;
+    }
+    fetchedKeyRef.current = currentKey;
+
     let active = true;
     const controller = new AbortController();
-    abortRef.current?.abort();
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
     abortRef.current = controller;
 
-    setToken('');
     setErrorMessage('');
     setConnectionStatus('connecting');
     hasConnectedRef.current = false;
@@ -151,10 +163,8 @@ export function LiveKitVoiceModal({
 
     return () => {
       active = false;
-      controller.abort();
-      abortRef.current = null;
     };
-  }, [isOpen, roomId, username, userName]);
+  }, [isOpen, roomId]);
 
   if (isOpen === false || !mounted) return null;
 
@@ -183,7 +193,7 @@ export function LiveKitVoiceModal({
           </div>
         ) : (
           <LiveKitRoom
-            key={token}
+            key={roomId}
             video={false}
             audio={true}
             token={token}
@@ -196,7 +206,9 @@ export function LiveKitVoiceModal({
             }}
             onDisconnected={() => {
               setConnectionStatus('disconnected');
-              onClose();
+              if (hasConnectedRef.current) {
+                onClose();
+              }
             }}
             onError={(err: any) => {
               console.error('[LiveKit Error]:', err);
