@@ -935,7 +935,8 @@ function useChatData() {
       }).catch(console.error);
 
       // Non-blocking background push notification dispatch to offline/tab-closed recipients
-      const recipientIds = selectedChat.participants ? selectedChat.participants.filter((pId: string) => pId !== senderId) : [];
+      const targetConvo = conversations.find(c => c.id === chatId);
+      const recipientIds = targetConvo?.participants ? targetConvo.participants.filter((pId: string) => pId !== senderId) : [];
       if (recipientIds.length > 0) {
         fetch('/api/notifications/send', {
           method: 'POST',
@@ -964,7 +965,7 @@ function useChatData() {
       throw error;
     }
   
-  }, [currentUser]);
+  }, [currentUser, conversations]);
 
   const handleSendBase64File = useCallback(async (chatId: any, senderId: any, base64Data: any, fileType: any, fileName: any, caption: any) => {
     if (!base64Data || !currentUser) return Promise.reject("No data or user");
