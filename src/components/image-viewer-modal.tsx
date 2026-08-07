@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download, ZoomIn, ZoomOut } from 'lucide-react';
-import Image from 'next/image';
 
 interface ImageViewerModalProps {
   isOpen: boolean;
@@ -13,7 +13,12 @@ interface ImageViewerModalProps {
 }
 
 export function ImageViewerModal({ isOpen, src, alt = 'Image preview', title, onClose }: ImageViewerModalProps) {
-  const [zoom, setZoom] = React.useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -25,7 +30,7 @@ export function ImageViewerModal({ isOpen, src, alt = 'Image preview', title, on
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !src) return null;
+  if (!isOpen || !src || !mounted) return null;
 
   const handleDownload = async () => {
     try {
@@ -44,10 +49,13 @@ export function ImageViewerModal({ isOpen, src, alt = 'Image preview', title, on
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-4 animate-in fade-in duration-200 select-none">
+  const modalContent = (
+    <div 
+      className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-4 animate-in fade-in duration-200 select-none w-screen h-screen"
+      style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+    >
       {/* Top Header Controls */}
-      <div className="flex items-center justify-between z-10 px-2 py-1">
+      <div className="flex items-center justify-between z-10 px-3 py-2 shrink-0">
         <div className="text-white text-sm font-medium truncate max-w-[200px] sm:max-w-md">
           {title || 'Photo'}
         </div>
@@ -88,23 +96,25 @@ export function ImageViewerModal({ isOpen, src, alt = 'Image preview', title, on
         </div>
       </div>
 
-      {/* Main High-Res Image Container */}
+      {/* Main Centered High-Res Image Display Container */}
       <div
-        className="flex-1 flex items-center justify-center overflow-hidden relative cursor-zoom-out p-2"
+        className="flex-1 flex items-center justify-center overflow-hidden relative cursor-zoom-out p-2 w-full h-full"
         onClick={onClose}
       >
         <div
-          className="relative max-w-full max-h-full transition-transform duration-200"
+          className="relative flex items-center justify-center max-w-full max-h-full transition-transform duration-200"
           style={{ transform: `scale(${zoom})` }}
           onClick={(e) => e.stopPropagation()}
         >
           <img
             src={src}
             alt={alt}
-            className="max-h-[85vh] max-w-[95vw] object-contain rounded-2xl shadow-2xl border border-white/10"
+            className="max-h-[85dvh] max-w-[95dvw] object-contain rounded-2xl shadow-2xl border border-white/10 m-auto"
           />
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
