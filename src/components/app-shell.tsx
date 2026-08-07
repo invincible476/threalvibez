@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { authService } from '@/lib/auth-service';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useAndroidPush } from '@/hooks/useAndroidPush';
+import { useAndroidBackButton } from '@/hooks/useAndroidBackButton';
 import { type Firestore } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import type { Conversation, Message, Story, User, StoryReaction } from '@/lib/types';
@@ -238,6 +239,12 @@ function useChatData() {
 
   useNotifications({ conversations, usersCache, currentUser, activeChatId: selectedChat?.id });
   useAndroidPush(currentUser?.uid);
+  useAndroidBackButton({
+    selectedChat,
+    setSelectedChat,
+    selectedStory,
+    setSelectedStory,
+  });
 
   const updateUserInCache = useCallback((userToCache: User) => {
     if (!userToCache) return;
