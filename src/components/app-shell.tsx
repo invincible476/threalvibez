@@ -1273,8 +1273,18 @@ function useChatData() {
         });
 
         // Dispatch Push Notification for uploaded file / voice note
-        const targetConvo = conversations.find(c => c.id === chatId);
-        const recipientIds = (targetConvo?.participants || []).filter(id => id !== senderId);
+        let recipientIds = (conversations.find(c => c.id === chatId)?.participants || []).filter(id => id !== senderId);
+        if (recipientIds.length === 0) {
+          try {
+            const chatSnap = await getDoc(doc(db, 'conversations', chatId));
+            if (chatSnap.exists()) {
+              const participants: string[] = chatSnap.data()?.participants || [];
+              recipientIds = participants.filter(id => id !== senderId);
+            }
+          } catch (err) {
+            console.warn('[Push Notification] Participant lookup error:', err);
+          }
+        }
 
         if (recipientIds.length > 0) {
           fetch('/api/notifications/send', {
@@ -1493,8 +1503,18 @@ function useChatData() {
                   });
 
                   // Dispatch Push Notification for Storage file / voice note
-                  const targetConvo = conversations.find(c => c.id === chatId);
-                  const recipientIds = (targetConvo?.participants || []).filter(id => id !== senderId);
+                  let recipientIds = (conversations.find(c => c.id === chatId)?.participants || []).filter(id => id !== senderId);
+                  if (recipientIds.length === 0) {
+                    try {
+                      const chatSnap = await getDoc(doc(db, 'conversations', chatId));
+                      if (chatSnap.exists()) {
+                        const participants: string[] = chatSnap.data()?.participants || [];
+                        recipientIds = participants.filter(id => id !== senderId);
+                      }
+                    } catch (err) {
+                      console.warn('[Push Notification] Participant lookup error:', err);
+                    }
+                  }
 
                   if (recipientIds.length > 0) {
                     fetch('/api/notifications/send', {
@@ -1986,8 +2006,10 @@ function useChatData() {
 
       const newStoryRef = await addDoc(collection(db, 'stories'), storyData);
 
-      // Dispatch story push notification to friends
-      const friendIds = currentUser.friends || Array.from(usersCache.keys()).filter(id => id !== currentUser.uid);
+      // Dispatch story push notification to friends or active contacts
+      const friendIds = (Array.isArray(currentUser.friends) && currentUser.friends.length > 0)
+        ? currentUser.friends
+        : Array.from(usersCache.keys()).filter(id => id !== currentUser.uid);
       if (friendIds.length > 0) {
         fetch('/api/notifications/send', {
           method: 'POST',
