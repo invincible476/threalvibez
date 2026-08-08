@@ -284,20 +284,46 @@ export const authService = {
       // ── Native Android Google Account Picker Bridge ─────────────────────────
       if (typeof window !== 'undefined' && (window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
         console.log('[Auth Service] Triggering Native Android Google Account Picker...');
-        return new Promise((resolve, reject) => {
+        const nativeAuthResult = await new Promise((resolve) => {
+          let timeoutId: any = null;
+
           (window as any).handleNativeGoogleSignIn = async (idToken: string) => {
+            if (timeoutId) clearTimeout(timeoutId);
             try {
               const credential = GoogleAuthProvider.credential(idToken);
               const result = await firebaseSignInCredential(auth, credential);
-              await this.ensureUserDocument(result.user);
-              await setupPresence(result.user.uid);
+              this.ensureUserDocument(result.user).catch(() => null);
+              try { setupPresence(result.user.uid); } catch {}
               resolve(result.user);
             } catch (err) {
-              reject(err);
+              console.warn('[Auth Service] Native credential sign in failed:', err);
+              resolve(null);
             }
           };
-          (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
+
+          (window as any).handleNativeGoogleSignInError = (errMessage: string) => {
+            if (timeoutId) clearTimeout(timeoutId);
+            console.warn('[Auth Service] Native Google Auth error:', errMessage);
+            resolve(null);
+          };
+
+          // 5-second timeout safeguard for native picker
+          timeoutId = setTimeout(() => {
+            console.warn('[Auth Service] Native Google Auth timed out, proceeding with Web Auth...');
+            resolve(null);
+          }, 5000);
+
+          try {
+            (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
+          } catch (e) {
+            if (timeoutId) clearTimeout(timeoutId);
+            resolve(null);
+          }
         });
+
+        if (nativeAuthResult) {
+          return nativeAuthResult;
+        }
       }
 
       // Initialize Google Auth Provider
