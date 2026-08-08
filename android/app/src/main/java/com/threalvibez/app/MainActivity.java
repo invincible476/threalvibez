@@ -40,6 +40,16 @@ public class MainActivity extends BridgeActivity {
     private WebView mainWebView;
     private GoogleSignInClient mGoogleSignInClient;
     private android.webkit.ValueCallback<android.net.Uri[]> mFilePathCallback;
+    private boolean isWebViewConfigured = false;
+
+    private WebView getAppWebView() {
+        if (mainWebView != null) return mainWebView;
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            mainWebView = this.bridge.getWebView();
+            return mainWebView;
+        }
+        return null;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -48,6 +58,12 @@ public class MainActivity extends BridgeActivity {
         setupGoogleNativeAuth();
         setupWebView();
         requestAndroidPermissions();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        setupWebView();
     }
 
     // ── 1. Request Runtime Permissions (Notifications, Camera, Audio) ─────────
@@ -70,13 +86,20 @@ public class MainActivity extends BridgeActivity {
     // ── 2. Configure Native Google Sign-In ─────────────────────────────────────
     private void setupGoogleNativeAuth() {
         try {
+            String webClientId;
+            try {
+                webClientId = getString(R.string.default_web_client_id);
+            } catch (Exception e) {
+                webClientId = "1003230563610-hilqtdtlqpujrkp3j0oc61tg0aq86mmn.apps.googleusercontent.com";
+            }
             GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken("1003230563610-hilqtdtlqpujrkp3j0oc61tg0aq86mmn.apps.googleusercontent.com")
+                .requestIdToken(webClientId)
                 .requestEmail()
                 .build();
             mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+            android.util.Log.d("NativeAuth", "GoogleSignInClient setup complete with client ID: " + webClientId);
         } catch (Exception e) {
-            e.printStackTrace();
+            android.util.Log.e("NativeAuth", "Error setting up GoogleNativeAuth", e);
         }
     }
 
@@ -91,6 +114,8 @@ public class MainActivity extends BridgeActivity {
                         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
                         startActivityForResult(signInIntent, RC_SIGN_IN);
                     });
+                } else {
+                    android.util.Log.e("NativeAuth", "mGoogleSignInClient is null when triggerNativeGoogleSignIn was called.");
                 }
             });
         }
@@ -121,24 +146,28 @@ public class MainActivity extends BridgeActivity {
 
         if (requestCode == RC_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            WebView targetWebView = (this.bridge != null && this.bridge.getWebView() != null) ? this.bridge.getWebView() : mainWebView;
+            WebView wv = getAppWebView();
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (account != null && account.getIdToken() != null) {
                     String idToken = account.getIdToken();
+                    android.util.Log.d("NativeAuth", "Native Google auth success. Injecting ID token to web.");
                     // Pass native Google ID Token back into web app JavaScript
-                    if (targetWebView != null) {
-                        targetWebView.post(() -> {
-                            targetWebView.evaluateJavascript(
+                    if (wv != null) {
+                        wv.post(() -> {
+                            wv.evaluateJavascript(
                                 "if(window.handleNativeGoogleSignIn){ window.handleNativeGoogleSignIn('" + idToken + "'); }",
                                 null
                             );
                         });
+                    } else {
+                        android.util.Log.e("NativeAuth", "WebView is null on sign in result!");
                     }
                 } else {
-                    if (targetWebView != null) {
-                        targetWebView.post(() -> {
-                            targetWebView.evaluateJavascript(
+                    android.util.Log.e("NativeAuth", "Native Google sign in account or token is null");
+                    if (wv != null) {
+                        wv.post(() -> {
+                            wv.evaluateJavascript(
                                 "if(window.handleNativeGoogleSignInError){ window.handleNativeGoogleSignInError('No ID token'); }",
                                 null
                             );
@@ -146,11 +175,11 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             } catch (ApiException e) {
-                System.err.println("[Native Google Auth] Sign in failed code: " + e.getStatusCode());
-                if (targetWebView != null) {
-                    final int code = e.getStatusCode();
-                    targetWebView.post(() -> {
-                        targetWebView.evaluateJavascript(
+                final int code = e.getStatusCode();
+                android.util.Log.e("NativeAuth", "Native Google Sign in failed code: " + code, e);
+                if (wv != null) {
+                    wv.post(() -> {
+                        wv.evaluateJavascript(
                             "if(window.handleNativeGoogleSignInError){ window.handleNativeGoogleSignInError('ApiException " + code + "'); }",
                             null
                         );
@@ -205,16 +234,15 @@ public class MainActivity extends BridgeActivity {
     // ── 4. Configure WebView Settings & Prevent Background Freezing ──────────
     private void setupWebView() {
         try {
-            WebView wv = (this.bridge != null) ? this.bridge.getWebView() : null;
+            WebView wv = getAppWebView();
             if (wv == null) {
-                // Retry setup until bridge and WebView are ready
-                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::setupWebView, 300);
+                if (getWindow() != null && getWindow().getDecorView() != null) {
+                    getWindow().getDecorView().postDelayed(this::setupWebView, 500);
+                }
                 return;
             }
 
-            mainWebView = wv;
-            WebSettings settings = mainWebView.getSettings();
-
+            WebSettings settings = wv.getSettings();
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
             settings.setSupportMultipleWindows(true);
@@ -222,109 +250,113 @@ public class MainActivity extends BridgeActivity {
             settings.setMediaPlaybackRequiresUserGesture(false);
 
             // Bind native JavaScript interface
-            mainWebView.addJavascriptInterface(new NativeAuthInterface(), "AndroidNativeAuth");
+            wv.addJavascriptInterface(new NativeAuthInterface(), "AndroidNativeAuth");
 
-            mainWebView.setWebChromeClient(new WebChromeClient() {
-                @Override
-                public boolean onShowFileChooser(WebView webView, android.webkit.ValueCallback<android.net.Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
-                    if (mFilePathCallback != null) {
-                        mFilePathCallback.onReceiveValue(null);
-                    }
-                    mFilePathCallback = filePathCallback;
-
-                    try {
-                        Intent intent = fileChooserParams.createIntent();
-                        startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE);
-                    } catch (ActivityNotFoundException e) {
-                        mFilePathCallback = null;
-                        return false;
-                    }
-                    return true;
-                }
-
-                @Override
-                public void onPermissionRequest(final android.webkit.PermissionRequest request) {
-                    MainActivity.this.runOnUiThread(() -> {
-                        request.grant(request.getResources());
-                    });
-                }
-
-                @Override
-                public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-                    WebView popupWebView = new WebView(MainActivity.this);
-                    popupWebView.setLayoutParams(new FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                    ));
-
-                    WebSettings ps = popupWebView.getSettings();
-                    ps.setJavaScriptEnabled(true);
-                    ps.setDomStorageEnabled(true);
-                    ps.setSupportMultipleWindows(true);
-                    ps.setUserAgentString(
-                        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
-                        "(KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36"
-                    );
-
-                    Dialog popupDialog = new Dialog(MainActivity.this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-                    popupDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-                    popupDialog.setContentView(popupWebView);
-
-                    popupWebView.setWebViewClient(new WebViewClient() {
-                        @Override
-                        public void onPageStarted(WebView wv, String url, Bitmap favicon) {
-                            if (url != null && url.contains("/__/auth/handler")) {
-                                mainWebView.evaluateJavascript(
-                                    "(function(){" +
-                                    "  var ss={};" +
-                                    "  for(var i=0;i<sessionStorage.length;i++){" +
-                                    "    var k=sessionStorage.key(i);" +
-                                    "    ss[k]=sessionStorage.getItem(k);" +
-                                    "  }" +
-                                    "  return JSON.stringify(ss);" +
-                                    "})()",
-                                    parentSessionStorage -> {
-                                        if (parentSessionStorage != null && !parentSessionStorage.equals("null") && !parentSessionStorage.equals("\"\"")) {
-                                            String injectScript =
-                                                "(function(data){" +
-                                                "  try{" +
-                                                "    var ss=JSON.parse(data);" +
-                                                "    Object.keys(ss).forEach(function(k){" +
-                                                "      sessionStorage.setItem(k,ss[k]);" +
-                                                "    });" +
-                                                "  }catch(e){console.error('[Auth Bridge] inject failed',e);}" +
-                                                "})('" + parentSessionStorage.replace("'", "\\'") + "')";
-                                            wv.evaluateJavascript(injectScript, null);
-                                        }
-                                    }
-                                );
-                            }
+            if (!isWebViewConfigured) {
+                isWebViewConfigured = true;
+                wv.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public boolean onShowFileChooser(WebView webView, android.webkit.ValueCallback<android.net.Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                        if (mFilePathCallback != null) {
+                            mFilePathCallback.onReceiveValue(null);
                         }
+                        mFilePathCallback = filePathCallback;
 
-                        @Override
-                        public boolean shouldOverrideUrlLoading(WebView wv, WebResourceRequest req) {
+                        try {
+                            Intent intent = fileChooserParams.createIntent();
+                            startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE);
+                        } catch (ActivityNotFoundException e) {
+                            mFilePathCallback = null;
                             return false;
                         }
-                    });
+                        return true;
+                    }
 
-                    popupWebView.setWebChromeClient(new WebChromeClient() {
-                        @Override
-                        public void onCloseWindow(WebView window) {
-                            popupDialog.dismiss();
-                        }
-                    });
+                    @Override
+                    public void onPermissionRequest(final android.webkit.PermissionRequest request) {
+                        MainActivity.this.runOnUiThread(() -> {
+                            request.grant(request.getResources());
+                        });
+                    }
 
-                    WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                    transport.setWebView(popupWebView);
-                    resultMsg.sendToTarget();
+                    @Override
+                    public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                        WebView popupWebView = new WebView(MainActivity.this);
+                        popupWebView.setLayoutParams(new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                        ));
 
-                    popupDialog.show();
-                    return true;
-                }
-            });
+                        WebSettings ps = popupWebView.getSettings();
+                        ps.setJavaScriptEnabled(true);
+                        ps.setDomStorageEnabled(true);
+                        ps.setSupportMultipleWindows(true);
+                        ps.setUserAgentString(
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
+                            "(KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36"
+                        );
+
+                        Dialog popupDialog = new Dialog(MainActivity.this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+                        popupDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+                        popupDialog.setContentView(popupWebView);
+
+                        popupWebView.setWebViewClient(new WebViewClient() {
+                            @Override
+                            public void onPageStarted(WebView popupWv, String url, Bitmap favicon) {
+                                WebView parentWv = getAppWebView();
+                                if (url != null && url.contains("/__/auth/handler") && parentWv != null) {
+                                    parentWv.evaluateJavascript(
+                                        "(function(){" +
+                                        "  var ss={};" +
+                                        "  for(var i=0;i<sessionStorage.length;i++){" +
+                                        "    var k=sessionStorage.key(i);" +
+                                        "    ss[k]=sessionStorage.getItem(k);" +
+                                        "  }" +
+                                        "  return JSON.stringify(ss);" +
+                                        "})()",
+                                        parentSessionStorage -> {
+                                            if (parentSessionStorage != null && !parentSessionStorage.equals("null") && !parentSessionStorage.equals("\"\"")) {
+                                                String injectScript =
+                                                    "(function(data){" +
+                                                    "  try{" +
+                                                    "    var ss=JSON.parse(data);" +
+                                                    "    Object.keys(ss).forEach(function(k){" +
+                                                    "      sessionStorage.setItem(k,ss[k]);" +
+                                                    "    });" +
+                                                    "  }catch(e){console.error('[Auth Bridge] inject failed',e);}" +
+                                                    "})('" + parentSessionStorage.replace("'", "\\'") + "')";
+                                                popupWv.evaluateJavascript(injectScript, null);
+                                            }
+                                        }
+                                    );
+                                }
+                            }
+
+                            @Override
+                            public boolean shouldOverrideUrlLoading(WebView wv, WebResourceRequest req) {
+                                return false;
+                            }
+                        });
+
+                        popupWebView.setWebChromeClient(new WebChromeClient() {
+                            @Override
+                            public void onCloseWindow(WebView window) {
+                                popupDialog.dismiss();
+                            }
+                        });
+
+                        WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                        transport.setWebView(popupWebView);
+                        resultMsg.sendToTarget();
+
+                        popupDialog.show();
+                        return true;
+                    }
+                });
+            }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            android.util.Log.e("NativeAuth", "Error setting up WebView", e);
         }
     }
 
@@ -332,17 +364,20 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        if (mainWebView != null) {
-            mainWebView.onResume();
-            mainWebView.resumeTimers();
+        setupWebView();
+        WebView wv = getAppWebView();
+        if (wv != null) {
+            wv.onResume();
+            wv.resumeTimers();
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (mainWebView != null) {
-            mainWebView.pauseTimers();
+        WebView wv = getAppWebView();
+        if (wv != null) {
+            wv.pauseTimers();
         }
     }
 }

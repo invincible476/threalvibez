@@ -281,52 +281,83 @@ export const authService = {
     try {
       logDebug('Starting Google sign-in process');
 
+      const isAndroidCapacitor = typeof window !== 'undefined' && (
+        !!(window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn ||
+        ((window as any).Capacitor && (window as any).Capacitor.getPlatform() === 'android')
+      );
+
       // ── Native Android Google Account Picker Bridge ─────────────────────────
-      if (typeof window !== 'undefined' && (window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
-        console.log('[Auth Service] Triggering Native Android Google Account Picker...');
-        const nativeAuthResult = await new Promise((resolve, reject) => {
-          let timeoutId: any = null;
-
-          (window as any).handleNativeGoogleSignIn = async (idToken: string) => {
-            if (timeoutId) clearTimeout(timeoutId);
-            try {
-              const credential = GoogleAuthProvider.credential(idToken);
-              const result = await firebaseSignInCredential(auth, credential);
-              this.ensureUserDocument(result.user).catch(() => null);
-              try { setupPresence(result.user.uid); } catch {}
-              resolve(result.user);
-            } catch (err: any) {
-              console.warn('[Auth Service] Native credential sign in failed:', err);
-              reject(new AuthError(err.message || 'Failed to authenticate with Google credential', 'auth/google-sign-in-failed'));
-            }
-          };
-
-          (window as any).handleNativeGoogleSignInError = (errMessage: string) => {
-            if (timeoutId) clearTimeout(timeoutId);
-            console.warn('[Auth Service] Native Google Auth error:', errMessage);
-            if (errMessage.includes('12501') || errMessage.includes('cancelled')) {
-              reject(new AuthError('Google sign-in was cancelled.', 'auth/popup-closed-by-user'));
-            } else {
-              reject(new AuthError(`Native Google Sign-In error: ${errMessage}`, 'auth/google-sign-in-failed'));
-            }
-          };
-
-          // 60-second timeout safeguard to allow user ample time to select an account
-          timeoutId = setTimeout(() => {
-            console.warn('[Auth Service] Native Google Auth timed out.');
-            reject(new AuthError('Google sign-in timed out. Please try again.', 'auth/timeout'));
-          }, 60000);
-
-          try {
-            (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
-          } catch (e: any) {
-            if (timeoutId) clearTimeout(timeoutId);
-            reject(new AuthError('Failed to trigger native Google account picker.', 'auth/native-trigger-failed'));
+      if (isAndroidCapacitor) {
+        console.log('[Auth Service] Android Capacitor detected. Using Native Google Auth Bridge...');
+        
+        // Wait up to 2 seconds if AndroidNativeAuth is not yet injected into window
+        if (!(window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
+          for (let i = 0; i < 20; i++) {
+            if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) break;
+            await new Promise((r) => setTimeout(r, 100));
           }
-        });
+        }
 
-        if (nativeAuthResult) {
-          return nativeAuthResult;
+        if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
+          let nativeAuthErr: string | null = null;
+          const nativeAuthResult = await new Promise((resolve) => {
+            let timeoutId: any = null;
+
+            (window as any).handleNativeGoogleSignIn = async (idToken: string) => {
+              if (timeoutId) clearTimeout(timeoutId);
+              try {
+                const credential = GoogleAuthProvider.credential(idToken);
+                const result = await firebaseSignInCredential(auth, credential);
+                this.ensureUserDocument(result.user).catch(() => null);
+                try { setupPresence(result.user.uid); } catch {}
+                resolve(result.user);
+              } catch (err: any) {
+                console.warn('[Auth Service] Native credential sign in failed:', err);
+                nativeAuthErr = err?.message || 'Firebase credential error';
+                resolve(null);
+              }
+            };
+
+            (window as any).handleNativeGoogleSignInError = (errMessage: string) => {
+              if (timeoutId) clearTimeout(timeoutId);
+              console.warn('[Auth Service] Native Google Auth error:', errMessage);
+              nativeAuthErr = errMessage;
+              resolve(null);
+            };
+
+            // 60-second timeout safeguard for native account picker interaction
+            timeoutId = setTimeout(() => {
+              console.warn('[Auth Service] Native Google Auth timed out.');
+              nativeAuthErr = 'Native sign-in timed out';
+              resolve(null);
+            }, 60000);
+
+            try {
+              (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
+            } catch (e: any) {
+              if (timeoutId) clearTimeout(timeoutId);
+              nativeAuthErr = e?.message || 'Failed to trigger native Google sign-in';
+              resolve(null);
+            }
+          });
+
+          if (nativeAuthResult) {
+            return nativeAuthResult;
+          }
+          if (auth.currentUser) {
+            return auth.currentUser;
+          }
+
+          throw new AuthError(
+            nativeAuthErr || 'Google sign-in was cancelled or failed on this Android device.',
+            'auth/google-sign-in-failed'
+          );
+        } else {
+          console.warn('[Auth Service] AndroidNativeAuth bridge is missing on Android device.');
+          throw new AuthError(
+            'Native Google Sign-In bridge is unavailable on this device.',
+            'auth/bridge-unavailable'
+          );
         }
       }
 

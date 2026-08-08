@@ -4,4 +4,5 @@
     <string name="title_activity_main">Vibez</string>
     <string name="package_name">com.threalvibez.app</string>
     <string name="custom_url_scheme">com.threalvibez.app</string>
+    <string name="default_web_client_id">1003230563610-hilqtdtlqpujrkp3j0oc61tg0aq86mmn.apps.googleusercontent.com</string>
 </resources>
