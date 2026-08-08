@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useMobileDesign } from '@/components/providers/mobile-provider';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { SlideIn } from '@/components/transitions';
 
 function SettingsSkeleton() {
     return (
@@ -40,8 +41,6 @@ const getTitleFromPath = (path: string) => {
     if (path.includes('weather')) return 'Weather';
     return 'Settings';
 }
-
-import { SlideIn } from '@/components/transitions';
 
 function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -78,9 +77,15 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading } = useAuth();
   const { isMobileView } = useMobileDesign();
 
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading, router]);
 
   if (loading || !user) {
       return <SettingsSkeleton />

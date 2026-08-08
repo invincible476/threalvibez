@@ -2,6 +2,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,11 +72,18 @@ function AccountSkeleton() {
 
 export default function AccountPage() {
     const { user, loading } = useAuth();
+    const router = useRouter();
     const { toast } = useToast();
     const [isProcessing, setIsProcessing] = useState(false);
     const importInputRef = useRef<HTMLInputElement>(null);
     const [blockedUsersList, setBlockedUsersList] = useState<User[]>([]);
     const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!loading && !user) {
+            router.replace('/login');
+        }
+    }, [user, loading, router]);
 
     useEffect(() => {
         if (!user) return;
@@ -277,19 +285,28 @@ export default function AccountPage() {
     const handleDeleteAccount = async () => {
         if (!user) return;
         setIsProcessing(true);
+        const uid = user.uid;
         try {
             const batch = writeBatch(db);
-            const userDocRef = doc(db, 'users', user.uid);
+            const userDocRef = doc(db, 'users', uid);
             batch.delete(userDocRef);
             
             await batch.commit();
 
             await deleteUser(user);
             
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('lastLogin');
+                localStorage.removeItem('sessionUser');
+                localStorage.removeItem(`emailVerified_${uid}`);
+                sessionStorage.clear();
+            }
+
             toast({ title: "Account Deleted", description: "Your account has been permanently deleted." });
+            router.replace('/login');
         } catch (error: any) {
             console.error("Account deletion error:", error);
-            if(error.code === 'auth/requires-recent-login') {
+            if (error.code === 'auth/requires-recent-login') {
                  toast({ title: "Action Required", description: "This is a sensitive action. Please log out and log back in before deleting your account.", variant: "destructive", duration: 7000});
             } else {
                 toast({ title: "Error", description: error.message || "Failed to delete account.", variant: "destructive"});

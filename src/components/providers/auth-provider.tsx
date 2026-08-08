@@ -174,9 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const hasStoredSession = typeof window !== 'undefined' && !!localStorage.getItem('sessionUser');
-
-      if (!activeUser && !hasStoredSession && !isAuthRoute) {
+      if (!activeUser && !isAuthRoute) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('sessionUser');
           localStorage.removeItem('lastLogin');
