@@ -121,23 +121,24 @@ public class MainActivity extends BridgeActivity {
 
         if (requestCode == RC_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            WebView targetWebView = (this.bridge != null && this.bridge.getWebView() != null) ? this.bridge.getWebView() : mainWebView;
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (account != null && account.getIdToken() != null) {
                     String idToken = account.getIdToken();
                     // Pass native Google ID Token back into web app JavaScript
-                    if (mainWebView != null) {
-                        mainWebView.post(() -> {
-                            mainWebView.evaluateJavascript(
+                    if (targetWebView != null) {
+                        targetWebView.post(() -> {
+                            targetWebView.evaluateJavascript(
                                 "if(window.handleNativeGoogleSignIn){ window.handleNativeGoogleSignIn('" + idToken + "'); }",
                                 null
                             );
                         });
                     }
                 } else {
-                    if (mainWebView != null) {
-                        mainWebView.post(() -> {
-                            mainWebView.evaluateJavascript(
+                    if (targetWebView != null) {
+                        targetWebView.post(() -> {
+                            targetWebView.evaluateJavascript(
                                 "if(window.handleNativeGoogleSignInError){ window.handleNativeGoogleSignInError('No ID token'); }",
                                 null
                             );
@@ -146,10 +147,10 @@ public class MainActivity extends BridgeActivity {
                 }
             } catch (ApiException e) {
                 System.err.println("[Native Google Auth] Sign in failed code: " + e.getStatusCode());
-                if (mainWebView != null) {
+                if (targetWebView != null) {
                     final int code = e.getStatusCode();
-                    mainWebView.post(() -> {
-                        mainWebView.evaluateJavascript(
+                    targetWebView.post(() -> {
+                        targetWebView.evaluateJavascript(
                             "if(window.handleNativeGoogleSignInError){ window.handleNativeGoogleSignInError('ApiException " + code + "'); }",
                             null
                         );
@@ -204,9 +205,14 @@ public class MainActivity extends BridgeActivity {
     // ── 4. Configure WebView Settings & Prevent Background Freezing ──────────
     private void setupWebView() {
         try {
-            if (this.bridge == null || this.bridge.getWebView() == null) return;
+            WebView wv = (this.bridge != null) ? this.bridge.getWebView() : null;
+            if (wv == null) {
+                // Retry setup until bridge and WebView are ready
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::setupWebView, 300);
+                return;
+            }
 
-            mainWebView = this.bridge.getWebView();
+            mainWebView = wv;
             WebSettings settings = mainWebView.getSettings();
 
             settings.setDomStorageEnabled(true);

@@ -53,7 +53,7 @@ export function usePrefetch<T>(
   };
 }
 
-export function useOptimisticUpdate<T, U = unknown>(
+export function useOptimisticUpdate<T extends Record<string, any>, U = unknown>(
   queryKey: string[],
   updateFn: (data: T) => Promise<U>
 ) {
@@ -61,7 +61,7 @@ export function useOptimisticUpdate<T, U = unknown>(
 
   return useMutation({
     mutationFn: updateFn,
-    onMutate: async (variables) => {
+    onMutate: async (variables: T) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey });
 
@@ -70,7 +70,7 @@ export function useOptimisticUpdate<T, U = unknown>(
 
       // Optimistically update to the new value
       if (previousData) {
-        queryClient.setQueryData<T>(queryKey, (old) => ({
+        queryClient.setQueryData<T>(queryKey, (old: any) => ({
           ...old,
           ...variables,
         }));
@@ -78,7 +78,7 @@ export function useOptimisticUpdate<T, U = unknown>(
 
       return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (err: Error, variables: T, context: any) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousData) {
         queryClient.setQueryData(queryKey, context.previousData);
@@ -112,11 +112,11 @@ export function useInfiniteScroll<T>(
     isLoading,
     isError,
     error
-  } = useInfiniteQuery<PaginatedResponse<T>, Error, InfiniteData<PaginatedResponse<T>>, string[]>({
+  } = useInfiniteQuery<PaginatedResponse<T>, Error, InfiniteData<PaginatedResponse<T>>, string[], string>({
     queryKey,
-    queryFn: async ({ pageParam }) => fetchFn(Number(pageParam)),
+    queryFn: async ({ pageParam }: { pageParam: string }) => fetchFn(Number(pageParam)),
     initialPageParam: '1',
-    getNextPageParam: (lastPage) => 
+    getNextPageParam: (lastPage: PaginatedResponse<T>) => 
       lastPage.hasMore ? String(lastPage.nextCursor) : undefined,
     staleTime: defaultOptions.staleTime,
     gcTime: defaultOptions.gcTime,
@@ -129,7 +129,7 @@ export function useInfiniteScroll<T>(
       const lastPage = data.pages[data.pages.length - 1];
       await queryClient.prefetchInfiniteQuery({
         queryKey,
-        queryFn: async ({ pageParam }) => fetchFn(Number(pageParam)),
+        queryFn: async ({ pageParam }: { pageParam: string }) => fetchFn(Number(pageParam)),
         initialPageParam: '1',
         getNextPageParam: (lastPage: PaginatedResponse<T>) => 
           lastPage.hasMore ? String(lastPage.nextCursor) : undefined,

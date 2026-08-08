@@ -56,6 +56,8 @@ database-debug.log
 
 # Android App
 android-app/
-android/
+android/.gradle/
+android/build/
+android/app/build/
 *.apk
 

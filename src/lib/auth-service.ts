@@ -284,7 +284,7 @@ export const authService = {
       // ── Native Android Google Account Picker Bridge ─────────────────────────
       if (typeof window !== 'undefined' && (window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
         console.log('[Auth Service] Triggering Native Android Google Account Picker...');
-        const nativeAuthResult = await new Promise((resolve) => {
+        const nativeAuthResult = await new Promise((resolve, reject) => {
           let timeoutId: any = null;
 
           (window as any).handleNativeGoogleSignIn = async (idToken: string) => {
@@ -295,29 +295,33 @@ export const authService = {
               this.ensureUserDocument(result.user).catch(() => null);
               try { setupPresence(result.user.uid); } catch {}
               resolve(result.user);
-            } catch (err) {
+            } catch (err: any) {
               console.warn('[Auth Service] Native credential sign in failed:', err);
-              resolve(null);
+              reject(new AuthError(err.message || 'Failed to authenticate with Google credential', 'auth/google-sign-in-failed'));
             }
           };
 
           (window as any).handleNativeGoogleSignInError = (errMessage: string) => {
             if (timeoutId) clearTimeout(timeoutId);
             console.warn('[Auth Service] Native Google Auth error:', errMessage);
-            resolve(null);
+            if (errMessage.includes('12501') || errMessage.includes('cancelled')) {
+              reject(new AuthError('Google sign-in was cancelled.', 'auth/popup-closed-by-user'));
+            } else {
+              reject(new AuthError(`Native Google Sign-In error: ${errMessage}`, 'auth/google-sign-in-failed'));
+            }
           };
 
-          // 5-second timeout safeguard for native picker
+          // 60-second timeout safeguard to allow user ample time to select an account
           timeoutId = setTimeout(() => {
-            console.warn('[Auth Service] Native Google Auth timed out, proceeding with Web Auth...');
-            resolve(null);
-          }, 5000);
+            console.warn('[Auth Service] Native Google Auth timed out.');
+            reject(new AuthError('Google sign-in timed out. Please try again.', 'auth/timeout'));
+          }, 60000);
 
           try {
             (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
-          } catch (e) {
+          } catch (e: any) {
             if (timeoutId) clearTimeout(timeoutId);
-            resolve(null);
+            reject(new AuthError('Failed to trigger native Google account picker.', 'auth/native-trigger-failed'));
           }
         });
 

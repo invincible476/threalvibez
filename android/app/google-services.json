@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1003230563610",
+    "project_id": "blackvienna-ea6c7",
+    "storage_bucket": "blackvienna-ea6c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1003230563610:android:7d079d45682b5cc27730a3",
+        "android_client_info": {
+          "package_name": "com.threalvibez.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1003230563610-hilqtdtlqpujrkp3j0oc61tg0aq86mmn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDf-sEGHlZH2MX6d1dRYwmVljqIHtRE2b4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1003230563610-hilqtdtlqpujrkp3j0oc61tg0aq86mmn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
