@@ -31,11 +31,12 @@ export class GeminiService {
         }
 
         try {
-            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent', {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${GEMINI_API_KEY}`
+                    'x-goog-api-key': GEMINI_API_KEY
                 },
                 body: JSON.stringify({
                     contents: messages,
@@ -116,6 +117,12 @@ export class GeminiService {
             role: 'model',
             parts: [{ text: response }]
         });
+
+        // Evict oldest entries if cache exceeds 50 chats to prevent memory leaks
+        if (this.chatHistory.size >= 50 && !this.chatHistory.has(chatId)) {
+            const firstKey = this.chatHistory.keys().next().value;
+            if (firstKey) this.chatHistory.delete(firstKey);
+        }
 
         // Update chat history
         this.chatHistory.set(chatId, chatHistory);

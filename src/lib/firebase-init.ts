@@ -115,11 +115,9 @@ export async function initializeFirebase() {
 
     let auth: Auth;
     try {
-      if (getApps().length) {
-        // Use getAuth for existing app
+      try {
         auth = getAuth(app);
-      } else {
-        // Initialize new auth with persistence
+      } catch {
         auth = initializeAuth(app, {
           persistence: [
             indexedDBLocalPersistence,
@@ -127,11 +125,7 @@ export async function initializeFirebase() {
             browserSessionPersistence
           ]
         });
-
-        // Ensure persistence is set
-        await setPersistence(auth, browserLocalPersistence);
       }
-
     } catch (authError: any) {
       console.error('[Firebase Init] Auth initialization error:', {
         code: authError.code,
@@ -148,6 +142,20 @@ export async function initializeFirebase() {
   }
 }
 
+function getOrInitAuth(targetApp: FirebaseApp): Auth {
+  try {
+    return getAuth(targetApp);
+  } catch {
+    return initializeAuth(targetApp, {
+      persistence: [
+        indexedDBLocalPersistence,
+        browserLocalPersistence,
+        browserSessionPersistence
+      ]
+    });
+  }
+}
+
 // Initialize Firebase app synchronously to avoid top-level await bundling issues
 export const firebaseApp: FirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const firebaseAuth: Auth = getAuth(firebaseApp);
+export const firebaseAuth: Auth = getOrInitAuth(firebaseApp);

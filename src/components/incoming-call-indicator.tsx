@@ -61,10 +61,12 @@ export function IncomingCallIndicator({
       return;
     }
 
-    // Start ringtone sound
-    if (!ringtonePlayerRef.current) {
-      ringtonePlayerRef.current = createRingtonePlayer();
+    // Start ringtone sound safely
+    if (ringtonePlayerRef.current) {
+      ringtonePlayerRef.current.stop();
+      ringtonePlayerRef.current = null;
     }
+    ringtonePlayerRef.current = createRingtonePlayer();
 
     // Trigger browser notification once per callId
     if (!notifiedCallIdsRef.current.has(activeCall.callId)) {

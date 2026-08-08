@@ -348,15 +348,9 @@ export const authService = {
             return auth.currentUser;
           }
 
-          if (nativeAuthErr?.includes('10') || nativeAuthErr?.includes('DEVELOPER_ERROR')) {
-            nativeAuthErr = 'Google Sign-In DEVELOPER_ERROR (ApiException 10): The APK SHA-1 fingerprint must be registered in Firebase Console under Project Settings -> Android App.';
-          }
-
-          if (nativeAuthErr) {
-            throw new AuthError(
-              nativeAuthErr,
-              'auth/google-sign-in-failed'
-            );
+          const errStr: string | null = nativeAuthErr;
+          if (errStr) {
+            console.warn('[Auth Service] Native Google Auth failed or timed out, falling back to Web Auth:', errStr);
           }
         } else {
           console.log('[Auth Service] Native Google Auth bridge not present, proceeding with Web Auth...');
@@ -375,34 +369,11 @@ export const authService = {
       logDebug('Attempting Google sign-in with popup');
       let result: any = null;
       try {
-        // Race popup resolution against checking if auth.currentUser was signed in
-        const popupPromise = firebaseSignInPopup(auth, provider);
-        const checkUserPromise = new Promise((resolve) => {
-          const interval = setInterval(() => {
-            if (auth.currentUser) {
-              clearInterval(interval);
-              resolve({ user: auth.currentUser });
-            }
-          }, 300);
-          setTimeout(() => {
-            clearInterval(interval);
-            resolve(null);
-          }, 6000);
-        });
-
-        const raceResult: any = await Promise.race([popupPromise, checkUserPromise]);
-        if (raceResult?.user) {
-          result = raceResult;
-        } else {
-          result = await popupPromise;
-        }
+        result = await firebaseSignInPopup(auth, provider);
       } catch (popupError: any) {
         console.error('Popup sign-in error:', popupError);
         
-        // If auth.currentUser exists despite popup error/close, use currentUser
-        if (auth.currentUser) {
-          result = { user: auth.currentUser };
-        } else if (popupError.code === 'auth/missing-initial-state' || popupError.message?.includes('missing initial state')) {
+        if (popupError.code === 'auth/missing-initial-state' || popupError.message?.includes('missing initial state')) {
           console.warn('[Auth Service] Missing initial state detected (storage partitioned). Retrying with popup authentication...');
           result = await firebaseSignInPopup(auth, provider);
         } else if (popupError.code === 'auth/popup-blocked' || 
@@ -433,10 +404,11 @@ export const authService = {
         }
       }
       
-      const loggedInUser = result?.user || auth.currentUser;
-      if (!loggedInUser) {
-        throw new AuthError('No user returned from Google sign in', 'auth/google-sign-in-failed');
+      if (!result || !result.user) {
+        throw new Error('Google sign-in completed without returning a valid user.');
       }
+
+      const loggedInUser = result.user;
 
       logDebug('Google sign-in successful, ensuring user document');
       
@@ -447,10 +419,12 @@ export const authService = {
         localStorage.setItem('lastLogin', Date.now().toString());
       }
 
-      // Ensure user document exists (Non-blocking background call)
-      this.ensureUserDocument(loggedInUser).catch((docErr) => {
+      // Ensure user document exists in Firestore
+      try {
+        await this.ensureUserDocument(loggedInUser);
+      } catch (docErr) {
         console.warn('[Auth Service] Non-fatal error ensuring user document during Google Sign-In:', docErr);
-      });
+      }
       
       // Setup presence system asynchronously in background
       try { setupPresence(loggedInUser.uid); } catch {}

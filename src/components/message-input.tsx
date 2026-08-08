@@ -240,8 +240,15 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
   };
 
   const cancelRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch {}
     }
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     if (recordedAudio) URL.revokeObjectURL(recordedAudio.url);
@@ -265,6 +272,16 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (recordedAudio) URL.revokeObjectURL(recordedAudio.url);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (mediaRecorderRef.current) {
+        try {
+          if (mediaRecorderRef.current.stream) {
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+          }
+          if (mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+          }
+        } catch {}
+      }
     };
   }, [recordedAudio]);
 

@@ -97,15 +97,8 @@ export function MobileGalaxyBackground() {
 
     const draw = () => {
         if (!ctx || !canvas) return;
-        const dpr = window.devicePixelRatio || 1;
         const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-
-        canvas.width = vw * dpr;
-        canvas.height = vh * dpr;
-        canvas.style.width = `${vw}px`;
-        canvas.style.height = `${vh}px`;
-        ctx.scale(dpr, dpr);
 
         ctx.clearRect(0, 0, vw, vh);
         ctx.fillStyle = '#000005';

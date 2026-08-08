@@ -760,6 +760,12 @@ const ChatItem = React.memo(
     const nextTs = safeGetMillis(nextProps.conversation?.lastMessage?.timestamp || (nextProps.conversation?.lastMessage as any)?.createdAt);
     const prevOther = prevProps.conversation?.participantsDetails?.find(p => p.uid !== prevProps.currentUser?.uid);
     const nextOther = nextProps.conversation?.participantsDetails?.find(p => p.uid !== nextProps.currentUser?.uid);
+    
+    const prevIsFriend = prevOther?.uid ? prevProps.currentUser?.friends?.includes(prevOther.uid) : false;
+    const nextIsFriend = nextOther?.uid ? nextProps.currentUser?.friends?.includes(nextOther.uid) : false;
+    const prevIsSent = prevOther?.uid ? prevProps.currentUser?.friendRequestsSent?.includes(prevOther.uid) : false;
+    const nextIsSent = nextOther?.uid ? nextProps.currentUser?.friendRequestsSent?.includes(nextOther.uid) : false;
+
     return (
       prevProps.conversation?.id === nextProps.conversation?.id &&
       prevProps.conversation?.lastMessage?.text === nextProps.conversation?.lastMessage?.text &&
@@ -773,9 +779,8 @@ const ChatItem = React.memo(
       prevOther?.storyViewed === nextOther?.storyViewed &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.currentUser?.uid === nextProps.currentUser?.uid &&
-      prevProps.currentUser?.friends?.length === nextProps.currentUser?.friends?.length &&
-      prevProps.currentUser?.friendRequestsSent?.length === nextProps.currentUser?.friendRequestsSent?.length &&
-      prevProps.currentUser?.friendRequestsReceived?.length === nextProps.currentUser?.friendRequestsReceived?.length
+      prevIsFriend === nextIsFriend &&
+      prevIsSent === nextIsSent
     );
   }
 );
