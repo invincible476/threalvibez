@@ -19,7 +19,15 @@ async function getUserTokens(
     : false;
 
   if (mutedAll || mutedKey) return [];
-  return Array.isArray(data.fcmTokens) ? data.fcmTokens.filter(Boolean) : [];
+
+  const tokens: string[] = [];
+  if (Array.isArray(data.fcmTokens)) {
+    tokens.push(...data.fcmTokens.filter(Boolean));
+  }
+  if (typeof data.fcmToken === 'string' && data.fcmToken.trim()) {
+    tokens.push(data.fcmToken.trim());
+  }
+  return [...new Set(tokens)];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

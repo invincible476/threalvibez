@@ -31,6 +31,7 @@ export function useAndroidPush(uid: string | null | undefined) {
         const userRef = doc(db, 'users', uid);
         await updateDoc(userRef, {
           fcmTokens: arrayUnion(token),
+          fcmToken: token,
           platform: 'android',
         });
         console.log('[PushNotifications] FCM token saved to Firestore:', token.slice(0, 20) + '...');
@@ -116,7 +117,31 @@ export function useAndroidPush(uid: string | null | undefined) {
         return;
       }
 
-      // ── 3. Register with FCM ──────────────────────────────────────────────
+      // ── 3. Create Notification Channels for Android 8.0+ ─────────────────
+      try {
+        await PushNotifications.createChannel({
+          id: 'messages',
+          name: 'Messages & Friend Requests',
+          description: 'Notifications for messages, calls, and friend requests',
+          importance: 5,
+          visibility: 1,
+          sound: 'default',
+          vibration: true,
+        });
+        await PushNotifications.createChannel({
+          id: 'default',
+          name: 'General Notifications',
+          description: 'General notifications and updates',
+          importance: 5,
+          visibility: 1,
+          sound: 'default',
+          vibration: true,
+        });
+      } catch (err) {
+        console.warn('[PushNotifications] Error creating notification channels:', err);
+      }
+
+      // ── 4. Register with FCM ──────────────────────────────────────────────
       await PushNotifications.register();
     };
 
