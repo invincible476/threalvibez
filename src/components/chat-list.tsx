@@ -608,153 +608,149 @@ const ChatItem = React.memo(
         layout
         className="list-none w-full max-w-full min-w-0 overflow-x-hidden will-change-[transform,opacity] relative group/item"
       >
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              onTouchMove={handleTouchMove}
-              onTouchCancel={handleTouchEnd}
-              onContextMenu={handleContextMenu}
-              onClick={handleClick}
-              style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-              className={cn(
-                'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3.5 px-4 text-left transition-colors cursor-pointer overflow-x-hidden active:scale-[0.98] select-none',
-                isSelected ? 'bg-primary/15' : 'hover:bg-white/5'
-              )}
-            >
-              <UserAvatar
-                user={
-                  isGroupChat
-                    ? {
-                        name: conversation.name || 'Group',
-                        photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
-                        isGroup: true,
-                        type: 'group',
-                      }
-                    : otherParticipant || {
-                        name: conversation.name || 'Unknown',
-                        photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
-                      }
-                }
-                hasStory={!isGroupChat ? otherParticipant?.hasActiveStory : false}
-                storyViewed={!isGroupChat ? otherParticipant?.storyViewed : undefined}
-                isFriend={isFriend}
-                isGroup={isGroupChat}
-                className="h-10 w-10 flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
-                <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-foreground">
-                      {conversation.name}
-                    </p>
-                    {conversation.isFavorite && !isAiChat && (
-                      <Star className="h-3.5 w-3.5 text-amber-400/80 fill-amber-400/80 shrink-0" />
-                    )}
-                    {isAiChat && <Bot className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0 min-w-[50px]">
-                    <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
-                    {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
-                      <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-violet-700 text-[10px] font-semibold text-white">
-                        {conversation.unreadCount}
-                      </span>
-                    ) : (
-                      <span className="h-4" />
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
-                  <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
-                    {text}
-                  </p>
-                  {!isAiChat && (
+        {/* Plain div — NOT a DropdownMenuTrigger. Long press sets menuOpen=true directly. */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
+          onTouchCancel={handleTouchEnd}
+          onContextMenu={handleContextMenu}
+          onClick={onSelect}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+          className={cn(
+            'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3.5 px-4 text-left transition-colors cursor-pointer overflow-x-hidden active:scale-[0.98] select-none',
+            isSelected ? 'bg-primary/15' : 'hover:bg-white/5'
+          )}
+        >
+          <UserAvatar
+            user={
+              isGroupChat
+                ? {
+                    name: conversation.name || 'Group',
+                    photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
+                    isGroup: true,
+                    type: 'group',
+                  }
+                : otherParticipant || {
+                    name: conversation.name || 'Unknown',
+                    photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
+                  }
+            }
+            hasStory={!isGroupChat ? otherParticipant?.hasActiveStory : false}
+            storyViewed={!isGroupChat ? otherParticipant?.storyViewed : undefined}
+            isFriend={isFriend}
+            isGroup={isGroupChat}
+            className="h-10 w-10 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
+            <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-foreground">
+                  {conversation.name}
+                </p>
+                {conversation.isFavorite && !isAiChat && (
+                  <Star className="h-3.5 w-3.5 text-amber-400/80 fill-amber-400/80 shrink-0" />
+                )}
+                {isAiChat && <Bot className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0 min-w-[50px]">
+                <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
+                {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
+                  <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-violet-700 text-[10px] font-semibold text-white">
+                    {conversation.unreadCount}
+                  </span>
+                ) : (
+                  <span className="h-4" />
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
+              <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
+                {text}
+              </p>
+              {!isAiChat && (
+                <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                  <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 shrink-0 opacity-0 group-hover/chat-item:opacity-100 transition-opacity p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMenuOpen(true);
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
-                  )}
-                </div>
-              </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    onClick={(e) => e.stopPropagation()}
+                    align="start"
+                    className="w-56 shadow-xl backdrop-blur-xl bg-background/95 border-white/10 z-50 p-1 animate-in fade-in-0 zoom-in-95"
+                  >
+                    <DropdownMenuItem onClick={() => handleAction('toggleFavorite')}>
+                      <Star className="mr-2 h-4 w-4 text-amber-400" />
+                      <span>{conversation.isFavorite ? 'Unfavorite' : 'Favorite'}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleAction(conversation.isArchived ? 'unarchive' : 'archive')}>
+                      {conversation.isArchived ? (
+                        <ArchiveRestore className="mr-2 h-4 w-4 text-violet-400" />
+                      ) : (
+                        <Archive className="mr-2 h-4 w-4 text-violet-400" />
+                      )}
+                      <span>{conversation.isArchived ? 'Unarchive' : 'Archive'}</span>
+                    </DropdownMenuItem>
+
+                    {canSendRequest && (
+                      <DropdownMenuItem onClick={handleFriendRequest}>
+                        <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
+                        <span>Add Friend</span>
+                      </DropdownMenuItem>
+                    )}
+                    {isFriend && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                        onClick={() => {
+                          if (otherParticipant) {
+                            onFriendAction(otherParticipant.uid, 'removeFriend');
+                            setMenuOpen(false);
+                          }
+                        }}
+                      >
+                        <UserX className="mr-2 h-4 w-4 text-destructive" />
+                        <span>Unfriend</span>
+                      </DropdownMenuItem>
+                    )}
+                    {hasSentRequest && (
+                      <DropdownMenuItem disabled>
+                        <UserCheck className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <span>Request Sent</span>
+                      </DropdownMenuItem>
+                    )}
+                    {hasReceivedRequest && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (otherParticipant) {
+                            onFriendAction(otherParticipant.uid, 'acceptRequest');
+                            setMenuOpen(false);
+                          }
+                        }}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
+                        <span>Accept Friend Request</span>
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10 font-medium"
+                      onClick={() => handleAction('delete')}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                      <span>Delete Chat</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
-          </DropdownMenuTrigger>
-          {!isAiChat && (
-            <DropdownMenuContent
-              onClick={(e) => e.stopPropagation()}
-              align="start"
-              className="w-56 shadow-xl backdrop-blur-xl bg-background/95 border-white/10 z-50 p-1 animate-in fade-in-0 zoom-in-95"
-            >
-              <DropdownMenuItem onClick={() => handleAction('toggleFavorite')}>
-                <Star className="mr-2 h-4 w-4 text-amber-400" />
-                <span>{conversation.isFavorite ? 'Unfavorite' : 'Favorite'}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAction(conversation.isArchived ? 'unarchive' : 'archive')}>
-                {conversation.isArchived ? (
-                  <ArchiveRestore className="mr-2 h-4 w-4 text-violet-400" />
-                ) : (
-                  <Archive className="mr-2 h-4 w-4 text-violet-400" />
-                )}
-                <span>{conversation.isArchived ? 'Unarchive' : 'Archive'}</span>
-              </DropdownMenuItem>
-
-              {canSendRequest && (
-                <DropdownMenuItem onClick={handleFriendRequest}>
-                  <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
-                  <span>Add Friend</span>
-                </DropdownMenuItem>
-              )}
-              {isFriend && (
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onClick={() => {
-                    if (otherParticipant) {
-                      onFriendAction(otherParticipant.uid, 'removeFriend');
-                      setMenuOpen(false);
-                    }
-                  }}
-                >
-                  <UserX className="mr-2 h-4 w-4 text-destructive" />
-                  <span>Unfriend</span>
-                </DropdownMenuItem>
-              )}
-              {hasSentRequest && (
-                <DropdownMenuItem disabled>
-                  <UserCheck className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <span>Request Sent</span>
-                </DropdownMenuItem>
-              )}
-              {hasReceivedRequest && (
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (otherParticipant) {
-                      onFriendAction(otherParticipant.uid, 'acceptRequest');
-                      setMenuOpen(false);
-                    }
-                  }}
-                >
-                  <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
-                  <span>Accept Friend Request</span>
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive focus:bg-destructive/10 font-medium"
-                onClick={() => handleAction('delete')}
-              >
-                <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                <span>Delete Chat</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          )}
-        </DropdownMenu>
+          </div>
+        </div>
         <div className="ml-16 border-b border-white/10 group-[[data-sidebar-state=collapsed]]/sidebar:ml-0" />
       </motion.li>
     );

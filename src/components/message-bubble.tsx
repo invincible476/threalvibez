@@ -401,178 +401,175 @@ function MessageBubble({
           )
         )}
 
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              onTouchMove={handleTouchMove}
-              onTouchCancel={handleTouchEnd}
-              onContextMenu={handleContextMenu}
-              style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-              className={cn(
-                'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-md transition-all overflow-hidden group/bubble select-none cursor-pointer',
-                message.isAiMessage
-                  ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-foreground border border-emerald-800/40 backdrop-blur-md'
-                  : isOutgoing
-                  ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-white'
-                  : 'rounded-2xl rounded-tl-xs bg-muted border border-border/40 text-foreground',
-                isMediaOnly ? 'p-0 w-fit rounded-2xl bg-transparent border-0 shadow-none' : 'px-4 py-2.5'
-              )}
-            >
-              {/* Sender Name in Group Chat */}
-              {!isOutgoing && isGroupChat && !isGrouped && !isMediaOnly && (
-                <p className="text-[11px] font-semibold text-violet-300 mb-0.5 tracking-tight">{sender?.name}</p>
-              )}
+        {/* Plain bubble div — NOT a DropdownMenuTrigger. Long press/right-click opens menu via state. */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
+          onTouchCancel={handleTouchEnd}
+          onContextMenu={handleContextMenu}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+          className={cn(
+            'relative flex max-w-[80%] sm:max-w-[70%] flex-col shadow-md transition-all overflow-hidden group/bubble select-none',
+            message.isAiMessage
+              ? 'rounded-2xl rounded-tl-xs bg-emerald-950/40 text-foreground border border-emerald-800/40 backdrop-blur-md'
+              : isOutgoing
+              ? 'rounded-2xl rounded-tr-xs bg-violet-700 text-white'
+              : 'rounded-2xl rounded-tl-xs bg-muted border border-border/40 text-foreground',
+            isMediaOnly ? 'p-0 w-fit rounded-2xl bg-transparent border-0 shadow-none' : 'px-4 py-2.5'
+          )}
+        >
+          {/* Sender Name in Group Chat */}
+          {!isOutgoing && isGroupChat && !isGrouped && !isMediaOnly && (
+            <p className="text-[11px] font-semibold text-violet-300 mb-0.5 tracking-tight">{sender?.name}</p>
+          )}
 
-              {/* Quoted Reply Banner */}
-              {message.replyTo && (
-                <div className="p-2 mb-1.5 bg-black/25 rounded-lg text-xs border-l-2 border-violet-400 flex flex-col gap-0.5">
-                  <p className="font-medium text-violet-300 text-[11px] truncate">{message.replyTo.messageSender}</p>
-                  <p className="text-white/90 line-clamp-1 text-[11px]">{message.replyTo.messageText}</p>
-                </div>
-              )}
-
-              {/* Media & Content */}
-              {renderMessageContent()}
-
-              {/* Text Message or Edit Form */}
-              {isEditing ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <Input
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    className="bg-black/30 border-white/20 text-white text-xs h-8"
-                  />
-                  <Button size="sm" onClick={handleSaveEdit} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-500">
-                    Save
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-8 text-xs text-muted-foreground">
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                message.text && (
-                  <p
-                    className={cn(
-                      'text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words chat-list-force-break',
-                      message.file ? 'mt-1.5 px-0.5' : '',
-                      message.deleted && 'italic text-muted-foreground'
-                    )}
-                  >
-                    {formatText(message.text, isOutgoing)}
-                  </p>
-                )
-              )}
-
-              {/* Displayed Emoji Reactions */}
-              {message.reactions && message.reactions.length > 0 && (
-                <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isOutgoing ? 'justify-end' : 'justify-start', isMediaOnly && 'p-1 bg-black/40 rounded-xl')}>
-                  {message.reactions.map((r) => (
-                    <motion.button
-                      key={r.emoji}
-                      whileTap={{ scale: 1.25 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                      onClick={() => onMessageAction(message.id, 'react', r.emoji)}
-                      className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2 py-0.5 text-[11px] shadow-sm hover:scale-105 active:scale-125 transition-transform duration-150 ease-out select-none"
-                    >
-                      <span>{r.emoji}</span>
-                      <span className="ml-1 font-semibold text-foreground/80">{r.count}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-
-              {/* Inline Bottom-Right Timestamp & Status Stacking (only for text/non-media-only messages) */}
-              {!isMediaOnly && (
-                <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-muted-foreground ml-2 float-right select-none">
-                  <span>{formattedTimestamp}</span>
-                  {isOutgoing && renderReadReceiptIcon()}
-                </div>
-              )}
+          {/* Quoted Reply Banner */}
+          {message.replyTo && (
+            <div className="p-2 mb-1.5 bg-black/25 rounded-lg text-xs border-l-2 border-violet-400 flex flex-col gap-0.5">
+              <p className="font-medium text-violet-300 text-[11px] truncate">{message.replyTo.messageSender}</p>
+              <p className="text-white/90 line-clamp-1 text-[11px]">{message.replyTo.messageText}</p>
             </div>
-          </DropdownMenuTrigger>
+          )}
 
-          <DropdownMenuContent
-            align={isOutgoing ? 'end' : 'start'}
-            side="bottom"
-            sideOffset={6}
-            collisionPadding={16}
-            className="w-56 bg-card/95 border-border backdrop-blur-xl text-foreground shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 z-50 pointer-events-auto will-change-[transform,opacity] transform-gpu"
-          >
-            {/* Quick Reaction Emoji Pill */}
-            <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-border">
-              {QUICK_REACTION_EMOJIS.map((emoji) => (
+          {/* Media & Content */}
+          {renderMessageContent()}
+
+          {/* Text Message or Edit Form */}
+          {isEditing ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="bg-black/30 border-white/20 text-white text-xs h-8"
+              />
+              <Button size="sm" onClick={handleSaveEdit} className="h-8 text-xs bg-emerald-600 hover:bg-emerald-500">
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-8 text-xs text-muted-foreground">
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            message.text && (
+              <p
+                className={cn(
+                  'text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words chat-list-force-break',
+                  message.file ? 'mt-1.5 px-0.5' : '',
+                  message.deleted && 'italic text-muted-foreground'
+                )}
+              >
+                {formatText(message.text, isOutgoing)}
+              </p>
+            )
+          )}
+
+          {/* Displayed Emoji Reactions */}
+          {message.reactions && message.reactions.length > 0 && (
+            <div className={cn('flex flex-wrap gap-1 mt-1 z-10', isOutgoing ? 'justify-end' : 'justify-start', isMediaOnly && 'p-1 bg-black/40 rounded-xl')}>
+              {message.reactions.map((r) => (
                 <motion.button
-                  key={emoji}
+                  key={r.emoji}
                   whileTap={{ scale: 1.25 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                  onClick={() => {
-                    onMessageAction(message.id, 'react', emoji);
-                    setMenuOpen(false);
-                  }}
-                  className="text-lg hover:scale-125 active:scale-125 transition-transform p-1 select-none"
+                  onClick={() => onMessageAction(message.id, 'react', r.emoji)}
+                  className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-2 py-0.5 text-[11px] shadow-sm hover:scale-105 active:scale-125 transition-transform duration-150 ease-out select-none"
                 >
-                  {emoji}
+                  <span>{r.emoji}</span>
+                  <span className="ml-1 font-semibold text-foreground/80">{r.count}</span>
                 </motion.button>
               ))}
             </div>
+          )}
 
-            <DropdownMenuItem onClick={() => { onReply(message); setMenuOpen(false); }}>
-              <Reply className="mr-2 h-4 w-4 text-violet-400" />
-              <span>Reply</span>
-            </DropdownMenuItem>
+          {/* Inline Bottom-Right Timestamp & Status */}
+          {!isMediaOnly && (
+            <div className="mt-1 flex items-center justify-end gap-1 self-end text-[10px] text-muted-foreground ml-2 float-right select-none">
+              <span>{formattedTimestamp}</span>
+              {isOutgoing && renderReadReceiptIcon()}
+            </div>
+          )}
+        </div>
 
-            {message.text && (
-              <DropdownMenuItem onClick={handleCopyText}>
-                <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Copy Text</span>
-              </DropdownMenuItem>
-            )}
-
-            <DropdownMenuItem onClick={handlePinMessage}>
-              <Pin className="mr-2 h-4 w-4 text-amber-400" />
-              <span>Pin Message</span>
-            </DropdownMenuItem>
-
-            {isCurrentUser && message.text && !message.deleted && (
-              <DropdownMenuItem onClick={() => { setIsEditing(true); setMenuOpen(false); }}>
-                <Edit className="mr-2 h-4 w-4 text-blue-400" />
-                <span>Edit Message</span>
-              </DropdownMenuItem>
-            )}
-
-            {!message.deleted && (
-              <>
-                <DropdownMenuSeparator className="bg-border" />
-                <DropdownMenuItem
-                  className="text-red-400 focus:text-red-300 focus:bg-red-950/40"
-                  onClick={() => {
-                    setIsDeleteDialogOpen(true);
-                    setMenuOpen(false);
-                  }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>Delete Message</span>
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Floating Context Menu Dropdown - Absolute Positioned Button for Desktop hover */}
+        {/* Floating MoreHorizontal button — this IS the DropdownMenu trigger, anchoring the popup */}
         <div className={cn('absolute top-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto', isOutgoing ? '-left-7' : '-right-7')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0 pointer-events-auto"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen(true);
-            }}
-          >
-            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-          </Button>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align={isCurrentUser ? 'end' : 'start'}
+              side="bottom"
+              sideOffset={6}
+              collisionPadding={16}
+              className="w-56 bg-card/95 border-border backdrop-blur-xl text-foreground shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95 duration-150 z-50 pointer-events-auto"
+            >
+              {/* Quick Reaction Emoji Pill */}
+              <div className="flex items-center justify-between px-1 py-1 mb-1 border-b border-border">
+                {QUICK_REACTION_EMOJIS.map((emoji) => (
+                  <motion.button
+                    key={emoji}
+                    whileTap={{ scale: 1.25 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                    onClick={() => {
+                      onMessageAction(message.id, 'react', emoji);
+                      setMenuOpen(false);
+                    }}
+                    className="text-lg hover:scale-125 active:scale-125 transition-transform p-1 select-none"
+                  >
+                    {emoji}
+                  </motion.button>
+                ))}
+              </div>
+
+              <DropdownMenuItem onClick={() => { onReply(message); setMenuOpen(false); }}>
+                <Reply className="mr-2 h-4 w-4 text-violet-400" />
+                <span>Reply</span>
+              </DropdownMenuItem>
+
+              {message.text && (
+                <DropdownMenuItem onClick={handleCopyText}>
+                  <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <span>Copy Text</span>
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem onClick={handlePinMessage}>
+                <Pin className="mr-2 h-4 w-4 text-amber-400" />
+                <span>Pin Message</span>
+              </DropdownMenuItem>
+
+              {isCurrentUser && message.text && !message.deleted && (
+                <DropdownMenuItem onClick={() => { setIsEditing(true); setMenuOpen(false); }}>
+                  <Edit className="mr-2 h-4 w-4 text-blue-400" />
+                  <span>Edit Message</span>
+                </DropdownMenuItem>
+              )}
+
+              {!message.deleted && (
+                <>
+                  <DropdownMenuSeparator className="bg-border" />
+                  <DropdownMenuItem
+                    className="text-red-400 focus:text-red-300 focus:bg-red-950/40"
+                    onClick={() => {
+                      setIsDeleteDialogOpen(true);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Message</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Delete Confirmation Alert Dialog */}
