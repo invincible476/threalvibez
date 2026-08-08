@@ -92,6 +92,11 @@ export function useAndroidPush(uid: string | null | undefined) {
         (notification: { title?: string; body?: string; data?: Record<string, string> }) => {
           const { title, body, data } = notification;
           console.log('[PushNotifications] Foreground notification:', title, body, data);
+          if (typeof window !== 'undefined' && (title || body)) {
+            window.dispatchEvent(new CustomEvent('in_app_notification', {
+              detail: { title, body, data }
+            }));
+          }
         }
       );
 
