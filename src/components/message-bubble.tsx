@@ -132,7 +132,7 @@ function MessageBubble({
             isOutgoing ? 'rounded-tr-none bg-violet-700 text-white' : 'rounded-tl-none bg-muted text-foreground'
           )}
         >
-          <p className="text-base">{message.text}</p>
+          <p className="text-base">{formatText(message.text || '', isOutgoing)}</p>
         </div>
       </div>
     );
@@ -446,7 +446,7 @@ function MessageBubble({
                   message.deleted && 'italic text-muted-foreground'
                 )}
               >
-                {formatText(message.text)}
+                {formatText(message.text, isOutgoing)}
               </p>
             )
           )}

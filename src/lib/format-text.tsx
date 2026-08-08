@@ -1,25 +1,48 @@
 import React from 'react';
+import { cn } from './utils';
 
-export function formatText(text: string): JSX.Element {
-  const urlRegex = /(\bhttps?:\/\/\S+\b)/g;
+export function formatText(text: string = '', isOutgoing: boolean = false): JSX.Element {
+  // Match URLs starting with http://, https://, or www.
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
   const geminiMentionRegex = /(@gemini)/g;
   
-  // First split by URLs
+  // Split text by URL pattern
   const urlParts = text.split(urlRegex);
   
   return (
     <>{urlParts.map((part: string, index: number) => {
       if (part.match(urlRegex)) {
+        // Strip trailing punctuation if accidentally attached
+        let cleanPart = part;
+        let trailingPunct = '';
+        const matchPunct = part.match(/([.,!?;)]+)$/);
+        if (matchPunct) {
+          trailingPunct = matchPunct[1];
+          cleanPart = part.slice(0, -trailingPunct.length);
+        }
+
+        const href = cleanPart.startsWith('http://') || cleanPart.startsWith('https://') 
+          ? cleanPart 
+          : `https://${cleanPart}`;
+
         return (
-          <a 
-            key={`url-${index}-${part.slice(0, 15)}`} 
-            href={part} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="text-primary underline underline-offset-2"
-          >
-            {part}
-          </a>
+          <React.Fragment key={`url-frag-${index}`}>
+            <a 
+              href={href} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={cn(
+                "underline underline-offset-2 break-all font-medium transition-colors cursor-pointer",
+                isOutgoing 
+                  ? "text-sky-200 hover:text-white decoration-sky-300/80" 
+                  : "text-violet-400 dark:text-violet-300 hover:text-violet-500 decoration-violet-400/80"
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {cleanPart}
+            </a>
+            {trailingPunct}
+          </React.Fragment>
         );
       }
       
