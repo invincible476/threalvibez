@@ -99,6 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Safety timeout: never leave isProcessingRedirect true for longer than 4 seconds
+    const safetyTimeout = setTimeout(() => {
+      setIsProcessingRedirect(false);
+    }, 4000);
+
     // Process redirect result (e.g. Google OAuth redirect) unconditionally on app load
     getRedirectResult(auth)
       .then(async (result) => {
@@ -111,8 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('lastLogin', Date.now().toString());
             localStorage.setItem('sessionUser', result.user.uid);
           }
-          await authService.ensureUserDocument(result.user);
-          await setupPresence(result.user.uid);
+          authService.ensureUserDocument(result.user).catch(() => null);
+          try { setupPresence(result.user.uid); } catch {}
           router.replace('/');
         } else if (wasExpecting) {
           console.error(`[Auth Provider] Google redirect completed but no user returned. Ensure "${window.location.hostname}" is listed under Firebase Console > Authentication > Settings > Authorized domains.`);
@@ -125,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .finally(() => {
+        clearTimeout(safetyTimeout);
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('expectingRedirect');
         }

@@ -121,13 +121,17 @@ export const authService = {
    * Ensure user document exists with unified schema (Idempotent merge)
    */
   async ensureUserDocument(user: any, customData?: { name?: string; username?: string; photoURL?: string }) {
+    if (!user || !user.uid) return null;
     const userDocRef = doc(db, 'users', user.uid);
     let userDoc: any = null;
     try {
       userDoc = await getDoc(userDocRef);
     } catch (err: any) {
-      if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
+      console.warn('[Auth Service] getDoc failed or timed out during ensureUserDocument:', err);
+      try {
         userDoc = await getDocFromCache(userDocRef).catch(() => null);
+      } catch {
+        userDoc = null;
       }
     }
 
@@ -165,24 +169,28 @@ export const authService = {
       updatedAt: serverTimestamp(),
     };
 
-    if (!userDoc || !userDoc.exists()) {
-      await setDoc(userDocRef, {
-        ...initialData,
-        createdAt: serverTimestamp(),
-      }, { merge: true });
-    } else {
-      const existing = userDoc.data() || {};
-      await setDoc(userDocRef, {
-        id: user.uid,
-        uid: user.uid,
-        name: existing.name || name,
-        displayName: existing.displayName || existing.name || name,
-        fullName: existing.fullName || existing.name || name,
-        username: existing.username || username,
-        photoURL: photoURL || existing.photoURL || '',
-        emailVerified: true,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+    try {
+      if (!userDoc || !userDoc.exists()) {
+        await setDoc(userDocRef, {
+          ...initialData,
+          createdAt: serverTimestamp(),
+        }, { merge: true });
+      } else {
+        const existing = userDoc.data() || {};
+        await setDoc(userDocRef, {
+          id: user.uid,
+          uid: user.uid,
+          name: existing.name || name,
+          displayName: existing.displayName || existing.name || name,
+          fullName: existing.fullName || existing.name || name,
+          username: existing.username || username,
+          photoURL: photoURL || existing.photoURL || '',
+          emailVerified: true,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+    } catch (setErr) {
+      console.warn('[Auth Service] Non-fatal error writing user document:', setErr);
     }
     return userDoc;
   },
@@ -350,11 +358,18 @@ export const authService = {
         localStorage.setItem('lastLogin', Date.now().toString());
       }
 
-      // Ensure user document exists with unified schema (Idempotent merge)
-      await this.ensureUserDocument(result.user);
+      // Ensure user document exists (Non-blocking with 4s timeout protection)
+      try {
+        await Promise.race([
+          this.ensureUserDocument(result.user),
+          new Promise((res) => setTimeout(res, 4000))
+        ]);
+      } catch (docErr) {
+        console.warn('[Auth Service] Non-fatal error ensuring user document during Google Sign-In:', docErr);
+      }
       
-      // Setup presence system
-      await setupPresence(result.user.uid);
+      // Setup presence system asynchronously in background (do not block auth resolution)
+      try { setupPresence(result.user.uid); } catch {}
       
       return result.user;
     } catch (error: any) {
