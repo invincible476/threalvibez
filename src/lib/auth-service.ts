@@ -310,14 +310,36 @@ export const authService = {
       });
       
       logDebug('Attempting Google sign-in with popup');
-      let result;
+      let result: any = null;
       try {
-        result = await firebaseSignInPopup(auth, provider);
+        // Race popup resolution against checking if auth.currentUser was signed in
+        const popupPromise = firebaseSignInPopup(auth, provider);
+        const checkUserPromise = new Promise((resolve) => {
+          const interval = setInterval(() => {
+            if (auth.currentUser) {
+              clearInterval(interval);
+              resolve({ user: auth.currentUser });
+            }
+          }, 300);
+          setTimeout(() => {
+            clearInterval(interval);
+            resolve(null);
+          }, 6000);
+        });
+
+        const raceResult: any = await Promise.race([popupPromise, checkUserPromise]);
+        if (raceResult?.user) {
+          result = raceResult;
+        } else {
+          result = await popupPromise;
+        }
       } catch (popupError: any) {
         console.error('Popup sign-in error:', popupError);
         
-        // Check for missing-initial-state or popup blocked error
-        if (popupError.code === 'auth/missing-initial-state' || popupError.message?.includes('missing initial state')) {
+        // If auth.currentUser exists despite popup error/close, use currentUser
+        if (auth.currentUser) {
+          result = { user: auth.currentUser };
+        } else if (popupError.code === 'auth/missing-initial-state' || popupError.message?.includes('missing initial state')) {
           console.warn('[Auth Service] Missing initial state detected (storage partitioned). Retrying with popup authentication...');
           result = await firebaseSignInPopup(auth, provider);
         } else if (popupError.code === 'auth/popup-blocked' || 
@@ -338,40 +360,39 @@ export const authService = {
             }
           }
         } else if (popupError.code === 'auth/popup-closed-by-user') {
-          // User manually closed popup, don't force redirect
-          throw popupError;
+          if (auth.currentUser) {
+            result = { user: auth.currentUser };
+          } else {
+            throw popupError;
+          }
         } else {
           throw popupError;
         }
       }
       
-      if (!result?.user) {
+      const loggedInUser = result?.user || auth.currentUser;
+      if (!loggedInUser) {
         throw new AuthError('No user returned from Google sign in', 'auth/google-sign-in-failed');
       }
 
       logDebug('Google sign-in successful, ensuring user document');
       
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
-        localStorage.setItem(`emailVerified_${result.user.uid}`, 'true');
-        localStorage.setItem('sessionUser', result.user.uid);
+        sessionStorage.setItem(`emailVerified_${loggedInUser.uid}`, 'true');
+        localStorage.setItem(`emailVerified_${loggedInUser.uid}`, 'true');
+        localStorage.setItem('sessionUser', loggedInUser.uid);
         localStorage.setItem('lastLogin', Date.now().toString());
       }
 
-      // Ensure user document exists (Non-blocking with 4s timeout protection)
-      try {
-        await Promise.race([
-          this.ensureUserDocument(result.user),
-          new Promise((res) => setTimeout(res, 4000))
-        ]);
-      } catch (docErr) {
+      // Ensure user document exists (Non-blocking background call)
+      this.ensureUserDocument(loggedInUser).catch((docErr) => {
         console.warn('[Auth Service] Non-fatal error ensuring user document during Google Sign-In:', docErr);
-      }
+      });
       
-      // Setup presence system asynchronously in background (do not block auth resolution)
-      try { setupPresence(result.user.uid); } catch {}
+      // Setup presence system asynchronously in background
+      try { setupPresence(loggedInUser.uid); } catch {}
       
-      return result.user;
+      return loggedInUser;
     } catch (error: any) {
       console.error('Google sign-in error:', error);
       throw new AuthError(

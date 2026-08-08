@@ -161,15 +161,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleAuth = async () => {
       if (isLoading) return;
 
-      // Handle authenticated user on auth routes (login, signup) -> redirect to home
+      // Handle authenticated user on auth routes (login, signup) -> redirect to home instantly
       if (activeUser && isAuthRoute && pathname !== '/verify-email') {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
           localStorage.setItem(`emailVerified_${activeUser.uid}`, 'true');
           localStorage.setItem('sessionUser', activeUser.uid);
           localStorage.setItem('lastLogin', now.toString());
+          if (window.location.pathname === '/login' || window.location.pathname === '/signup') {
+            window.location.href = '/';
+          } else {
+            router.replace('/');
+          }
         }
-        router.replace('/');
         return;
       }
 

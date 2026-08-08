@@ -231,6 +231,20 @@ function LoginForm() {
     e?.preventDefault();
     if (loading || googleLoading) return;
     setGoogleLoading(true);
+
+    // Hardcoded listener: if user becomes authenticated at ANY point during Google flow, force immediate hard redirect
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`emailVerified_${u.uid}`, 'true');
+          localStorage.setItem(`emailVerified_${u.uid}`, 'true');
+          localStorage.setItem('sessionUser', u.uid);
+          localStorage.setItem('lastLogin', Date.now().toString());
+          window.location.href = '/';
+        }
+      }
+    });
+    setTimeout(() => unsubscribe(), 10000);
     
     try {
       await setPersistence(auth, browserLocalPersistence);
@@ -238,6 +252,10 @@ function LoginForm() {
       const user: any = await authService.signInWithGoogle();
       
       if (!user || !user.uid) {
+        if (auth.currentUser) {
+          window.location.href = '/';
+          return;
+        }
         toast({
           title: 'Redirecting to Google',
           description: 'Please complete sign in in the Google window...',
@@ -252,13 +270,19 @@ function LoginForm() {
         localStorage.setItem('lastLogin', Date.now().toString());
       }
 
-      await registerDeviceSecurely(user);
+      registerDeviceSecurely(user).catch(() => null);
 
       toast({
         title: 'Welcome!',
         description: 'Successfully signed in with Google.',
       });
-      router.replace('/');
+      
+      // Force instant browser hard navigation to '/'
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      } else {
+        router.replace('/');
+      }
     } catch (e: any) {
       console.error("Google Sign-In error:", e);
       let errorMessage = 'An unexpected error occurred. Please try again.';
