@@ -348,6 +348,10 @@ export const authService = {
             return auth.currentUser;
           }
 
+          if (nativeAuthErr?.includes('10') || nativeAuthErr?.includes('DEVELOPER_ERROR')) {
+            nativeAuthErr = 'Google Sign-In DEVELOPER_ERROR (ApiException 10): The APK SHA-1 fingerprint must be registered in Firebase Console under Project Settings -> Android App.';
+          }
+
           throw new AuthError(
             nativeAuthErr || 'Google sign-in was cancelled or failed on this Android device.',
             'auth/google-sign-in-failed'
