@@ -50,7 +50,7 @@ function MobileSettingsLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex flex-col h-full h-[100dvh] w-full overflow-hidden min-h-0">
-            <header className="sticky top-0 z-10 w-full bg-background/80 backdrop-blur-md border-b border-border/40 px-4 py-3 flex items-center gap-2 shrink-0">
+            <header className="sticky top-0 z-10 w-full bg-background/80 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center gap-2 shrink-0">
                 <Button
                     variant="ghost"
                     size="icon"

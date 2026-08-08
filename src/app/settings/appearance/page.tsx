@@ -208,7 +208,7 @@ export default function AppearancePage() {
                         <CardDescription className="text-xs text-muted-foreground">Adjust backdrop blur strength and card opacity in real time.</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0">
-                        <div className="flex items-center justify-between py-3 px-4 border-b border-border/40">
+                        <div className="flex items-center justify-between py-3 px-4 border-b border-white/10">
                             <Label htmlFor="glass-enabled" className="flex flex-col space-y-0.5 flex-1 min-w-0 pr-2">
                                 <span className="text-sm font-medium text-foreground">Enable Frosted Glass Effect</span>
                                 <span className="text-xs text-muted-foreground break-words">

@@ -61,32 +61,34 @@ export function MobileSettingsMenu() {
                 const Icon = item.icon;
 
                 return (
-                    <Link 
-                        href={item.href} 
-                        key={item.href} 
-                        className={cn(
-                            "w-full flex items-center justify-between py-3.5 px-2 transition-all duration-200 relative border-b border-border/40 active:scale-[0.98]",
-                            isActive 
-                                ? "bg-muted/80 text-foreground" 
-                                : "hover:bg-muted/30 text-foreground"
-                        )}
-                    >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className={cn(
-                                "p-2 rounded-lg shrink-0 relative flex items-center justify-center",
-                                isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-muted/80 text-muted-foreground"
-                            )}>
-                                <Icon className="h-5 w-5" />
+                    <div key={item.href} className="relative group/item w-full">
+                        <Link 
+                            href={item.href} 
+                            className={cn(
+                                "w-full flex items-center justify-between py-3.5 px-2 transition-all duration-200 cursor-pointer active:scale-[0.98]",
+                                isActive 
+                                    ? "bg-primary/15 text-foreground" 
+                                    : "hover:bg-white/5 text-foreground"
+                            )}
+                        >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={cn(
+                                    "p-2 rounded-lg shrink-0 relative flex items-center justify-center",
+                                    isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-muted/80 text-muted-foreground"
+                                )}>
+                                    <Icon className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                    <span className={cn("font-medium text-base truncate flex items-center gap-2 text-foreground")}>
+                                        {item.title}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</span>
+                                </div>
                             </div>
-                            <div className="flex flex-col min-w-0 flex-1">
-                                <span className={cn("font-medium text-base truncate flex items-center gap-2 text-foreground")}>
-                                    {item.title}
-                                </span>
-                                <span className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</span>
-                            </div>
-                        </div>
-                        <ChevronRight className={cn("h-5 w-5 shrink-0 ml-2", isActive ? "text-foreground/80" : "text-muted-foreground")} />
-                    </Link>
+                            <ChevronRight className={cn("h-5 w-5 shrink-0 ml-2", isActive ? "text-foreground/80" : "text-muted-foreground")} />
+                        </Link>
+                        <div className="ml-14 border-b border-white/10" />
+                    </div>
                 );
             })}
             </div>
