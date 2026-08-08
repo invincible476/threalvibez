@@ -1907,6 +1907,19 @@ function useChatData() {
           await setDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) }, { merge: true });
           await setDoc(targetUserRef, { friendRequestsReceived: arrayUnion(currentUser.uid) }, { merge: true });
           toast({ title: 'Request Sent', description: 'Your friend request has been sent.' });
+
+          // Send push notification for friend request
+          fetch('/api/notifications/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'friend_request',
+              senderId: currentUser.uid,
+              senderName: currentUser.name || currentUser.username || 'Someone',
+              senderPhoto: currentUser.photoURL || '',
+              recipientIds: [targetUserId],
+            }),
+          }).catch(err => console.error('[Notification] Error sending friend request notification:', err));
       } else if (action === 'acceptRequest') {
           await setDoc(currentUserRef, { 
               friends: arrayUnion(targetUserId),
@@ -1916,6 +1929,19 @@ function useChatData() {
               friends: arrayUnion(currentUser.uid),
               friendRequestsSent: arrayRemove(currentUser.uid)
           }, { merge: true });
+
+          // Send push notification for accepted request
+          fetch('/api/notifications/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'friend_accept',
+              senderId: currentUser.uid,
+              senderName: currentUser.name || currentUser.username || 'Someone',
+              senderPhoto: currentUser.photoURL || '',
+              recipientIds: [targetUserId],
+            }),
+          }).catch(err => console.error('[Notification] Error sending friend accept notification:', err));
 
           try {
             const participants = [currentUser.uid, targetUserId].sort();

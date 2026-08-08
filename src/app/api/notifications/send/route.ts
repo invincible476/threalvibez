@@ -231,6 +231,104 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, sent: res.successCount, failed: res.failureCount });
     }
 
+    // ── 4. FRIEND REQUEST NOTIFICATION ────────────────────────────────────────
+    if (type === 'friend_request') {
+      const { recipientIds } = body;
+      if (!recipientIds?.length) {
+        return NextResponse.json({ error: 'Missing recipientIds' }, { status: 400 });
+      }
+
+      const allTokens: string[] = [];
+      for (const uid of recipientIds) {
+        const tokens = await getUserTokens(db, uid);
+        allTokens.push(...tokens);
+      }
+      const unique = [...new Set(allTokens)];
+      if (!unique.length) return NextResponse.json({ success: true, message: 'No tokens' });
+
+      const title = '👋 New Friend Request';
+      const bodyText = senderName ? `${senderName} sent you a friend request!` : 'Someone sent you a friend request!';
+
+      const res = await messaging.sendEachForMulticast({
+        tokens: unique,
+        notification: { title, body: bodyText },
+        data: {
+          type: 'friend_request',
+          senderId,
+          senderName: senderName ?? '',
+          senderPhoto: senderPhoto ?? '',
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'messages',
+            sound: 'default',
+            icon: 'ic_launcher',
+            color: '#10B981',
+            tag: `freq-${senderId}`,
+            clickAction: 'OPEN_FRIENDS',
+          },
+        },
+        apns: {
+          payload: {
+            aps: { sound: 'default', badge: 1 },
+          },
+        },
+      });
+
+      await cleanStaleTokens(db, recipientIds, unique, res.responses);
+      return NextResponse.json({ success: true, sent: res.successCount, failed: res.failureCount });
+    }
+
+    // ── 5. FRIEND ACCEPT NOTIFICATION ─────────────────────────────────────────
+    if (type === 'friend_accept') {
+      const { recipientIds } = body;
+      if (!recipientIds?.length) {
+        return NextResponse.json({ error: 'Missing recipientIds' }, { status: 400 });
+      }
+
+      const allTokens: string[] = [];
+      for (const uid of recipientIds) {
+        const tokens = await getUserTokens(db, uid);
+        allTokens.push(...tokens);
+      }
+      const unique = [...new Set(allTokens)];
+      if (!unique.length) return NextResponse.json({ success: true, message: 'No tokens' });
+
+      const title = '🎉 Friend Request Accepted';
+      const bodyText = senderName ? `${senderName} accepted your friend request!` : 'Your friend request was accepted!';
+
+      const res = await messaging.sendEachForMulticast({
+        tokens: unique,
+        notification: { title, body: bodyText },
+        data: {
+          type: 'friend_accept',
+          senderId,
+          senderName: senderName ?? '',
+          senderPhoto: senderPhoto ?? '',
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'messages',
+            sound: 'default',
+            icon: 'ic_launcher',
+            color: '#10B981',
+            tag: `faccept-${senderId}`,
+            clickAction: 'OPEN_FRIENDS',
+          },
+        },
+        apns: {
+          payload: {
+            aps: { sound: 'default', badge: 1 },
+          },
+        },
+      });
+
+      await cleanStaleTokens(db, recipientIds, unique, res.responses);
+      return NextResponse.json({ success: true, sent: res.successCount, failed: res.failureCount });
+    }
+
     return NextResponse.json({ error: 'Unknown notification type' }, { status: 400 });
   } catch (err: any) {
     console.error('[Notification API Error]:', err);

@@ -81,6 +81,8 @@ export function useAndroidPush(uid: string | null | undefined) {
             }
           } else if (type === 'story' && storyId) {
             window.location.href = `/stories?storyId=${storyId}`;
+          } else if (type === 'friend_request' || type === 'friend_accept') {
+            window.location.href = `/friends`;
           }
         }
       );
