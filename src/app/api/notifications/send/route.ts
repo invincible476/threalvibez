@@ -269,7 +269,7 @@ export async function POST(req: Request) {
         android: {
           priority: 'high',
           notification: {
-            channelId: 'messages',
+            channelId: 'friends',
             sound: 'default',
             icon: 'ic_launcher',
             color: '#10B981',
@@ -318,7 +318,7 @@ export async function POST(req: Request) {
         android: {
           priority: 'high',
           notification: {
-            channelId: 'messages',
+            channelId: 'friends',
             sound: 'default',
             icon: 'ic_launcher',
             color: '#10B981',

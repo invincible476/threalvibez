@@ -287,28 +287,10 @@ function useChatData() {
     setCurrentUser(prev => (prev && prev.uid === authUser.uid ? prev : fallbackUser));
     updateUserInCache(fallbackUser);
     
-    const prevRequestsReceivedRef = { current: [] as string[] };
-    
     const userDocRef = doc(db, 'users', authUser.uid);
     const unsubscribeCurrentUser = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
             const userData = { id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as User;
-            const currentRequests = userData.friendRequestsReceived || [];
-            const prevRequests = prevRequestsReceivedRef.current;
-
-            // Detect new incoming friend request in active session
-            if (prevRequests.length >= 0 && currentRequests.length > prevRequests.length) {
-              const newSenderId = currentRequests.find(id => !prevRequests.includes(id));
-              if (newSenderId) {
-                const sender = usersCacheRef.current.get(newSenderId);
-                const senderName = sender?.name || sender?.username || 'Someone';
-                toast({
-                  title: '👋 New Friend Request',
-                  description: `${senderName} sent you a friend request!`,
-                });
-              }
-            }
-            prevRequestsReceivedRef.current = currentRequests;
 
             setCurrentUser(userData);
             updateUserInCache(userData);
