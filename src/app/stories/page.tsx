@@ -6,7 +6,7 @@ import { useStories } from '@/components/providers/stories-provider';
 import { UserAvatar } from '@/components/user-avatar';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { Story } from '@/lib/types';
@@ -30,8 +30,6 @@ const getMillis = (timestamp: Timestamp | Date): number => {
     if (timestamp instanceof Date) {
         return timestamp.getTime();
     }
-    // Fallback for potentially malformed data, though it should be one of the above.
-    // Try to parse if it's a string representation of a date.
     if(typeof timestamp === 'string') {
         const date = new Date(timestamp);
         if (!isNaN(date.getTime())) {
@@ -47,6 +45,13 @@ export default function StoriesPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            sessionStorage.setItem('stories_section_opened_at', Date.now().toString());
+            window.dispatchEvent(new Event('stories_opened'));
+        }
+    }, []);
     
     useEffect(() => {
         // Assume loading is finished when currentUser and usersWithStories are populated
@@ -102,10 +107,24 @@ export default function StoriesPage() {
 
     return (
         <motion.div
-            className="p-4 sm:p-6 lg:p-8"
+            className="p-4 sm:p-6 lg:p-8 space-y-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
         >
+            {/* Minimal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground" onClick={() => router.back()}>
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                    <h1 className="text-2xl font-bold font-heading tracking-tight text-foreground">Stories</h1>
+                </div>
+                <Button size="sm" onClick={handleCreateStoryClick} className="bg-violet-700 hover:bg-violet-600 text-white rounded-full font-medium text-xs gap-1.5 shadow-md">
+                    <Plus className="h-4 w-4" />
+                    Add Story
+                </Button>
+            </div>
+
             <input
                 type="file"
                 ref={fileInputRef}

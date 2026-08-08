@@ -13,7 +13,7 @@ import { CreateGroupModal } from './create-group-modal';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -205,6 +205,7 @@ export function ChatList() {
     currentUser,
     handleConversationAction,
     handleFriendAction,
+    stories,
   } = useAppShell();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -212,6 +213,54 @@ export function ChatList() {
   const { keyboardOpen } = useMobileKeyboardHeight();
   const { isWeatherVisible } = useAppearance();
   const { isMobileView } = useMobileDesign();
+
+  const [storiesOpenedAt, setStoriesOpenedAt] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('stories_section_opened_at');
+      return saved ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    const handleStoriesOpened = () => {
+      if (typeof window !== 'undefined') {
+        const saved = sessionStorage.getItem('stories_section_opened_at');
+        setStoriesOpenedAt(saved ? parseInt(saved, 10) : Date.now());
+      }
+    };
+    window.addEventListener('stories_opened', handleStoriesOpened);
+    return () => window.removeEventListener('stories_opened', handleStoriesOpened);
+  }, []);
+
+  const hasUnwatchedStoriesIndicator = useMemo(() => {
+    if (!stories || !currentUser) return false;
+    return stories.some(s => {
+      if (s.ownerId === currentUser.uid) return false;
+      const isViewed = s.viewedBy?.includes(currentUser.uid);
+      if (isViewed) return false;
+      
+      const getStoryMillis = (ts: any): number => {
+        if (!ts) return 0;
+        if (typeof ts.toMillis === 'function') return ts.toMillis();
+        if (ts instanceof Date) return ts.getTime();
+        if (typeof ts === 'number') return ts;
+        if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+        if (typeof ts === 'string') return new Date(ts).getTime() || 0;
+        return 0;
+      };
+
+      const storyTime = getStoryMillis(s.createdAt);
+      return storyTime > storiesOpenedAt;
+    });
+  }, [stories, currentUser, storiesOpenedAt]);
+
+  const handleStoriesLinkClick = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('stories_section_opened_at', Date.now().toString());
+      window.dispatchEvent(new Event('stories_opened'));
+    }
+  };
 
   const filteredConversations = useMemo(() => {
     const blockedUserIds = currentUser?.blockedUsers || [];
@@ -286,10 +335,15 @@ export function ChatList() {
            </div>
         </div>
          <div className="mt-1.5 group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
-            <Button asChild variant="ghost" className="w-full justify-start text-sm h-9 px-3 text-muted-foreground hover:text-foreground">
-                <Link href="/stories">
-                    <GalleryHorizontal className="mr-2 h-4 w-4" />
-                    Stories
+            <Button asChild variant="ghost" className="w-full justify-start text-sm h-9 px-3 text-muted-foreground hover:text-foreground relative">
+                <Link href="/stories" onClick={handleStoriesLinkClick}>
+                    <GalleryHorizontal className="mr-2 h-4 w-4 text-violet-400" />
+                    <span>Stories</span>
+                    {hasUnwatchedStoriesIndicator && (
+                      <span className="ml-auto flex items-center justify-center">
+                        <span className="h-2 w-2 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)] animate-pulse" />
+                      </span>
+                    )}
                 </Link>
             </Button>
         </div>
