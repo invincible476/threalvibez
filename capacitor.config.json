@@ -4,9 +4,10 @@
   "webDir": "public",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://threalvibez.vercel.app",
+    "url": "https://threalvibez-git-fix-audit-remediation-omega-one.vercel.app",
     "cleartext": true,
     "allowNavigation": [
+      "threalvibez-git-fix-audit-remediation-omega-one.vercel.app",
       "threalvibez.vercel.app",
       "*.firebaseapp.com",
       "*.googleapis.com",
