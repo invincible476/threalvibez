@@ -285,16 +285,18 @@ export const authService = {
       if (typeof window !== 'undefined') {
         let nativeAuthInterface = (window as any).AndroidNativeAuth;
 
-        // Wait up to 3 seconds for AndroidNativeAuth if running inside Capacitor Android WebView
+        // On Capacitor Android, if AndroidNativeAuth is not bound directly on window, use scheme trigger fallback
         if (!nativeAuthInterface?.triggerNativeGoogleSignIn && (window as any).Capacitor?.getPlatform() === 'android') {
-          console.log('[Auth Service] Capacitor Android detected. Waiting for AndroidNativeAuth bridge...');
-          for (let i = 0; i < 30; i++) {
-            if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
-              nativeAuthInterface = (window as any).AndroidNativeAuth;
-              break;
+          console.log('[Auth Service] Capacitor Android detected. Creating native auth trigger...');
+          nativeAuthInterface = {
+            triggerNativeGoogleSignIn: () => {
+              if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
+                (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
+              } else {
+                window.location.href = 'nativeauth://trigger';
+              }
             }
-            await new Promise((r) => setTimeout(r, 100));
-          }
+          };
         }
 
         if (nativeAuthInterface?.triggerNativeGoogleSignIn) {

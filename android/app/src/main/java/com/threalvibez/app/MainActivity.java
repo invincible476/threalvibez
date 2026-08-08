@@ -254,6 +254,45 @@ public class MainActivity extends BridgeActivity {
 
             if (!isWebViewConfigured) {
                 isWebViewConfigured = true;
+
+                wv.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                        super.onPageStarted(view, url, favicon);
+                        view.addJavascriptInterface(new NativeAuthInterface(), "AndroidNativeAuth");
+                    }
+
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        super.onPageFinished(view, url);
+                        view.evaluateJavascript(
+                            "(function(){" +
+                            "  if (!window.AndroidNativeAuth || !window.AndroidNativeAuth.triggerNativeGoogleSignIn) {" +
+                            "    window.AndroidNativeAuth = window.AndroidNativeAuth || {};" +
+                            "    window.AndroidNativeAuth.triggerNativeGoogleSignIn = function() {" +
+                            "      console.log('[NativeAuth] Triggering native auth via scheme fallback...');" +
+                            "      window.location.href = 'nativeauth://trigger';" +
+                            "    };" +
+                            "  }" +
+                            "  console.log('[NativeAuth] Bridge state injected successfully');" +
+                            "})()",
+                            null
+                        );
+                    }
+
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                        if (request != null && request.getUrl() != null) {
+                            String urlStr = request.getUrl().toString();
+                            if (urlStr.startsWith("nativeauth://trigger")) {
+                                new NativeAuthInterface().triggerNativeGoogleSignIn();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                });
+
                 wv.setWebChromeClient(new WebChromeClient() {
                     @Override
                     public boolean onShowFileChooser(WebView webView, android.webkit.ValueCallback<android.net.Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
