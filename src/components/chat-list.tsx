@@ -1,7 +1,7 @@
 
 
 'use client';
-import { Search, LogOut, Plus, Settings, Star, MoreHorizontal, Bot, Archive, ArchiveRestore, UserPlus, UserCheck, UserX, GalleryHorizontal, Moon, Sun } from 'lucide-react';
+import { Search, LogOut, Plus, Settings, Star, MoreHorizontal, Bot, Archive, ArchiveRestore, UserPlus, UserCheck, UserX, GalleryHorizontal, Moon, Sun, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { CreateGroupModal } from './create-group-modal';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -514,12 +514,16 @@ interface ChatItemProps {
   currentUser?: User;
   selectedChat?: Conversation;
   onSelect: () => void;
-  onAction: (conversationId: string, action: 'toggleFavorite' | 'archive' | 'unarchive') => void;
-  onFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend') => void;
+  onAction: (conversationId: string, action: 'toggleFavorite' | 'archive' | 'unarchive' | 'delete') => void;
+  onFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => void;
 }
 
 const ChatItem = React.memo(
   function ChatItem({ conversation, isSelected, currentUser, selectedChat, onSelect, onAction, onFriendAction }: ChatItemProps) {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+    const isLongPressRef = useRef(false);
+
     const lastMessage = (convo: Conversation) => {
       if (convo?.lastMessage) {
         const rawTs = convo.lastMessage?.timestamp || (convo.lastMessage as any)?.createdAt;
@@ -533,17 +537,61 @@ const ChatItem = React.memo(
     };
 
     const { text, timestamp } = lastMessage(conversation);
-    
-    const handleAction = (action: 'toggleFavorite' | 'archive' | 'unarchive') => {
+
+    const handleAction = (action: 'toggleFavorite' | 'archive' | 'unarchive' | 'delete') => {
       onAction(conversation.id, action);
-    }
-    
+      setMenuOpen(false);
+    };
+
     const handleFriendRequest = () => {
       const otherParticipant = conversation.participantsDetails?.find(p => p.uid !== currentUser?.uid);
-      if(otherParticipant) {
-          onFriendAction(otherParticipant.uid, 'sendRequest');
+      if (otherParticipant) {
+        onFriendAction(otherParticipant.uid, 'sendRequest');
       }
-    }
+      setMenuOpen(false);
+    };
+
+    const handleTouchStart = () => {
+      isLongPressRef.current = false;
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+      longPressTimer.current = setTimeout(() => {
+        isLongPressRef.current = true;
+        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate?.(40);
+        }
+        setMenuOpen(true);
+      }, 400);
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+
+    const handleTouchMove = () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMenuOpen(true);
+    };
+
+    const handleClick = (e: React.MouseEvent) => {
+      if (isLongPressRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        isLongPressRef.current = false;
+        return;
+      }
+      onSelect();
+    };
 
     const isGroupChat = conversation.type === 'group' || (conversation as any).isGroup === true;
     const otherParticipant = isGroupChat ? undefined : conversation.participantsDetails?.find(p => p.uid !== currentUser?.uid);
@@ -551,85 +599,162 @@ const ChatItem = React.memo(
     const hasSentRequest = !isGroupChat && currentUser?.friendRequestsSent?.includes(otherParticipant?.uid || '');
     const hasReceivedRequest = !isGroupChat && currentUser?.friendRequestsReceived?.includes(otherParticipant?.uid || '');
     const isAiChat = conversation.id === 'gemini-ai-chat-bot-7a4b9c1d-f2e3-4d56-a1b2-c3d4e5f6a7b8';
-    
+
     const canSendRequest = conversation.type === 'private' && !isFriend && !hasSentRequest && !hasReceivedRequest && !isAiChat;
-    
-    const ContextMenuContent = ({ children }: { children: React.ReactNode }) => (
-      <DropdownMenuContent onClick={(e) => e.stopPropagation()} className="shadow-lg backdrop-blur-xl bg-background/80">
-          {children}
-      </DropdownMenuContent>
-    );
 
     return (
-       <motion.li
-          variants={itemVariants}
-          layout
-          className="list-none w-full max-w-full min-w-0 overflow-x-hidden will-change-[transform,opacity] relative group/item"
+      <motion.li
+        variants={itemVariants}
+        layout
+        className="list-none w-full max-w-full min-w-0 overflow-x-hidden will-change-[transform,opacity] relative group/item"
       >
-          <div
-              onClick={onSelect}
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <div
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onTouchMove={handleTouchMove}
+              onTouchCancel={handleTouchEnd}
+              onContextMenu={handleContextMenu}
+              onClick={handleClick}
+              style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
               className={cn(
-                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3.5 px-4 text-left transition-colors cursor-pointer overflow-x-hidden active:scale-[0.98]',
-                  isSelected ? 'bg-primary/15' : 'hover:bg-white/5'
+                'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3.5 px-4 text-left transition-colors cursor-pointer overflow-x-hidden active:scale-[0.98] select-none',
+                isSelected ? 'bg-primary/15' : 'hover:bg-white/5'
               )}
-          >
-          <UserAvatar 
-              user={isGroupChat ? {
-                  name: conversation.name || 'Group',
-                  photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
-                  isGroup: true,
-                  type: 'group'
-              } : (otherParticipant || {
-                  name: conversation.name || 'Unknown',
-                  photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
-              })} 
-              hasStory={!isGroupChat ? otherParticipant?.hasActiveStory : false}
-              storyViewed={!isGroupChat ? otherParticipant?.storyViewed : undefined}
-              isFriend={isFriend}
-              isGroup={isGroupChat}
-              className="h-10 w-10 flex-shrink-0"
-          />
-          <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
-              <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
+            >
+              <UserAvatar
+                user={
+                  isGroupChat
+                    ? {
+                        name: conversation.name || 'Group',
+                        photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
+                        isGroup: true,
+                        type: 'group',
+                      }
+                    : otherParticipant || {
+                        name: conversation.name || 'Unknown',
+                        photoURL: conversation.avatar || (conversation as any).avatarUrl || null,
+                      }
+                }
+                hasStory={!isGroupChat ? otherParticipant?.hasActiveStory : false}
+                storyViewed={!isGroupChat ? otherParticipant?.storyViewed : undefined}
+                isFriend={isFriend}
+                isGroup={isGroupChat}
+                className="h-10 w-10 flex-shrink-0"
+              />
+              <div className="flex-1 min-w-0 max-w-full overflow-hidden group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
+                <div className="flex justify-between items-center min-w-0 max-w-full gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-foreground">{conversation.name}</p>
-                      {conversation.isFavorite && !isAiChat && <Star className="h-3.5 w-3.5 text-amber-400/80 fill-amber-400/80 shrink-0" />}
-                      {isAiChat && <Bot className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
+                    <p className="font-semibold truncate text-sm min-w-0 overflow-hidden whitespace-nowrap text-foreground">
+                      {conversation.name}
+                    </p>
+                    {conversation.isFavorite && !isAiChat && (
+                      <Star className="h-3.5 w-3.5 text-amber-400/80 fill-amber-400/80 shrink-0" />
+                    )}
+                    {isAiChat && <Bot className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0 min-w-[50px]">
-                      <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
-                      {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
-                          <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-violet-700 text-[10px] font-semibold text-white">
-                              {conversation.unreadCount}
-                          </span>
-                      ) : <span className="h-4" />}
+                    <p className="text-[11px] text-muted-foreground leading-none">{timestamp}</p>
+                    {conversation.unreadCount && conversation.unreadCount > 0 && conversation.id !== selectedChat?.id ? (
+                      <span className="flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-violet-700 text-[10px] font-semibold text-white">
+                        {conversation.unreadCount}
+                      </span>
+                    ) : (
+                      <span className="h-4" />
+                    )}
                   </div>
-              </div>
-              <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
+                </div>
+                <div className="flex items-center justify-between gap-2 min-w-0 max-w-full mt-0.5">
                   <p className="text-xs text-muted-foreground line-clamp-1 break-words overflow-hidden min-w-0 max-w-full flex-1 chat-list-force-break">
-                      {text}
+                    {text}
                   </p>
                   {!isAiChat && (
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 opacity-0 group-hover/chat-item:opacity-100 transition-opacity p-0" onClick={(e) => e.stopPropagation()}>
-                                  <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <ContextMenuContent>
-                              {canSendRequest && <DropdownMenuItem onClick={handleFriendRequest}><UserPlus className="mr-2 h-4 w-4" /><span>Add Friend</span></DropdownMenuItem>}
-                              {isFriend && <DropdownMenuItem disabled><UserCheck className="mr-2 h-4 w-4" /><span>Friends</span></DropdownMenuItem>}
-                              {hasSentRequest && <DropdownMenuItem disabled><UserCheck className="mr-2 h-4 w-4" /><span>Request Sent</span></DropdownMenuItem>}
-                              {hasReceivedRequest && <DropdownMenuItem onClick={() => { if (otherParticipant) onFriendAction(otherParticipant.uid, 'acceptRequest'); }}><UserPlus className="mr-2 h-4 w-4" /><span>Accept Request</span></DropdownMenuItem>}
-                              <DropdownMenuItem onClick={() => handleAction('toggleFavorite')}><Star className="mr-2 h-4 w-4" /><span>{conversation.isFavorite ? 'Unfavorite' : 'Favorite'}</span></DropdownMenuItem>
-                              {conversation.isArchived ? <DropdownMenuItem onClick={() => handleAction('unarchive')}><ArchiveRestore className="mr-2 h-4 w-4" /><span>Unarchive</span></DropdownMenuItem> : <DropdownMenuItem onClick={() => handleAction('archive')}><Archive className="mr-2 h-4 w-4" /><span>Archive</span></DropdownMenuItem>}
-                              {isFriend && <DropdownMenuItem className="text-destructive" onClick={() => { if(otherParticipant) onFriendAction(otherParticipant.uid, 'removeFriend'); }}><UserX className="mr-2 h-4 w-4" /><span>Remove Friend</span></DropdownMenuItem>}
-                          </ContextMenuContent>
-                      </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0 opacity-0 group-hover/chat-item:opacity-100 transition-opacity p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpen(true);
+                      }}
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
                   )}
+                </div>
               </div>
-          </div>
-        </div>
+            </div>
+          </DropdownMenuTrigger>
+          {!isAiChat && (
+            <DropdownMenuContent
+              onClick={(e) => e.stopPropagation()}
+              align="start"
+              className="w-56 shadow-xl backdrop-blur-xl bg-background/95 border-white/10 z-50 p-1 animate-in fade-in-0 zoom-in-95"
+            >
+              <DropdownMenuItem onClick={() => handleAction('toggleFavorite')}>
+                <Star className="mr-2 h-4 w-4 text-amber-400" />
+                <span>{conversation.isFavorite ? 'Unfavorite' : 'Favorite'}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAction(conversation.isArchived ? 'unarchive' : 'archive')}>
+                {conversation.isArchived ? (
+                  <ArchiveRestore className="mr-2 h-4 w-4 text-violet-400" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4 text-violet-400" />
+                )}
+                <span>{conversation.isArchived ? 'Unarchive' : 'Archive'}</span>
+              </DropdownMenuItem>
+
+              {canSendRequest && (
+                <DropdownMenuItem onClick={handleFriendRequest}>
+                  <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
+                  <span>Add Friend</span>
+                </DropdownMenuItem>
+              )}
+              {isFriend && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={() => {
+                    if (otherParticipant) {
+                      onFriendAction(otherParticipant.uid, 'removeFriend');
+                      setMenuOpen(false);
+                    }
+                  }}
+                >
+                  <UserX className="mr-2 h-4 w-4 text-destructive" />
+                  <span>Unfriend</span>
+                </DropdownMenuItem>
+              )}
+              {hasSentRequest && (
+                <DropdownMenuItem disabled>
+                  <UserCheck className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <span>Request Sent</span>
+                </DropdownMenuItem>
+              )}
+              {hasReceivedRequest && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (otherParticipant) {
+                      onFriendAction(otherParticipant.uid, 'acceptRequest');
+                      setMenuOpen(false);
+                    }
+                  }}
+                >
+                  <UserPlus className="mr-2 h-4 w-4 text-emerald-400" />
+                  <span>Accept Friend Request</span>
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive focus:bg-destructive/10 font-medium"
+                onClick={() => handleAction('delete')}
+              >
+                <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                <span>Delete Chat</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          )}
+        </DropdownMenu>
         <div className="ml-16 border-b border-white/10 group-[[data-sidebar-state=collapsed]]/sidebar:ml-0" />
       </motion.li>
     );

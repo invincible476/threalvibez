@@ -1705,7 +1705,7 @@ function useChatData() {
 
   const handleConversationAction = useCallback(async (
     conversationId: string,
-    action: 'toggleFavorite' | 'archive' | 'unarchive'
+    action: 'toggleFavorite' | 'archive' | 'unarchive' | 'delete'
   ) => {
     const conversation = conversations.find(c => c.id === conversationId);
     if (!conversation) return;
@@ -1724,11 +1724,20 @@ function useChatData() {
         setSelectedChat(undefined);
       }
     } else if (action === 'unarchive') {
+      await updateDoc(conversationRef, {
+        isArchived: false,
+      });
+    } else if (action === 'delete') {
+      if (currentUser?.uid) {
         await updateDoc(conversationRef, {
-            isArchived: false,
+          deletedFor: arrayUnion(currentUser.uid),
         });
+        if (selectedChat?.id === conversationId) {
+          setSelectedChat(undefined);
+        }
+      }
     }
-  }, [conversations, selectedChat?.id]);
+  }, [conversations, selectedChat?.id, currentUser?.uid]);
 
   const handleMessageAction = useCallback(async (
     messageId: string,
@@ -2393,7 +2402,7 @@ interface AppShellContextType {
   handleCreateChat: (targetUser: User) => Promise<string>;
   handleCreateGroupChat: (groupName: string, selectedUsers: User[]) => Promise<string>;
   handleBack: () => void;
-  handleConversationAction: (conversationId: string, action: 'toggleFavorite' | 'archive' | 'unarchive') => Promise<void>;
+  handleConversationAction: (conversationId: string, action: 'toggleFavorite' | 'archive' | 'unarchive' | 'delete') => Promise<void>;
   handleTyping: (isTyping: boolean) => Promise<void>;
   handleFriendAction: (targetUserId: string, action: 'sendRequest' | 'acceptRequest' | 'declineRequest' | 'removeFriend' | 'cancelRequest') => Promise<void>;
   handleBlockUser: (targetUserId: string, isBlocked: boolean) => Promise<void>;
