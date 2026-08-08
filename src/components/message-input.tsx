@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GifPicker } from './gif-picker';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { CameraModal } from './camera-modal';
 
 interface MessageInputProps {
   onSendMessage: (messageText: string) => void;
@@ -139,6 +140,8 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
     if (event.target) event.target.value = '';
   };
 
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+
   const handleCameraClick = async () => {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -167,9 +170,8 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
       }
     }
 
-    if (cameraInputRef.current) {
-      cameraInputRef.current.click();
-    }
+    // Fallback: Open built-in live camera viewfinder modal
+    setIsCameraModalOpen(true);
   };
 
   const removeSelectedFile = (index: number) => {
@@ -443,6 +445,15 @@ export function MessageInput({ onSendMessage, onFileSelect, onGifSelect, onSelec
           </Button>
         ) : null}
       </div>
+
+      {/* Live Camera Viewfinder Modal */}
+      <CameraModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={(file) => {
+          onFileSelect(file);
+        }}
+      />
     </div>
   );
 }
