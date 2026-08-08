@@ -296,7 +296,7 @@ export function ChatList() {
   return (
     <>
     <div className="flex flex-col h-full min-h-0 w-full min-w-0 flex-1 overflow-x-hidden bg-transparent" style={{boxSizing: 'border-box'}}>
-    <div className="flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-md sticky top-0 z-20 border-b border-border/40 shrink-0 flex-none gap-2">
+    <div className="flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-md sticky top-0 z-20 border-b border-white/10 shrink-0 flex-none gap-2">
          <VibezLogo className="group-[[data-sidebar-state=collapsed]]/sidebar:hidden" />
          <div className="flex-1 flex justify-center group-[[data-sidebar-state=collapsed]]/sidebar:hidden">
             {isWeatherVisible && <WeatherWidget />}
@@ -309,7 +309,7 @@ export function ChatList() {
          </CreateGroupModal>
        </div>
 
-    <div className="flex-none px-3 py-2 border-b border-border/50">
+    <div className="flex-none px-3 py-2 border-b border-white/10">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input 
@@ -500,7 +500,7 @@ export function ChatList() {
         </div>
       </ScrollArea>
 
-    <div className={cn("flex-none shrink-0 p-2 border-t border-border/50 transition-all duration-200 mt-auto bg-background/30 backdrop-blur-md z-20", (isMobileView && (keyboardOpen || isSearchFocused)) && "hidden")}>
+    <div className={cn("flex-none shrink-0 p-2 border-t border-white/10 transition-all duration-200 mt-auto bg-background/30 backdrop-blur-md z-20", (isMobileView && (keyboardOpen || isSearchFocused)) && "hidden")}>
       <UserProfileMenu currentUser={currentUser} />
     </div>
     </div>
@@ -564,13 +564,13 @@ const ChatItem = React.memo(
        <motion.li
           variants={itemVariants}
           layout
-          className="list-none w-full max-w-full min-w-0 overflow-x-hidden will-change-[transform,opacity]"
+          className="list-none w-full max-w-full min-w-0 overflow-x-hidden will-change-[transform,opacity] relative group/item"
       >
           <div
               onClick={onSelect}
               className={cn(
-                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3 px-4 text-left transition-all cursor-pointer overflow-x-hidden border-b border-border/40 active:scale-[0.98]',
-                  isSelected ? 'bg-primary/15' : 'hover:bg-muted/10'
+                  'group/chat-item relative flex w-full max-w-full min-w-0 items-center gap-3 py-3.5 px-4 text-left transition-colors cursor-pointer overflow-x-hidden active:scale-[0.98]',
+                  isSelected ? 'bg-primary/15' : 'hover:bg-white/5'
               )}
           >
           <UserAvatar 
@@ -630,6 +630,7 @@ const ChatItem = React.memo(
               </div>
           </div>
         </div>
+        <div className="ml-16 border-b border-white/10 group-[[data-sidebar-state=collapsed]]/sidebar:ml-0" />
       </motion.li>
     );
   },
