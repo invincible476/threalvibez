@@ -50,12 +50,8 @@ const settingsItems = [
     }
 ];
 
-import { useAppShell } from '@/components/app-shell';
-
 export function MobileSettingsMenu() {
     const pathname = usePathname();
-    const { currentUser } = useAppShell();
-    const requestCount = currentUser?.friendRequestsReceived?.length || 0;
 
     return (
         <div className="w-full max-w-md mx-auto px-4 py-2">
@@ -63,7 +59,6 @@ export function MobileSettingsMenu() {
             {settingsItems.map(item => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
-                const showBadge = (item.href === '/settings/notifications' || item.href === '/settings/profile') && requestCount > 0;
 
                 return (
                     <Link 
@@ -82,18 +77,10 @@ export function MobileSettingsMenu() {
                                 isActive ? "bg-violet-950/80 text-violet-200 border border-violet-800/40" : "bg-muted/80 text-muted-foreground"
                             )}>
                                 <Icon className="h-5 w-5" />
-                                {showBadge && (
-                                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950 animate-pulse" />
-                                )}
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
                                 <span className={cn("font-medium text-base truncate flex items-center gap-2 text-foreground")}>
                                     {item.title}
-                                    {showBadge && (
-                                        <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                                            {requestCount} new
-                                        </span>
-                                    )}
                                 </span>
                                 <span className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</span>
                             </div>

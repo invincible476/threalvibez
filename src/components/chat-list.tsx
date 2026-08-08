@@ -158,9 +158,6 @@ function UserProfileMenu({ currentUser }: { currentUser?: User }) {
                         <Link href="/settings">
                             <Settings className="mr-2 h-4 w-4" />
                             <span>Settings</span>
-                            {hasFriendRequests && (
-                                <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            )}
                         </Link>
                     </Button>
                 </div>
