@@ -283,6 +283,20 @@ export default function FriendsPage() {
                 await setDoc(currentUserRef, { friendRequestsSent: arrayUnion(targetUserId) }, { merge: true });
                 await setDoc(targetUserRef, { friendRequestsReceived: arrayUnion(authUser.uid) }, { merge: true });
                 toast({ title: 'Friend Request Sent', description: 'Your friend request has been sent successfully.' });
+
+                // Push notification — fire & forget
+                fetch('/api/notifications/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'friend_request',
+                    senderId: authUser.uid,
+                    senderName: activeUser?.name || activeUser?.username || authUser.displayName || 'Someone',
+                    senderPhoto: activeUser?.photoURL || authUser.photoURL || '',
+                    recipientIds: [targetUserId],
+                  }),
+                }).catch(err => console.error('[Notification] friend_request push error:', err));
+
             } else if (action === 'acceptRequest') {
                 await setDoc(currentUserRef, { 
                     friends: arrayUnion(targetUserId),
@@ -293,6 +307,20 @@ export default function FriendsPage() {
                     friendRequestsSent: arrayRemove(authUser.uid)
                 }, { merge: true });
                 toast({ title: 'Friend Added', description: 'You are now friends!' });
+
+                // Push notification — fire & forget
+                fetch('/api/notifications/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'friend_accept',
+                    senderId: authUser.uid,
+                    senderName: activeUser?.name || activeUser?.username || authUser.displayName || 'Someone',
+                    senderPhoto: activeUser?.photoURL || authUser.photoURL || '',
+                    recipientIds: [targetUserId],
+                  }),
+                }).catch(err => console.error('[Notification] friend_accept push error:', err));
+
             } else if (action === 'declineRequest') {
                 await setDoc(currentUserRef, { friendRequestsReceived: arrayRemove(targetUserId) }, { merge: true });
                 await setDoc(targetUserRef, { friendRequestsSent: arrayRemove(authUser.uid) }, { merge: true });
