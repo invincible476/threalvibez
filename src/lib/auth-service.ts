@@ -281,24 +281,24 @@ export const authService = {
     try {
       logDebug('Starting Google sign-in process');
 
-      const isAndroidCapacitor = typeof window !== 'undefined' && (
-        !!(window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn ||
-        ((window as any).Capacitor && (window as any).Capacitor.getPlatform() === 'android')
-      );
-
       // ── Native Android Google Account Picker Bridge ─────────────────────────
-      if (isAndroidCapacitor) {
-        console.log('[Auth Service] Android Capacitor detected. Using Native Google Auth Bridge...');
-        
-        // Wait up to 2 seconds if AndroidNativeAuth is not yet injected into window
-        if (!(window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
-          for (let i = 0; i < 20; i++) {
-            if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) break;
+      if (typeof window !== 'undefined') {
+        let nativeAuthInterface = (window as any).AndroidNativeAuth;
+
+        // Wait up to 3 seconds for AndroidNativeAuth if running inside Capacitor Android WebView
+        if (!nativeAuthInterface?.triggerNativeGoogleSignIn && (window as any).Capacitor?.getPlatform() === 'android') {
+          console.log('[Auth Service] Capacitor Android detected. Waiting for AndroidNativeAuth bridge...');
+          for (let i = 0; i < 30; i++) {
+            if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
+              nativeAuthInterface = (window as any).AndroidNativeAuth;
+              break;
+            }
             await new Promise((r) => setTimeout(r, 100));
           }
         }
 
-        if ((window as any).AndroidNativeAuth?.triggerNativeGoogleSignIn) {
+        if (nativeAuthInterface?.triggerNativeGoogleSignIn) {
+          console.log('[Auth Service] Triggering Native Android Google Account Picker...');
           let nativeAuthErr: string | null = null;
           const nativeAuthResult = await new Promise((resolve) => {
             let timeoutId: any = null;
@@ -333,7 +333,7 @@ export const authService = {
             }, 60000);
 
             try {
-              (window as any).AndroidNativeAuth.triggerNativeGoogleSignIn();
+              nativeAuthInterface.triggerNativeGoogleSignIn();
             } catch (e: any) {
               if (timeoutId) clearTimeout(timeoutId);
               nativeAuthErr = e?.message || 'Failed to trigger native Google sign-in';
@@ -352,16 +352,14 @@ export const authService = {
             nativeAuthErr = 'Google Sign-In DEVELOPER_ERROR (ApiException 10): The APK SHA-1 fingerprint must be registered in Firebase Console under Project Settings -> Android App.';
           }
 
-          throw new AuthError(
-            nativeAuthErr || 'Google sign-in was cancelled or failed on this Android device.',
-            'auth/google-sign-in-failed'
-          );
+          if (nativeAuthErr) {
+            throw new AuthError(
+              nativeAuthErr,
+              'auth/google-sign-in-failed'
+            );
+          }
         } else {
-          console.warn('[Auth Service] AndroidNativeAuth bridge is missing on Android device.');
-          throw new AuthError(
-            'Native Google Sign-In bridge is unavailable on this device.',
-            'auth/bridge-unavailable'
-          );
+          console.log('[Auth Service] Native Google Auth bridge not present, proceeding with Web Auth...');
         }
       }
 
